@@ -1,6 +1,6 @@
 [workspace]
 resolver="3"
-members = ["crates/subrusta-bin", "crates/subrusta-map","crates/subrusta-math", "crates/subrusta-net", "crates/subrusta-physics", "crates/subrusta-protocol", "crates/subrusta-sim"]
+members = ["crates/ferrosa-bin", "crates/ferrosa-map","crates/ferrosa-math", "crates/ferrosa-net", "crates/ferrosa-physics", "crates/ferrosa-protocol", "crates/ferrosa-sim"]
 
 [workspace.package]
 version = "0.1.0"
@@ -23,9 +23,9 @@ glam = "0.34.1"
 binrw = "0.15.0"
 rand = "0.10"
 
-subrusta-map = { path = "crates/subrusta-map", default-features = false }
-subrusta-sim = { path = "crates/subrusta-sim", default-features = false }
-subrusta-math = { path = "crates/subrusta-math", default-features = false }
-subrusta-net = { path = "crates/subrusta-net", default-features = false }
-subrusta-protocol = { path = "crates/subrusta-protocol", default-features = false }
-subrusta-physics = { path = "crates/subrusta-physics", default-features = false }
+ferrosa-map = { path = "crates/ferrosa-map", default-features = false }
+ferrosa-sim = { path = "crates/ferrosa-sim", default-features = false }
+ferrosa-math = { path = "crates/ferrosa-math", default-features = false }
+ferrosa-net = { path = "crates/ferrosa-net", default-features = false }
+ferrosa-protocol = { path = "crates/ferrosa-protocol", default-features = false }
+ferrosa-physics = { path = "crates/ferrosa-physics", default-features = false }

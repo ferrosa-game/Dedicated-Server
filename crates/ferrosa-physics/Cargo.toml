@@ -1,0 +1,12 @@
+[package]
+name = "ferrosa-physics"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+glam.workspace = true
+rayon.workspace = true
+
+[lints]
+workspace = true

@@ -1,4 +1,4 @@
-# SubRusta
+# Ferrosa Dedicated Server
 
 A Sub Rosa dedicated server written in Rust: a port of the original Sub Rosa dedicated server.
 
@@ -22,7 +22,7 @@ Driving, racing, co-op and versus exist in the client but are not ported. Becaus
 You of course need the rust toolchain installed, along with a fresh copy of Sub Rosa. Since we will NOT be shipping the data folder as this is copyrighted.
 
 1. Build: `cargo build --release`
-2. Copy your Sub Rosa `data/` folder into the folder you intend to run SubRusta
+2. Copy your Sub Rosa `data/` folder into the folder you intend to run the dedicated server in
 3. Run it from that folder: `cargo run --release`
 
 The server listens on UDP port 27584 by default and registers with the master server so it shows in the server list.
@@ -75,13 +75,13 @@ In sandbox mode, or as an admin, there are test commands as well:
 
 | Crate | Contents |
 | --- | --- |
-| `subrusta-bin` | The executable: config, networking setup and the master server registration. |
-| `subrusta-sim` | The game: the simulation, game modes, players, humans, vehicles, traffic, items and computers. |
-| `subrusta-physics` | Rigid bodies, bonds and the collision solver. |
-| `subrusta-map` | Parsers for the game's files (maps, vehicle bodies, item sets, accounts). |
-| `subrusta-protocol` | The client/server packet formats. |
-| `subrusta-net` | The UDP connection layer and the master server. |
-| `subrusta-math` | Shared math types. |
+| `ferrosa-bin` | The executable: config, networking setup and the master server registration. |
+| `ferrosa-sim` | The game: the simulation, game modes, players, humans, vehicles, traffic, items and computers. |
+| `ferrosa-physics` | Rigid bodies, bonds and the collision solver. |
+| `ferrosa-map` | Parsers for the game's files (maps, vehicle bodies, item sets, accounts). |
+| `ferrosa-protocol` | The client/server packet formats. |
+| `ferrosa-net` | The UDP connection layer and the master server. |
+| `ferrosa-math` | Shared math types. |
 
 ## The future
 

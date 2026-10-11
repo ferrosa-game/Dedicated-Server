@@ -1,0 +1,14 @@
+[package]
+name = "ferrosa-protocol"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+bitflags = "2.13.2"
+
+ferrosa-math.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

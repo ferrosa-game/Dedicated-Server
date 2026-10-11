@@ -1,0 +1,15 @@
+[package]
+name = "ferrosa-net"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+ferrosa-protocol.workspace = true
+ferrosa-sim.workspace = true
+
+reqwest = "0.13.5"
+tokio.workspace = true
+
+[lints]
+workspace = true
