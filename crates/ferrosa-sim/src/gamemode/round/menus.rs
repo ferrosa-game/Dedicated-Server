@@ -6,13 +6,13 @@ use ferrosa_protocol::{
 use super::Sim;
 use crate::{PlayerId, items::state::ItemState};
 
-/// The vehicle stock the corporations buy from in round mode (corp_stock_data + 0x1c4, 0x10 each).
+/// The vehicle stock the corporations buy from in round mode.
 pub const VEHICLE_STOCK: usize = 8;
 const VEHICLE_COLORS: i32 = 6;
 const COLOR_NAMES: [&str; 6] = ["Black", "Red", "Blue", "Silver", "White", "Gold"];
 /// A sold-out vehicle slot's button.
 const SOLD: i32 = 8;
-/// Button bytes 0x80 to 0x85 switch to menus 14 to 19.
+/// Button bytes 128 to 133 switch to menus 14 to 19.
 const TAB: u32 = 0x80;
 const FIRE: i32 = 6;
 /// A player can buy 10 items a round day.

@@ -20,8 +20,7 @@ pub(crate) const PHONE_NUMBER_STEP: i32 = 1111;
 /// A member can work the garage door from up to 4 outside the base.
 const DOOR_REACH: f32 = 4.0;
 
-/// A corporation's people and account (game_mode_state.corporations +0x324 manager, +0x5d80 applicants; world state
-/// 0x10591640 + team * 0x14 money and credit).
+/// A corporation's people and account: its manager and applicants, and its money and credit.
 #[derive(Clone, Debug, Default)]
 pub struct CorpState {
     pub manager: Option<PlayerId>,
@@ -29,27 +28,27 @@ pub struct CorpState {
     pub money: i32,
     /// How far the account can go below zero: the manager's corporate rating when they took over (world mode).
     pub credit: i32,
-    /// The garage door (+0x320).
+    /// The garage door.
     pub door_open: bool,
-    /// Whether the door cells are open: they follow the door events (server_main handling event 0xa), which round mode
+    /// Whether the door cells are open: they follow the door events (server_main handling event 10), which round mode
     /// also sends without changing the flag.
     pub door_cells_open: bool,
-    /// The corporation's round funds (+0x50).
+    /// The corporation's round funds.
     pub funds: i32,
-    /// What setting up this round's missions took from the corporation (+0x4c, negative).
+    /// What setting up this round's missions took from the corporation (negative).
     pub spent: i32,
     pub missions: [super::missions::Mission; super::missions::MISSION_SLOTS],
-    /// Active players on the team (+0x54), counted every tick.
+    /// Active players on the team, counted every tick.
     pub player_count: i32,
-    /// Which of the base's car spaces hold a vehicle (+0x460 in each 0x34 byte space).
+    /// Which of the base's car spaces hold a vehicle.
     pub car_space_taken: Vec<bool>,
-    /// The accounts the round manager fired (+0xccc count, up to 128).
+    /// The accounts the round manager fired (up to 128).
     pub fired: Vec<u32>,
-    /// The intel the corporation can ask for (money record +0xc: 1 to 8 can request, 0 requested, 11 faxed, others
-    /// none) and how many screens it has printed (+0x10, 4 at most).
+    /// The intel the corporation can ask for (1 to 8 can request, 0 requested, 11 faxed, others
+    /// none) and how many screens it has printed (4 at most).
     pub intel: i32,
     pub prints: i32,
-    /// The volumes of the base's computers (+0x320 count, from game_mode_state + 0x320 + k * 0x5bc4).
+    /// The volumes of the base's computers.
     pub computers: Vec<i32>,
 }
 

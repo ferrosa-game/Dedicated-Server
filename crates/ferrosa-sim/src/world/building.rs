@@ -60,7 +60,7 @@ pub fn building_type(name: &str, roundcity: bool) -> i32 {
     }
 }
 
-/// The kinds of building record (buildings +0x00): a corporation's base, a car dealership, a lab, a clothing store, a
+/// The kinds of building record: a corporation's base, a car dealership, a lab, a clothing store, a
 /// bank, a gun store and a burger shop.
 pub const CORPORATION_BASE: i32 = 1;
 pub const CAR_DEALER: i32 = 3;
@@ -74,7 +74,7 @@ pub const BURGER_SHOP: i32 = 9;
 const CLOTHING_STOCK: [(i32, i32); 5] = [(0, 1000), (1, 5000), (2, 10000), (3, 10000), (4, 100000)];
 const BURGER_PRICE: i32 = 20;
 
-/// A shop's stock entry (building +0xc9f8, 0xc each): an item or vehicle type, its price and a third value (a
+/// A shop's stock entry: an item or vehicle type, its price and a third value (a
 /// dealership car's colour).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ShopEntry {
@@ -83,35 +83,35 @@ pub struct ShopEntry {
     pub extra: i32,
 }
 
-/// A building the game keeps a record of (buildings, 0xdb0c each, created in placement order): its kind, the box inside
-/// it (+0x40, +0x4c) and what it sells (+0xc9f4 count).
+/// A building the game keeps a record of (created in placement order): its kind, the box inside
+/// it and what it sells.
 #[derive(Clone, Debug, Default)]
 pub struct BuildingRecord {
     pub kind: i32,
     pub interior_min: Vec3,
     pub interior_max: Vec3,
     pub shop: Vec<ShopEntry>,
-    /// Where the building's local frame sits in the world (+0x10, +0x1c): its origin and turned axes.
+    /// Where the building's local frame sits in the world: its origin and turned axes.
     pub pos: Vec3,
     pub rot: RotMatrix,
-    /// The places a lab guard can be posted (+0x1f0, 0x314 each from +0x1f4): the building file's bots placed
+    /// The places a lab guard can be posted: the building file's bots placed
     /// in the world.
     pub patrol: Vec<PatrolSpot>,
-    /// Where a dealership puts the cars it sells (+0xcabc: 24 along, 80 across and 2 up from its origin), and which
-    /// of the 8 spaces back from there is next (+0xcab8).
+    /// Where a dealership puts the cars it sells (24 along, 80 across and 2 up from its origin), and which
+    /// of the 8 spaces back from there is next.
     pub car_spawn: Vec3,
     pub car_counter: i32,
-    /// Its lobby (+0xc6f4: 32 along, 18 across and 2 up from its origin; a lab's 50 along and 26 across), where a
+    /// Its lobby (32 along, 18 across and 2 up from its origin; a lab's 50 along and 26 across), where a
     /// lab's intel disk is left.
     pub lobby: Vec3,
-    /// The computers the building's item sets place (+0xcac8 count, 16 bytes each from +0xcacc): their cell and the
+    /// The computers the building's item sets place: their cell and the
     /// volume init_mission_spots gives them.
     pub computers: Vec<(IVec3, i32)>,
-    /// The corporation a base belongs to (+0x1e8).
+    /// The corporation a base belongs to.
     pub team: i32,
-    /// A lab's mission spot (+0x1ec).
+    /// A lab's mission spot.
     pub spot: i32,
-    /// The two streets of the intersection nearest the point 32 along the building's facing (+0x1d8, +0x1dc).
+    /// The two streets of the intersection nearest the point 32 along the building's facing.
     pub streets: (i32, i32),
 }
 
@@ -169,7 +169,7 @@ const VERSUS_SPAWN_LIFT: f32 = 12.0;
 const VERSUS_SPAWN_LIFT2: f32 = 1.5;
 const VERSUS: u32 = 7;
 
-/// A corporation's base (game_mode_state.corporations, 0x5bc4 each): the box inside it (one floor high), its vault,
+/// A corporation's base: the box inside it (one floor high), its vault,
 /// the table, where players spawn and the spaces its cars appear in.
 #[derive(Clone, Debug)]
 pub struct CorporationBase {
@@ -177,12 +177,12 @@ pub struct CorporationBase {
     pub interior_max: Vec3,
     pub vault_min: Vec3,
     pub vault_max: Vec3,
-    /// The way the table faces (+0x30): a half turn plus a quarter turn per turn of the base building.
+    /// The way the table faces: a half turn plus a quarter turn per turn of the base building.
     pub table_orientation: f32,
     pub table: Vec3,
     pub spawn: Vec3,
     pub car_spaces: Vec<(Vec3, RotMatrix)>,
-    /// The two cells of the garage door (the last one placed) and the way it faces (+0x43c).
+    /// The two cells of the garage door (the last one placed) and the way it faces.
     pub door: Option<([IVec3; 2], u32)>,
 }
 

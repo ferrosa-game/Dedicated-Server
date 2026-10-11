@@ -10,7 +10,7 @@ use crate::world::item_sets::{SetHit, entry_pose};
 /// How near its place in the set an item must be when deleted to go back into the set.
 const RETURN_REACH: f32 = 0.125;
 
-/// The item-set cell an item was taken from (item +0x318 on): the cell, its word and the item's index in the set.
+/// The item-set cell an item was taken from: the cell, its word and the item's index in the set.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SetOrigin {
     pub cell: IVec3,

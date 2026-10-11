@@ -32,7 +32,7 @@ const ROTOR_COEFS: [f32; 3] = [4.0, 0.125, 4.0];
 /// The control flags a vehicle starts with: the handbrake on.
 pub const HANDBRAKE: i32 = 4;
 
-/// A wheel of a vehicle (vehicle +0x3944, 0xac each), copied from its type's wheel and given its own body.
+/// A wheel of a vehicle, copied from its type's wheel and given its own body.
 #[derive(Clone, Debug, Default)]
 pub struct Wheel {
     pub body: usize,
@@ -43,32 +43,32 @@ pub struct Wheel {
     pub local_pos: Vec3,
     pub mass: f32,
     pub radius: f32,
-    /// The wheel body's spin about its axle (+0x40) and the angle it has turned through (+0x44).
+    /// The wheel body's spin about its axle and the angle it has turned through.
     pub spin: f32,
     pub angle: f32,
-    /// How far the wheel is steered about the chassis' up axis (+0x48).
+    /// How far the wheel is steered about the chassis' up axis.
     pub steer: f32,
-    /// The wheel body's position (+0x4c) and velocity (+0x64) after the last vehicle step, and the velocity before
-    /// that (+0x58).
+    /// The wheel body's position and velocity after the last vehicle step, and the velocity before
+    /// that.
     pub world_pos: Vec3,
     pub prev_vel: Vec3,
     pub vel: Vec3,
-    /// How far the wheel has travelled along the chassis' up axis (-1 to 1) for the clients (+0x70).
+    /// How far the wheel has travelled along the chassis' up axis (-1 to 1) for the clients.
     pub visual_height: f32,
     pub vertical_offset: f32,
-    /// The suspension: how hard the wheel is pulled to its mount (+0x78), how much of the relative velocity is
-    /// damped (+0x7c) and the extra damping along the chassis' up axis (+0x80).
+    /// The suspension: how hard the wheel is pulled to its mount, how much of the relative velocity is
+    /// damped and the extra damping along the chassis' up axis.
     pub spring: f32,
     pub damping: f32,
     pub travel_damping: f32,
     pub skid: f32,
 }
 
-/// A vehicle in the world (vehicles, 0x5168 each).
+/// A vehicle in the world.
 #[derive(Clone, Debug)]
 pub struct Vehicle {
     pub kind: ferrosa_protocol::clientbound::game::VehicleKind,
-    /// The type's +0x08 flag (controllableState); a vehicle in state 3 is not sent to clients.
+    /// The type's flag (controllableState); a vehicle in state 3 is not sent to clients.
     pub controllable_state: i32,
     pub health: i32,
     pub last_driver: i32,
@@ -76,7 +76,7 @@ pub struct Vehicle {
     pub despawn_time: u16,
     pub spawned_state: u16,
     pub locked: bool,
-    /// The player who owns the vehicle (+0x24, -1 for none): hurting someone in your own vehicle earns no
+    /// The player who owns the vehicle (-1 for none): hurting someone in your own vehicle earns no
     /// criminal rating.
     pub owner: i32,
     pub body: usize,
@@ -84,79 +84,79 @@ pub struct Vehicle {
     pub prev_pos: Vec3,
     pub rot: RotMatrix,
     pub prev_rot: RotMatrix,
-    /// The chassis body's velocity (+0x8c), the one before (+0x98) and its angular velocity (+0xa4).
+    /// The chassis body's velocity, the one before and its angular velocity.
     pub vel: Vec3,
     pub prev_vel: Vec3,
     pub ang_vel: Vec3,
-    /// The render shape's bounds (+0xb0, +0xbc) and the level blocks they cover (+0xc8, +0xd4).
+    /// The render shape's bounds and the level blocks they cover.
     pub bounds_min: Vec3,
     pub bounds_max: Vec3,
     pub block_min: [i32; 3],
     pub block_max: [i32; 3],
-    /// The driver's controls (+0x3600..+0x360c): the gear stick, steering and gas.
+    /// The driver's controls: the gear stick, steering and gas.
     pub gear_x: f32,
     pub steer_control: f32,
     pub gear_y: f32,
     pub gas_control: f32,
-    /// The driver's control flags (+0x3620): 2 holds the clutch, 4 the handbrake; -1 is a car nobody controls.
+    /// The driver's control flags: 2 holds the clutch, 4 the handbrake; -1 is a car nobody controls.
     pub controls: i32,
-    /// The human in each seat (+0x3628).
+    /// The human in each seat.
     pub occupants: [i32; MAX_SEATS],
     pub traffic_car: i32,
     /// Set when a player takes the driver's seat of a traffic car with free hands, for the traffic to hand it over
     /// (is_bot 2) on its next tick.
     pub traffic_taken: bool,
-    /// The engine (+0x3898..+0x38b8): its speed, throttle and power, the gearbox speed and inertia, the engine's
+    /// The engine: its speed, throttle and power, the gearbox speed and inertia, the engine's
     /// inertia and losses.
     pub engine_speed: f32,
     pub throttle: f32,
     pub engine_power: f32,
     pub gearbox_speed: f32,
     pub gearbox_inertia: f32,
-    /// How strongly the driven wheels pull back on the gearbox (+0x38ac, 64 every step).
+    /// How strongly the driven wheels pull back on the gearbox (64 every step).
     pub wheel_feedback: f32,
     pub engine_inertia: f32,
-    /// How strongly the clutch's drag slows the engine (+0x38b4, 199.99998) and what the engine's drive is divided by
-    /// with its inertia (+0x38b8, 0.005).
+    /// How strongly the clutch's drag slows the engine (199.99998) and what the engine's drive is divided by
+    /// with its inertia (0.005).
     pub clutch_drag: f32,
     pub drive_divisor: f32,
     /// The gear (-1 reverse, 0 neutral, 1 to 4), the gear last step, its ratio and inverse, the clutch (1 engaged)
-    /// and the brake (+0x38bc..+0x38d4).
+    /// and the brake.
     pub gear: i32,
     pub prev_gear: i32,
     pub gear_ratio: f32,
     pub inv_gear_ratio: f32,
     pub clutch: f32,
     pub brake: f32,
-    /// The driven wheels (+0x38e0 count, +0x38e4).
+    /// The driven wheels.
     pub driven: Vec<usize>,
     pub engine_rpm: i32,
-    /// Automatic gear changes (+0x3934) and the ticks until the next one (+0x3938).
+    /// Automatic gear changes and the ticks until the next one.
     pub auto_shift: i32,
     pub shift_delay: i32,
-    /// The steering angle the clients draw (+0x393c).
+    /// The steering angle the clients draw.
     pub steer: f32,
     pub wheels: Vec<Wheel>,
     /// Which of the type's windows are broken (windowStates).
     pub broken_windows: Vec<bool>,
-    /// How hard the last crashes were, played back as crash sounds (+0x5140).
+    /// How hard the last crashes were, played back as crash sounds.
     pub crash: f32,
     pub track: f32,
     pub wheelbase: f32,
     pub seats: Vec<Vec3>,
-    /// A train's two bogies (+0x4fbc, 12 apart): each one's body and the angular bond turning it with the train.
+    /// A train's two bogies (12 apart): each one's body and the angular bond turning it with the train.
     pub bogies: Vec<(usize, usize)>,
-    /// The track piece a train's bogies last touched (+0x4fb0) and which train spawn it came from (+0x4fb8).
+    /// The track piece a train's bogies last touched and which train spawn it came from.
     pub train_segment: i32,
     pub train_index: i32,
-    /// Ticks a train has stood at its station (+0x4fac) and its running direction (+0x4fb4, 1 reversed).
+    /// Ticks a train has stood at its station and its running direction (1 reversed).
     pub train_wait: i32,
     pub train_reverse: i32,
     pub rotor: Option<Rotor>,
 }
 
 /// A helicopter's rotor (bladeBodyID): its body, the bonds holding it to the chassis and
-/// the angles the main and tail rotors have turned through (kept in the first two wheels' angles, +0x3988, +0x3a34).
+/// the angles the main and tail rotors have turned through (kept in the first two wheels' angles).
 #[derive(Clone, Debug)]
 pub struct Rotor {
     pub body: usize,

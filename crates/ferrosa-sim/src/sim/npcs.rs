@@ -21,7 +21,7 @@ const ZOMBIE: i32 = 1;
 const NPC_TEAM: Team = Team::Mission;
 const GUARD_MAGAZINES: i32 = 3;
 
-/// NpcData (0x328 each): a guard or zombie waiting at its post, brought in as a bot near players.
+/// NpcData: a guard or zombie waiting at its post, brought in as a bot near players.
 #[derive(Clone, Debug)]
 pub struct Npc {
     pub kind: i32,

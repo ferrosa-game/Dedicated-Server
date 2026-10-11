@@ -7,7 +7,7 @@ use crate::items::state::ItemState;
 use crate::sim::memos;
 use crate::world::building::{CORPORATION_BASE, LAB};
 
-/// A lab's computers, where document missions are put (0x44da7000, 0x40c each): the building, how many missions it
+/// A lab's computers, where document missions are put: the building, how many missions it
 /// has been given and its computers' volumes.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MissionSpot {
@@ -16,7 +16,7 @@ pub struct MissionSpot {
     pub volumes: Vec<i32>,
 }
 
-/// The mission codenames (0x72cac0) run on into the project names (0x72cb00, 32 of them).
+/// The mission codenames run on into the project names (32 of them).
 pub const NAMES: [&str; 40] = [
     "ATOMIC", "BRAZIL", "CROWN", "DENVER", "EAGLE", "FALCON", "GUILD", "HOUND", "ACTOR", "GOLD", "RIVER", "PIANO", "PILLOW", "ANIMAL", "HORSE", "HONEY",
     "BRANCH", "LAMP", "LION", "TENT", "LONDON", "NIGHT", "FISH", "FLOWER", "TRUCK", "GLASS", "GHOST", "KNIFE", "SPOON", "TRAFFIC", "VASE", "SUGAR", "KITCHEN",
@@ -40,7 +40,7 @@ const MAX_MEMBERS: i32 = 10;
 /// The INTEL file of mission k is content k + 200.
 pub const INTEL_CONTENT: i32 = 200;
 
-/// A corporation's view of a world mission (0x86c each from mission +0x14): what it is worth to it, how often it has
+/// A corporation's view of a world mission: what it is worth to it, how often it has
 /// asked for intel, its status lines and status word.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct WorldMissionTeam {
@@ -48,24 +48,24 @@ pub struct WorldMissionTeam {
     pub status: i32,
     pub lines: Vec<String>,
     pub word: String,
-    /// Whether the corporation has uploaded a file for it (mission +0x10 + team * 0x86c).
+    /// Whether the corporation has uploaded a file for it.
     pub uploaded: bool,
 }
 
-/// A world mission (world_missions, 0x21d74 each): a project whose document sits on a lab computer.
+/// A world mission: a project whose document sits on a lab computer.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct WorldMission {
     pub active: bool,
-    /// 0 untouched, 1 being traded, 2 done (+0x8).
+    /// 0 untouched, 1 being traded, 2 done.
     pub state: i32,
     pub reward: i32,
     pub teams: [WorldMissionTeam; 6],
-    /// The content of its .DOC file (+0x1e874).
+    /// The content of its .DOC file.
     pub document: i32,
-    /// Its INTEL file's content (+0x21b60) and name (+0x21b64).
+    /// Its INTEL file's content and name.
     pub intel: i32,
     pub filename: String,
-    /// The document's name, the lab's streets and the project name (+0x21c70 on).
+    /// The document's name, the lab's streets and the project name.
     pub names: [String; 4],
     pub high_value: bool,
 }
@@ -398,7 +398,7 @@ impl Sim {
     }
 }
 
-/// A corporation's intel once its memo is faxed (corporation +0xc).
+/// A corporation's intel once its memo is faxed.
 const INTEL_FAXED: i32 = 11;
 /// Corporations give up looking for a mission worth something to one of them after 100 tries.
 const MEMO_TRIES: i32 = 100;

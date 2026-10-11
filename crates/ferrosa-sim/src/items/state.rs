@@ -12,42 +12,42 @@ use crate::{
 pub enum ItemState {
     /// Nothing beyond the common item fields.
     Plain,
-    /// Something that is used up (item +0x144, starting at the type's magazine_ammo): a magazine's or the Auto5's
+    /// Something that is used up (starting at the type's magazine_ammo): a magazine's or the Auto5's
     /// rounds, the soccer ball's charge.
     Stock { left: i32 },
-    /// A gun: rounds ready to fire (+0x144, the Auto5's own 300 shells, otherwise the round chambered from the
-    /// magazine), ticks until it can fire again (+0x13c) and how long the trigger has been held (+0x14c).
+    /// A gun: rounds ready to fire (the Auto5's own 300 shells, otherwise the round chambered from the
+    /// magazine), ticks until it can fire again and how long the trigger has been held.
     Gun { rounds: i32, cooldown: i32, trigger_ticks: i32 },
-    /// Uses left (+0x144) and how far the current patching has got (+0x13c, done past 255).
+    /// Uses left and how far the current patching has got (done past 255).
     Bandage { usage_left: i32, progress: i32 },
-    /// Bites left (+0x144).
+    /// Bites left.
     Burger { bites_left: i32 },
-    /// The pin (+0x144, 1 while in), the fuse (+0x13c: 240 while held unpinned, counting down once thrown) and the
-    /// player who pulled the pin (+0x20).
+    /// The pin (1 while in), the fuse (240 while held unpinned, counting down once thrown) and the
+    /// player who pulled the pin.
     Grenade { pin: i32, fuse: i32, primer: Option<PlayerId> },
     /// Phones and pay phones.
     Phone(Phone),
-    /// A walkie-talkie: its channel (+0x368, low 7 bits) and whether the use key is held to talk (+0x36c).
+    /// A walkie-talkie: its channel (low 7 bits) and whether the use key is held to talk.
     Radio { channel: i32, transmitting: bool },
-    /// An arcade machine's screen: the frame counter (+0x368) and top line (+0x36c).
+    /// An arcade machine's screen: the frame counter and top line.
     Arcade { frame: i32, top_line: i32 },
-    /// A car key and its vehicle (+0x280).
+    /// A car key and its vehicle.
     Key { vehicle: Option<usize> },
     /// A stack of world cash.
     Cash(Cash),
     /// A computer's screen, shell and programs.
     Computer(Box<crate::computer::Computer>),
-    /// A memo's text (item +0x368).
+    /// A memo's text.
     Memo(Box<[u8; memos::MEMO_LEN]>),
-    /// A door on its hinges: its axis (+0x2e8) and the two points it hangs from (+0x300, +0x30c).
+    /// A door on its hinges: its axis and the two points it hangs from.
     Door { axis: glam::Vec3, hinges: [glam::Vec3; 2] },
 }
 
-/// What each bill code is worth (raw 0x2e9e80).
+/// What each bill code is worth.
 pub const BILL_VALUES: [i32; 8] = [1, 5, 10, 20, 50, 100, 1000, 0];
 
-/// A stack of up to ten bills: one less than the count (+0x2a4), which bill is picked out (+0x2a0) and each bill's
-/// code, three bits apiece from the bottom (+0x2a8).
+/// A stack of up to ten bills: one less than the count, which bill is picked out and each bill's
+/// code, three bits apiece from the bottom.
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Cash {
     pub spread: i32,
@@ -151,7 +151,7 @@ impl ItemState {
         }
     }
 
-    /// Item +0x144: what is left of a used-up item, 0 for the rest.
+    /// What is left of a used-up item, 0 for the rest.
     pub(crate) fn left(&self) -> i32 {
         match self {
             Self::Stock { left } | Self::Bandage { usage_left: left, .. } | Self::Burger { bites_left: left } => *left,
@@ -161,7 +161,7 @@ impl ItemState {
         }
     }
 
-    /// Sets item +0x144 (what is left), for the states that keep it.
+    /// Sets what is left, for the states that keep it.
     pub(crate) fn set_left(&mut self, v: i32) {
         match self {
             Self::Stock { left } | Self::Bandage { usage_left: left, .. } | Self::Burger { bites_left: left } => *left = v,

@@ -31,7 +31,7 @@ use crate::{
 
 pub const MAX_ITEMS: usize = 1024;
 
-/// A disk in a computer sits in the drive: 0.15625 down and 0.09375 back from the computer (computer type +0x760, +0x764).
+/// A disk in a computer sits in the drive: 0.15625 down and 0.09375 back from the computer.
 /// A door hangs from two hinges 0.4375 across and 0.5 up and down from its middle.
 const DOOR_HINGE_ACROSS: f32 = -0.4375;
 const DOOR_HINGE_UP: f32 = 0.5;
@@ -58,15 +58,15 @@ const SPAWN_DISTANCE: f32 = 1.5;
 pub struct Item {
     pub item_type: ItemKind,
     pub body: usize,
-    /// Hit points (+0x138, 100 at creation); an item at none is destroyed, a watermelon shot bursting.
+    /// Hit points (100 at creation); an item at none is destroyed, a watermelon shot bursting.
     pub health: i32,
     pub pos2: Vec3,
-    /// The body's velocity at the last sync (+0x80), what a burst sends.
+    /// The body's velocity at the last sync, what a burst sends.
     pub vel: Vec3,
     pub physics_sim: bool,
     pub physics_settled: bool,
     pub settled_timer: i32,
-    /// Whether the item is out of sight (item +0x30): in a closed briefcase, on an item in a pocket, or in a pocket
+    /// Whether the item is out of sight: in a closed briefcase, on an item in a pocket, or in a pocket
     /// itself unless it is a phone or walkie-talkie. Clients are not sent pocketed items.
     pub in_pocket: bool,
     pub despawn_time: i32,
@@ -79,22 +79,22 @@ pub struct Item {
     pub parent_slot: i32,
     /// Where a pocketed item was last snapped to (active_item_pos_rot_snap); its body takes this place next tick.
     pub pocket_pose: Option<(Vec3, RotMatrix)>,
-    /// Items mounted on this one (+0x34 count, +0x38 ids), e.g. a gun's magazine; up to eight.
+    /// Items mounted on this one, e.g. a gun's magazine; up to eight.
     pub children: Vec<usize>,
-    /// The id in the first child slot (+0x38), which stays when the last child comes off (0 for a new item).
+    /// The id in the first child slot, which stays when the last child comes off (0 for a new item).
     pub first_child: usize,
     /// Where a mounted item was last placed on its parent by logic_item; its body takes this place next tick.
     pub mount_pose: Option<(Vec3, RotMatrix)>,
     /// What only items of this type have.
     pub state: ItemState,
-    /// Keys pressed on the item this tick by the hand holding it (+0x150: 1 use, 2 secondary), and last tick (+0x154).
+    /// Keys pressed on the item this tick by the hand holding it (1 use, 2 secondary), and last tick.
     pub input_flags: u32,
     pub last_input_flags: u32,
     /// The item-set cell the item was taken out of, if any.
     pub set_origin: Option<sets::SetOrigin>,
-    /// The file system volume of a disk or computer (+0x334), 0 until one is given.
+    /// The file system volume of a disk or computer, 0 until one is given.
     pub volume: i32,
-    /// The line links the item's text is sent through (+0x178), and which of them are in use (+0x170).
+    /// The line links the item's text is sent through, and which of them are in use.
     pub links: [i32; crate::computer::links::ITEM_SLOTS],
     pub link_mask: u64,
     /// num_item_events: bumped when what the item shows changes (a computer's line committed); a client that has not

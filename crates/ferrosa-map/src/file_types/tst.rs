@@ -34,7 +34,6 @@ pub struct TstFace {
     pub count: u32,
     #[br(count = count)]
     pub corners: Vec<TstCorner>,
-    /// Read and never used (face +0x34).
     pub unused: i32,
 }
 

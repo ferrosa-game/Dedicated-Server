@@ -29,9 +29,8 @@ pub struct SrkPlayerData {
     pub money: u32,
     pub corp_rating: u32,
     pub crim_rating: u32,
-    /// Play time: 5 is added at every world mode save (account record +0x4c); stats.txt counts it in tens.
+    /// Play time: 5 is added at every world mode save; stats.txt counts it in tens.
     pub play_time: u32,
-    /// The look the account was last seen with (account record +0x54, +0x58, +0x5c).
     pub eye_color: u32,
     pub hair_color: u32,
     pub skin_color: u32,

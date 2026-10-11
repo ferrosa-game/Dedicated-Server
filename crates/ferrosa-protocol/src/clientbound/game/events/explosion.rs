@@ -2,7 +2,7 @@ use ferrosa_math::vector::Vector;
 
 use crate::codec::WireWrite;
 
-/// Event 0x14: an explosion (size 0 for a grenade).
+/// Event 20: an explosion (size 0 for a grenade).
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventExplosion {
     pub size: i32,

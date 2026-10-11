@@ -469,7 +469,7 @@ pub struct OwnHumanData {
     pub inventory: [Vec<i32>; 7],
 }
 
-/// A menu button (player +0x1b18, 0x48 each): what pressing it sends back, its label and a value shown with it.
+/// A menu button: what pressing it sends back, its label and a value shown with it.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MenuButton {
     pub id: i32,
@@ -498,13 +498,13 @@ pub struct ServerGamePacket {
     pub spawn_timer: i32,
     pub vitality: i32,
     pub money: i32,
-    /// The money and credit of the player's corporation (player +0x50 and +0x54).
+    /// The money and credit of the player's corporation.
     pub corp_money: i32,
     pub corp_credit: i32,
-    /// The player's corporate and criminal ratings (player +0x58 and +0x5c).
+    /// The player's corporate and criminal ratings.
     pub corp_rating: i32,
     pub crim_rating: i32,
-    /// Whether the player sees the round manager page (player +0x90).
+    /// Whether the player sees the round manager page.
     pub manager_tab: bool,
     pub menu_buttons: Vec<MenuButton>,
     pub gamestate: GameState,

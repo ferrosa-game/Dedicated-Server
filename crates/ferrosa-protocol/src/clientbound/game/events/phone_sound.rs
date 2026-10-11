@@ -1,6 +1,6 @@
 use crate::{clientbound::game::events::sound::Sound, codec::WireWrite};
 
-/// Event 0x13: a phone plays a sound (ringing, the ringback tone, a key tone).
+/// Event 19: a phone plays a sound (ringing, the ringback tone, a key tone).
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventPhoneSound {
     pub sound: Sound,

@@ -13,7 +13,7 @@ impl Default for ActionQueue {
 }
 
 impl ActionQueue {
-    /// A client game packet: its count (player +0x1b4) becomes the base, and its actions go in from there.
+    /// A client game packet: its count becomes the base, and its actions go in from there.
     pub(crate) fn ingest(&mut self, start: u8, actions: Vec<GameAction>) {
         self.write = start % 64;
         for action in actions {
@@ -39,7 +39,7 @@ impl ActionQueue {
         self.ring[(i % 64) as usize].as_ref()
     }
 
-    /// logic_playerinteractions: every slot from the last handled one (+0x1b8) up to the count.
+    /// logic_playerinteractions: every slot from the last handled one up to the count.
     pub(crate) fn drain(&mut self) -> impl Iterator<Item = GameAction> + '_ {
         std::iter::from_fn(|| {
             while self.applied != self.write {

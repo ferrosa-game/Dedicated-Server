@@ -666,7 +666,7 @@ fn hold_frame(
         rotate_orientation(&mut m, axis, angle);
     }
 
-    // TODO: a door (type 0x1c) is held by its own frame (0x4285c0) turned by the human's yaw
+    // TODO: a door is held by its own frame (item_compute_position_in_human_bone2_frame) turned by the human's yaw
     let r = ty.hold_rot[hand];
     if r[3].abs() > 0.0 {
         let [m0, m1, m2] = m;

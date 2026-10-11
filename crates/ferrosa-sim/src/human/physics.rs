@@ -435,7 +435,7 @@ pub fn human_contacts(h: &Human, bodies: &mut RigidBodies, others: &[OtherHuman]
 
 /// What a human's tick asks of the sim, in the order it happened.
 pub enum HumanOutput {
-    /// A glass pane broke (event 0x10).
+    /// A glass pane broke (event 16).
     Glass(GlassBreak),
     /// The human lost blood: a blood drop (bullet-hit event, hit type 3) at this point.
     Blood(Vec3),

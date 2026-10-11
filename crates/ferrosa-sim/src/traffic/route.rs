@@ -16,7 +16,7 @@ struct SearchNode {
     parent: usize,
 }
 
-/// One step of the route search (0x4081a0): the open node with the lowest cost plus straight distance to the goal is
+/// One step of the route search: the open node with the lowest cost plus straight distance to the goal is
 /// closed and its neighbours opened; reaching the goal fills `path` from the goal back to the start.
 fn search_step(map: &StreetMap, nodes: &mut [SearchNode], from: usize, to: usize, path: &mut Vec<usize>) {
     let goal = map.route_nodes[to].pos;

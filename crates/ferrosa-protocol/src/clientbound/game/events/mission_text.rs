@@ -1,6 +1,6 @@
 use crate::codec::WireWrite;
 
-/// Event 0x16: one 64-byte line of a corporation mission's text (its result line), sent only to the corporation's
+/// Event 22: one 64-byte line of a corporation mission's text (its result line), sent only to the corporation's
 /// team.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventMissionText {

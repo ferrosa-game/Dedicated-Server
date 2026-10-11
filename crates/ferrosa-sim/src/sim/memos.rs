@@ -6,7 +6,7 @@ use crate::computer::links::{ITEM_SLOTS, KIND_MEMO, Link};
 use crate::items::state::ItemState;
 use crate::time::{WORLD_HOUR, WORLD_MINUTE};
 
-/// A memo holds up to 1023 characters (item +0x368), sent in 64 character blocks.
+/// A memo holds up to 1023 characters, sent in 64 character blocks.
 pub const MEMO_LEN: usize = 1024;
 const BLOCK: usize = 64;
 /// The newspaper is made of readme.txt's lines (124 characters each, up to 1021) and the 10 richest accounts.

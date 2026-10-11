@@ -15,21 +15,21 @@ const RADIUS_MARGIN: f32 = 1.125;
 const CAGE_PROBE: f32 = 0.25;
 const SBV_CAGE: [i32; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
 
-/// A point mass of the chassis (+0x44, 0x14 each): its rest position and share of the chassis mass.
+/// A point mass of the chassis: its rest position and share of the chassis mass.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ChassisNode {
     pub pos: Vec3,
     pub mass: f32,
 }
 
-/// A spring between two chassis nodes (+0x858, 0xc each).
+/// A spring between two chassis nodes.
 #[derive(Clone, Copy, Debug)]
 pub struct NodeEdge {
     pub a: i32,
     pub b: i32,
 }
 
-/// A wheel of the type (+0x1787c, 0x50 each), hung between two chassis nodes by the weights `weight_a` and `weight_b`.
+/// A wheel of the type, hung between two chassis nodes by the weights `weight_a` and `weight_b`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct WheelDef {
     pub state: i32,
@@ -38,68 +38,68 @@ pub struct WheelDef {
     pub weight_b: f32,
     pub mass: f32,
     pub radius: f32,
-    /// Between its two nodes, raised by `vertical_offset`, around the chassis centroid (+0x20).
+    /// Between its two nodes, raised by `vertical_offset`, around the chassis centroid.
     pub local_pos: Vec3,
     pub vertical_offset: f32,
-    /// The suspension, copied into each wheel: how hard it is pulled to its mount (+0x30), how much of the
-    /// relative velocity is damped (+0x34) and the extra damping along the chassis' up axis (+0x38).
+    /// The suspension, copied into each wheel: how hard it is pulled to its mount, how much of the
+    /// relative velocity is damped and the extra damping along the chassis' up axis.
     pub spring: f32,
     pub damping: f32,
     pub travel_damping: f32,
-    /// The wheel's drive configuration, the second argument of vehicletype_attach_wheels_sized (+0x40).
+    /// The wheel's drive configuration, the second argument of vehicletype_attach_wheels_sized.
     pub drive: i32,
-    /// Between its two nodes, around the centre of mass (+0x44).
+    /// Between its two nodes, around the centre of mass.
     pub mass_offset: Vec3,
 }
 
-/// A vehicle type (vehicleTypeDefinitions, 0x185c0 each).
+/// A vehicle type.
 #[derive(Clone, Debug, Default)]
 pub struct VehicleType {
-    /// 1 for the types built from a body file (+0x00): their cage is the node list at +0x548 and traces hit their
+    /// 1 for the types built from a body file: their cage is the frame nodes and traces hit their
     /// body slot's meshes rather than the panels.
     pub body_file: i32,
-    /// The state a vehicle of this type spawns in (+0x08, controllableState).
+    /// The state a vehicle of this type spawns in (controllableState).
     pub controllable_state: i32,
     pub name: String,
     pub price: i32,
-    /// The chassis body's mass (+0x38).
+    /// The chassis body's mass.
     pub mass: f32,
-    /// How far the chassis reaches from the cage centre, with a margin (+0x3c).
+    /// How far the chassis reaches from the cage centre, with a margin.
     pub radius: f32,
     pub nodes: Vec<ChassisNode>,
-    /// The chassis nodes that frame the car (+0x544 count, +0x548).
+    /// The chassis nodes that frame the car.
     pub cage: Vec<i32>,
-    /// The cage weights of a point a quarter radius right of (+0x648) and ahead of (+0x748) the cage centre, which the
+    /// The cage weights of a point a quarter radius right of and ahead of the cage centre, which the
     /// simulation uses to find the deformed chassis' axes.
     pub cage_right: Vec<f32>,
     pub cage_forward: Vec<f32>,
     pub centroid: Vec3,
     pub edges: Vec<NodeEdge>,
-    /// The chassis nodes around the cage mean (+0x7864 count, +0x7868).
+    /// The chassis nodes around the cage mean.
     pub centred_nodes: Vec<Vec3>,
-    /// The engine's power as a multiple of 213 (+0x17874).
+    /// The engine's power as a multiple of 213.
     pub engine_power: f32,
     pub wheels: Vec<WheelDef>,
-    /// The distance between the left and right wheels (+0x1827c) and between the front and rear wheels (+0x18280).
+    /// The distance between the left and right wheels and between the front and rear wheels.
     pub track: f32,
     pub wheelbase: f32,
-    /// Where each seat is, around the chassis (+0x18318 count, +0x1831c).
+    /// Where each seat is, around the chassis.
     pub seats: Vec<Vec3>,
     pub center_of_mass: Vec3,
-    /// The node mean around the centre of mass (+0x18534).
+    /// The node mean around the centre of mass.
     pub centroid_offset: Vec3,
     pub inertia: Vec3,
-    /// The body file's render vertices (sbv +0xd020), which the vehicle's bounds cover.
+    /// The body file's render vertices, which the vehicle's bounds cover.
     pub render_verts: Vec<Vec3>,
-    /// The collision mesh over the chassis points (sbv +0x2bb70), which the chassis sweeps against the level.
+    /// The collision mesh over the chassis points, which the chassis sweeps against the level.
     pub mesh: Option<crate::sim::hull::ConvexHull>,
-    /// The body file's faces over the chassis points (sbv +0x7018 count, +0x7020), three or four corners each, which
+    /// The body file's faces over the chassis points, three or four corners each, which
     /// humans collide with.
     pub chassis_faces: Vec<Vec<usize>>,
-    /// The render mesh's faces over `render_verts` (the file's subshapes, sbv +0x10020 count, +0x10028), which
+    /// The render mesh's faces over `render_verts` (the file's subshapes), which
     /// traces hit.
     pub render_faces: Vec<Vec<usize>>,
-    /// The windows' corners (the file's parts, sbv +0x2a024 count, +0x2a02c), traced from either side until broken.
+    /// The windows' corners (the file's parts), traced from either side until broken.
     pub windows: Vec<[Vec3; 4]>,
 }
 

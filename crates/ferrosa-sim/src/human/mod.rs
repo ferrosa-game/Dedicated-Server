@@ -37,7 +37,7 @@ pub struct Bone {
     pub capsule: [Vec3; 2],
     pub joint: Option<usize>,
     pub ground_contact: i32,
-    /// How hard the bone holds its pose (bone +0xc8): the human's strength, nothing for the pelvis and legs of a
+    /// How hard the bone holds its pose: the human's strength, nothing for the pelvis and legs of a
     /// seated human.
     pub strength: f32,
 }
@@ -81,9 +81,9 @@ impl Default for HumanHealth {
 
 pub struct Human {
     pub player: Option<PlayerId>,
-    /// The account of the player this human belongs to (record 0x34), kept after the player leaves.
+    /// The account of the player this human belongs to, kept after the player leaves.
     pub account: Option<u32>,
-    /// The player's share count, copied every tick (record 0x38) so a returning player can buy them back.
+    /// The player's share count, copied every tick so a returning player can buy them back.
     pub stocks: i32,
     pub team: Option<Team>,
     pub customization: CharacterCustomization,
@@ -91,17 +91,17 @@ pub struct Human {
     pub stamina: i32,
     pub max_stamina: i32,
     pub vehicle: Option<usize>,
-    /// The seat taken in `vehicle` (record 0x54).
+    /// The seat taken in `vehicle`.
     pub seat: usize,
-    /// Ticks the human has been getting out of its seat (record 0x74, 0 when not), which slides it outwards.
+    /// Ticks the human has been getting out of its seat (0 when not), which slides it outwards.
     pub seat_exit: i32,
-    /// The gear stick a driver moves (controls 0 and 2, record 0x150 and 0x158).
+    /// The gear stick a driver moves (controls 0 and 2).
     pub gear_x_input: f32,
     pub gear_y_input: f32,
     pub last_vehicle_cooldown: i32,
-    /// Whether the traffic car this human sits in names it as its driver (traffic car +0x04), set before each tick.
+    /// Whether the traffic car this human sits in names it as its driver, set before each tick.
     pub traffic_driver: bool,
-    /// An immortal human (record 0x68) loses no blood, cannot die of its wounds and is not hurt by falls or
+    /// An immortal human loses no blood, cannot die of its wounds and is not hurt by falls or
     /// vehicles; it recovers quickly while knocked down.
     pub is_immortal: bool,
     pub is_on_ground: bool,
@@ -121,11 +121,11 @@ pub struct Human {
     pub lean_forward: f32,
     pub lean_side: f32,
     pub pain: i32,
-    /// The spin a jump starts with, about the head's up and side axes (record 0x190, 0x194, from the player's
+    /// The spin a jump starts with, about the head's up and side axes (from the player's
     /// controls).
     pub jump_spin_yaw: f32,
     pub jump_spin_pitch: f32,
-    /// Where the player looks around without turning (controls 6 and 7, record 0x168 and 0x16c): the waist and
+    /// Where the player looks around without turning (controls 6 and 7): the waist and
     /// chest turn part of the way, and a pointing arm follows them.
     pub free_look_yaw: f32,
     pub free_look_pitch: f32,
@@ -146,15 +146,15 @@ pub struct Human {
     pub strength: f32,
     pub eat_cooldown: i32,
     pub progress_bar: i32,
-    /// Ticks an immortal human knocked below 50 health is kept from being shot (record 0x6c, 1800 when knocked down).
+    /// Ticks an immortal human knocked below 50 health is kept from being shot (1800 when knocked down).
     pub down_timer: i32,
-    /// How far the body still has to turn to face the view (record 0xe0).
+    /// How far the body still has to turn to face the view.
     pub view_turn: f32,
-    /// The body's heading (record 0x100), turned towards the view a step at a time.
+    /// The body's heading, turned towards the view a step at a time.
     pub body_yaw: f32,
-    /// The pitch counterpart of `yaw_offset` (record 0x124): the seated human's look pitch.
+    /// The pitch counterpart of `yaw_offset`: the seated human's look pitch.
     pub pitch_offset: f32,
-    /// Where the player looks (controls 4 and 5, record 0x160 and 0x164): the view's yaw from the body and its pitch,
+    /// Where the player looks (controls 4 and 5): the view's yaw from the body and its pitch,
     /// or the look around a seat.
     pub look_yaw: f32,
     pub look_pitch: f32,

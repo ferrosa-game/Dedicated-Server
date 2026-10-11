@@ -1,6 +1,6 @@
 use crate::codec::WireWrite;
 
-/// Event 0xf: which items of a level cell's item set have been taken out as real items, so clients stop drawing them,
+/// Event 15: which items of a level cell's item set have been taken out as real items, so clients stop drawing them,
 /// with a 2-bit value the server always sends as 1.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventItemSetCell {

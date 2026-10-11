@@ -21,7 +21,7 @@ const PAGE: i32 = 16;
 const INTEL_FAXED: i32 = 11;
 const INTEL_ASKABLE: i32 = 8;
 
-/// MISSION.EXE's state (item +0x1660 on): what the connection is for (0 the menu, 1 an upload) and its ticks left,
+/// MISSION.EXE's state: what the connection is for (0 the menu, 1 an upload) and its ticks left,
 /// the page (0 menu, 1 a mission, 2 the upload list), the menu row picked, the mission page's button, the file picked,
 /// the directory listed and the files listed.
 #[derive(Clone, Debug, Default, PartialEq)]

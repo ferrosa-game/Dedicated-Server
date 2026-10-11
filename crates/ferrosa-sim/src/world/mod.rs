@@ -52,7 +52,7 @@ impl World {
         self.sun_axial_tilt
     }
 
-    /// The sun's angle and axial tilt (game_mode_state +0x2b4, +0x2b8), as the initial sync sends them: 16-bit angles,
+    /// The sun's angle and axial tilt, as the initial sync sends them: 16-bit angles,
     /// the top bit for negative.
     pub(crate) fn set_sun(&mut self, angle: f32, tilt: f32) {
         self.sun_angle = encode_angle(angle);
@@ -60,7 +60,7 @@ impl World {
     }
 }
 
-/// The 16-bit angle encoding of server_send (0x426580): the size as a share of the turn, the top bit for negative.
+/// The 16-bit angle encoding of server_send: the size as a share of the turn, the top bit for negative.
 fn encode_angle(v: f32) -> u16 {
     const HALF: i64 = 1 << 15;
     let turn = 6.28318530718;

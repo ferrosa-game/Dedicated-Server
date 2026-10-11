@@ -216,7 +216,7 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
     attach_child(touch.items, touch.types, computer, item_id);
 }
 
-/// The hand swap key (input 0x2000): the right hand's item goes to the left hand and the left hand's to the right.
+/// The hand swap key: the right hand's item goes to the left hand and the left hand's to the right.
 fn swap_hands(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut Touchables) {
     let (right, left) = (h.inventory[0].count, h.inventory[1].count);
     if right > 0 {

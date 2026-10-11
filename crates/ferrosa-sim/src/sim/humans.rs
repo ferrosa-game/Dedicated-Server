@@ -329,7 +329,7 @@ pub(crate) fn occupied_seats(humans: &ferrosa_physics::Table<Human>) -> Vec<(usi
     humans.iter().filter_map(|(_, h)| h.vehicle.map(|v| (v, h.seat))).collect()
 }
 
-/// The wanted group of human_simulation (human +0x6fd4): 1 for a criminal rating of 1 to 99, 2 from 100, else 0.
+/// The wanted group of human_simulation: 1 for a criminal rating of 1 to 99, 2 from 100, else 0.
 fn wanted_group(crim_rating: i32) -> i32 {
     match crim_rating {
         1..=99 => 1,

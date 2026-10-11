@@ -1,6 +1,6 @@
 use crate::codec::WireWrite;
 
-/// Event 0x15: a mission message for one player: their eliminator role at the start, a position to go to, or the
+/// Event 21: a mission message for one player: their eliminator role at the start, a position to go to, or the
 /// results at the end.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventMission {

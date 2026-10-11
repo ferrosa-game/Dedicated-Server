@@ -194,7 +194,7 @@ fn pose_bones(h: &Human, bodies: &mut RigidBodies, map: &Map, has_item: bool, sc
 
 /// The seated part of human_simulation: the view following the vehicle, the driver's controls, the pose, and getting
 /// out once the enter key has been held long enough (or straight away when hurt). The binary lengthens the wait by a
-/// velocity at human record 0xb4, which nothing but create_human (setting it to zero) ever writes.
+/// velocity that nothing but create_human (setting it to zero) ever writes.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn simulate_seated(h: &mut Human, bodies: &mut RigidBodies, map: &Map, touch: &mut Touchables, vid: usize, has_item: bool, scale: f32) {
     let Some(v) = touch.vehicles.get(vid) else { return };

@@ -17,7 +17,7 @@ const TAX_FREE: i32 = 10000;
 const TAX_RATE: f32 = 0.05;
 const STOCK_TAX_FREE: f32 = 10000.0;
 
-/// A corporation's share market (0x5ac0bc00 + corp * 0x18).
+/// A corporation's share market.
 #[derive(Clone, Copy, Debug)]
 pub struct Corporation {
     /// Shares held by players.

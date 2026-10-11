@@ -1,6 +1,6 @@
 use crate::codec::WireWrite;
 
-/// Event 0xc: one of a corporation's missions, packed into four ints, sent only to the corporation's team.
+/// Event 12: one of a corporation's missions, packed into four ints, sent only to the corporation's team.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventUpdateCorporation {
     /// Active flag, slot << 1, corporation << 4, type << 8, disk type << 16.

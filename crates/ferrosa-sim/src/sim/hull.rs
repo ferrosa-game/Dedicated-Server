@@ -18,7 +18,7 @@ pub struct HullFace {
     pub normal: Vec3,
 }
 
-/// A convex group of a hull (0x38 each from the hull's +0x18): its centre, the vertices cast from it into another
+/// A convex group of a hull: its centre, the vertices cast from it into another
 /// hull, its faces and its edges.
 #[derive(Clone, Debug)]
 pub struct HullGroup {
@@ -28,7 +28,7 @@ pub struct HullGroup {
     pub edges: Vec<[usize; 2]>,
 }
 
-/// A convex collision hull in item-local space (item_types[t] + 0xf08): its vertices and its face groups.
+/// A convex collision hull in item-local space: its vertices and its face groups.
 #[derive(Clone, Debug)]
 pub struct ConvexHull {
     pub verts: Vec<Vec3>,

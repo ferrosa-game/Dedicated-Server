@@ -97,7 +97,7 @@ impl RoundConfig {
 /// config_versus.txt (load_conf_versus).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct VersusConfig {
-    /// Seconds at the start of a versus round in which nobody can walk (0x45385624, sent in the initial sync).
+    /// Seconds at the start of a versus round in which nobody can walk (sent in the initial sync).
     pub movedelay: i32,
 }
 
@@ -136,7 +136,7 @@ impl RoundMode {
     }
 }
 
-/// One item kept from a player's last round (player saved_inventory, 0xc each): its type and two values (a gun's
+/// One item kept from a player's last round: its type and two values (a gun's
 /// loaded magazine and rounds, an item's uses, a key's vehicle type and colour, cash bills and codes).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SavedItem {

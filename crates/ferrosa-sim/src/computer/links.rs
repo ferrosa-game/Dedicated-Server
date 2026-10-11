@@ -1,19 +1,19 @@
 use super::{COLUMNS, Computer, LINES, text_len};
 use crate::sim::Sim;
 
-/// The text lines clients are sent (0x56b7f640, 0x9c each): a memo's (kind 0) or a computer's (kind 1) line,
+/// The text lines clients are sent: a memo's (kind 0) or a computer's (kind 1) line,
 /// created afresh whenever the line changes and acknowledged per connection.
 pub const LINKS: usize = 16384;
 pub const KIND_MEMO: i32 = 0;
 pub const KIND_COMPUTER: i32 = 1;
-/// The item slots a line link takes (item +0x170 mask, +0x178 ids).
+/// The item slots a line link takes.
 pub const ITEM_SLOTS: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Link {
     pub active: bool,
     pub kind: i32,
-    /// The tick it was made (+0xc).
+    /// The tick it was made.
     pub tick: i32,
     pub item: i32,
     pub line: i32,

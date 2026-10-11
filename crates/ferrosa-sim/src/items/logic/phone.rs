@@ -15,7 +15,7 @@ enum PhoneCall {
     HangUp(usize),
 }
 
-/// Where a phone is in a call (item +0x27c).
+/// Where a phone is in a call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[repr(i32)]
 pub enum PhoneStatus {
@@ -33,17 +33,16 @@ pub struct Phone {
     pub number: i32,
     pub status: PhoneStatus,
     pub connected: Option<usize>,
-    /// Ticks spent ringing or busy (+0x164).
+    /// Ticks spent ringing or busy.
     pub ring_timer: i32,
-    /// The number on the screen (+0x168).
+    /// The number on the screen.
     pub display_number: i32,
-    /// The digits dialled so far (+0x16c).
+    /// The digits dialled so far.
     pub entered_number: i32,
-    /// Ticks before the keypad works again after a call is placed (+0x13c).
+    /// Ticks before the keypad works again after a call is placed.
     pub cooldown: i32,
-    /// +0x278
     pub texture: i32,
-    /// Where a pay phone was put (+0x300).
+    /// Where a pay phone was put.
     pub home: glam::Vec3,
 }
 
@@ -54,7 +53,7 @@ impl Sim {
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdatePhone(e) });
     }
 
-    /// create_event_phone: a sound the item plays (event 0x13).
+    /// create_event_phone: a sound the item plays (event 19).
     pub(crate) fn phone_sound(&mut self, sound: Sound, id: usize, volume: f32) {
         let e = EventPhoneSound { sound, item_id: id as i32, volume, pitch: 1.0 };
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::PhoneSound(e) });

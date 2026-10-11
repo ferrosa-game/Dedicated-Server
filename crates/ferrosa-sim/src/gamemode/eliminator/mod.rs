@@ -46,8 +46,8 @@ const GUNS: [(ItemKind, ItemKind); 5] = [
 const TABLE_CARS: [VehicleKind; 3] = [VehicleKind::Hatchback, VehicleKind::Beamer, VehicleKind::Test];
 const PHONE_NUMBER_STEP: i32 = 1111;
 
-/// One eliminator group (0x24 bytes): the target (+0), the eliminator (+4) and the protector (+8), where the target
-/// was last revealed to be (+0xc) and where they are now (+0x18).
+/// One eliminator group: the target, the eliminator and the protector, where the target
+/// was last revealed to be and where they are now.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct EliminatorGroup {
     pub target: i32,
@@ -57,8 +57,8 @@ pub struct EliminatorGroup {
     pub current: Vec3,
 }
 
-/// The eliminator globals (0x45385340 on): the groups (stale ones are kept past `count`), the last known target
-/// position (0x453855c0) and the ready players counted at the start (0x4538533c).
+/// The eliminator globals: the groups (stale ones are kept past `count`), the last known target
+/// position and the ready players counted at the start.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EliminatorState {
     pub count: usize,

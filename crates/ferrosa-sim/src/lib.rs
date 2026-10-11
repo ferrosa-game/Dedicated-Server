@@ -62,7 +62,7 @@ pub struct Client {
     /// Whether the connection gets admin chat and the admin list (an admin's).
     admin_visible: bool,
     earshots: [Option<sim::Earshot>; 8],
-    /// The human the client says it is watching (connection +0x19c), heard from while it has none of its own.
+    /// The human the client says it is watching, heard from while it has none of its own.
     spectating: Option<usize>,
     /// The client's object slot ring (2048 entries): what was queued, how far, and how far the client has
     /// acknowledged (the 11 bits after the spectated human in its game packet).
@@ -71,8 +71,8 @@ pub struct Client {
     pack_ack: u16,
     /// What each slot holds as far as the queued entries go.
     packed: std::collections::HashMap<u16, ferrosa_protocol::clientbound::game::ObjectPack>,
-    /// How overdue each traffic car is for this client (connection +0x6da4), and which intersection's lights it gets
-    /// next (connection +0x54).
+    /// How overdue each traffic car is for this client, and which intersection's lights it gets
+    /// next.
     traffic_priority: Vec<i32>,
     /// How overdue each vehicle is for this client, by vehicle id.
     vehicle_priority: Vec<i32>,
@@ -80,8 +80,8 @@ pub struct Client {
     packet_sequence: u32,
     client_packet_count: u32,
     signal_cursor: i32,
-    /// The line links this connection has been sent, per item (connection +0x1dac on), the 256 entry ring of links
-    /// queued for it (+0x2ddd0 on), how far it is filled (+0x2ddc4) and acknowledged (+0x2ddcc).
+    /// The line links this connection has been sent, per item, the 256 entry ring of links
+    /// queued for it, how far it is filled and acknowledged.
     link_sent: std::collections::HashMap<usize, u64>,
     link_ring: Vec<i32>,
     link_count: u8,

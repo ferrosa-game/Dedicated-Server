@@ -7,7 +7,7 @@ use crate::sim::hull::ConvexHull;
 const MAX_MESH_EDGES: usize = 256;
 
 /// A vehicle body as load_sbv leaves it: the body file (a version 5 file moved onto its stored offset), the chassis
-/// points around their mean (+0x4018) and the collision mesh over them with the quad faces' unique edges.
+/// points around their mean and the collision mesh over them with the quad faces' unique edges.
 #[derive(Clone, Debug)]
 pub struct VehicleBody {
     pub file: VehicleBodyFile,

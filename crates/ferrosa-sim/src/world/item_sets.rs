@@ -25,7 +25,7 @@ pub struct ItemSet {
     pub entries: Vec<SetEntry>,
 }
 
-/// The item a trace hit in an item-set cell (line_intersect_result +0x5c, +0x60, +0x64).
+/// The item a trace hit in an item-set cell.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SetHit {
     pub set: u32,

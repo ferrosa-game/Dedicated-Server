@@ -2,7 +2,7 @@ use ferrosa_math::vector::Vector;
 
 use crate::codec::WireWrite;
 
-/// Event 0x10: a breakable face of a level cell broke (a glass pane), so clients remove it.
+/// Event 16: a breakable face of a level cell broke (a glass pane), so clients remove it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventBulletHole {
     pub area: i32,

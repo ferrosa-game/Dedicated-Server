@@ -166,7 +166,7 @@ impl BuildingFile {
 /// What rotate_loaded_building_tiles_quarter_turn needs to know about a special block.
 #[derive(Clone, Copy, Debug)]
 pub struct SpecialBlock {
-    /// block_dimensions depth (+0xc8) of the resolved global block id
+    /// block_dimensions depth of the resolved global block id
     pub footprint: i32,
     /// the global id is in builtin_block_count..custom_block_start_id, so its orientation cycles
     pub rotates: bool,

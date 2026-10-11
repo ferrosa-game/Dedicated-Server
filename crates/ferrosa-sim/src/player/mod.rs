@@ -21,7 +21,7 @@ pub mod voice;
 /// create_player's starting money.
 const BOT_MONEY: i32 = 50000;
 
-/// A player's movement and view controls (player +0xa0 on), from their game packet or set by the bot AI.
+/// A player's movement and view controls, from their game packet or set by the bot AI.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Controls {
     pub gear_x: f32,
@@ -34,7 +34,7 @@ pub struct Controls {
     pub free_look_pitch: f32,
     /// The body yaw the client reports.
     pub body_yaw: f32,
-    /// The spin a jump starts with, about the head's up and side axes (player +0xe0, +0xe4).
+    /// The spin a jump starts with, about the head's up and side axes.
     pub spin_yaw: f32,
     pub spin_pitch: f32,
 }
@@ -47,16 +47,16 @@ pub struct Player {
     pub steam_id: u64,
     pub actions: ActionQueue,
     pub menu: MenuType,
-    /// The building whose shop or bank menu is open (player +0x168).
+    /// The building whose shop or bank menu is open.
     pub menu_tab: i32,
-    /// How many things the player has bought from gun stores and burger shops (player +0x68), cleared when they get a
+    /// How many things the player has bought from gun stores and burger shops, cleared when they get a
     /// new human, at reset_game, and every 3600 ticks in round mode.
     pub items_bought: i32,
-    /// The buttons of the open menu, rebuilt every tick (player +0x1b14).
+    /// The buttons of the open menu, rebuilt every tick.
     pub menu_buttons: Vec<MenuButton>,
-    /// The extra value of each button slot, which stays from the last button that set one (+0x1b5c in each).
+    /// The extra value of each button slot, which stays from the last button that set one.
     pub button_extras: Vec<i32>,
-    /// Whether the player sees the round manager page (player +0x90), given to each corporation's richest member at the
+    /// Whether the player sees the round manager page, given to each corporation's richest member at the
     /// end of a round.
     pub manager_tab: bool,
     /// A player fired with their human: the binary keeps the deleted human's id until they get a new one, so
@@ -65,16 +65,16 @@ pub struct Player {
     pub ghost_human: bool,
     /// What the binary still has of that deleted human (its record stays behind): purchases go into it.
     pub ghost: Option<round::menus::GhostHuman>,
-    /// Ticks before the player can change team in the lobby again (player +0x88).
+    /// Ticks before the player can change team in the lobby again.
     pub team_switch_timer: i32,
-    /// Vehicles bought this round day (player +0x6c) and the $5 and $10 bills taken from a bank since (+0x70).
+    /// Vehicles bought this round day and the $5 and $10 bills taken from a bank since.
     pub vehicles_bought: i32,
     pub bills_withdrawn: i32,
     /// What the player's human held at the end of the last round, slot by slot.
     pub saved_inventory: [Vec<crate::gamemode::round::SavedItem>; 7],
-    /// Where the player's human stood when the world day ended (player +0x3818 on).
+    /// Where the player's human stood when the world day ended.
     pub saved_body: Option<crate::gamemode::world::SavedBody>,
-    /// The money and credit of the player's corporation, copied every tick (player +0x50 and +0x54).
+    /// The money and credit of the player's corporation, copied every tick.
     pub corp_money: i32,
     pub corp_credit: i32,
     pub account_id: u32,
@@ -99,22 +99,22 @@ pub struct Player {
     pub input_bits: u32,
     pub control_mode: u32,
     pub zoom_level: u32,
-    /// A player the server drives (+0x2d18): the crews of round car chases.
+    /// A player the server drives: the crews of round car chases.
     pub is_bot: bool,
-    /// God mode (+0x60), toggled by /godmode: bullets pass through the player and team damage is not punished.
+    /// God mode, toggled by /godmode: bullets pass through the player and team damage is not punished.
     pub god_mode: bool,
-    /// An admin (+0x34): from serveradmin.txt, or after /admin with the password.
+    /// An admin: from serveradmin.txt, or after /admin with the password.
     pub is_admin: bool,
     /// /admin attempts so far; the fifth on is refused.
     pub admin_tries: i32,
-    /// A mission bot's deadline on the world clock (+0x36e4) and the deal it belongs to (+0x36e8).
+    /// A mission bot's deadline on the world clock and the deal it belongs to.
     pub bot_deadline: i32,
     pub bot_mission: i32,
     /// The bot AI's state (player_ai): see [`BotBrain`].
     pub bot: BotBrain,
 }
 
-/// An enemy a bot has seen (player +0x3564, 0x18 each): the human, where the bot thinks it is, how sure it is (0 to 16)
+/// An enemy a bot has seen: the human, where the bot thinks it is, how sure it is (0 to 16)
 /// and a timer set to 600 when first seen.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct BotTarget {
@@ -127,19 +127,19 @@ pub struct BotTarget {
 /// What player_ai keeps for a bot.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BotBrain {
-    /// A zombie (+0x2d1c) walks at what it sees, through walls.
+    /// A zombie walks at what it sees, through walls.
     pub is_zombie: bool,
-    /// The heading to face with nothing else to do (+0x2d28).
+    /// The heading to face with nothing else to do.
     pub idle_yaw: f32,
-    /// The waypoint being walked to (+0x2d34), how many there are (+0x2d38) and the waypoints (+0x2d3c, 0x20 each).
+    /// The waypoint being walked to, how many there are and the waypoints.
     pub waypoint: i32,
     pub waypoint_count: i32,
     pub waypoints: Vec<Vec3>,
-    /// Ticks the bot does nothing for (+0x3550).
+    /// Ticks the bot does nothing for.
     pub delay: i32,
-    /// Ticks the bot's vehicle has been wrecked (+0x3558); past 179 it gets out.
+    /// Ticks the bot's vehicle has been wrecked; past 179 it gets out.
     pub wrecked_ticks: i32,
-    /// The enemies seen (+0x355c count, up to 16) and the one aimed at (+0x3560).
+    /// The enemies seen (up to 16) and the one aimed at.
     pub targets: Vec<BotTarget>,
     pub target: i32,
 }
@@ -343,7 +343,7 @@ impl Player {
     }
 }
 
-/// The player records (players, 0x3834 each): a new player takes the lowest free slot, as create_player does.
+/// The player records: a new player takes the lowest free slot, as create_player does.
 #[derive(Default)]
 pub struct PlayerTable {
     slots: Vec<Option<Player>>,

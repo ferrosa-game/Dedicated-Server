@@ -29,7 +29,7 @@ const KEY_RIGHT: i32 = 19;
 const KEY_LEFT: i32 = 18;
 const KEY_DOWN: i32 = 17;
 const KEY_UP: i32 = 16;
-/// Board cells (item +0x1880, 32 per row) each level adds walls at, levels counted mod 8.
+/// Board cells (32 per row) each level adds walls at, levels counted mod 8.
 const LEVEL_WALLS: [&[usize]; 7] = [
     &[0x48, 0x68, 0x88, 0xa8, 0xc8, 0xe8, 0x108, 0x276, 0x256, 0x236, 0x216, 0x1f6, 0x1d6, 0x1b6],
     &[0x56, 0x76, 0x96, 0xb6, 0xd6, 0xf6, 0x116, 0x268, 0x248, 0x228, 0x208, 0x1e8, 0x1c8, 0x1a8],
@@ -40,7 +40,7 @@ const LEVEL_WALLS: [&[usize]; 7] = [
     &[0x196, 0x28],
 ];
 
-/// SNAKE's state (item +0x1660 on): score, apples left on the level, the level, ticks to the next move, whether the
+/// SNAKE's state: score, apples left on the level, the level, ticks to the next move, whether the
 /// game is over, the heading (0 right, 1 down, 2 left, 3 up), the body ring's head and tail and the board.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Snake {

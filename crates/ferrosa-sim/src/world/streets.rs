@@ -21,17 +21,17 @@ const STREETS: [&str; 9] =
 /// Avenue ids follow the nine street ids.
 const FIRST_AVENUE_ID: i32 = 9;
 
-/// A street intersection (level_data +0x64, 0x88 each).
+/// A street intersection.
 #[derive(Clone, Debug, Default)]
 pub struct StreetIntersection {
-    /// Its city grid position (+0x00) and world position (+0x0c).
+    /// Its city grid position and world position.
     pub pos: IVec3,
     pub world_pos: Vec3,
-    /// The street leaving it east, south, west and north (+0x18, -1 for none).
+    /// The street leaving it east, south, west and north (-1 for none).
     pub streets: [i32; 4],
-    /// How far the streets around it reach in each direction (+0x28), in grid units.
+    /// How far the streets around it reach in each direction, in grid units.
     pub lanes: [i32; 4],
-    /// The box the intersection's road covers (+0x70, +0x7c).
+    /// The box the intersection's road covers.
     pub bounds_min: Vec3,
     pub bounds_max: Vec3,
 }
@@ -43,26 +43,26 @@ pub struct Lane {
     pub end: Vec3,
 }
 
-/// A street between two intersections (level_data +0x22068, 0x630 each).
+/// A street between two intersections.
 #[derive(Clone, Debug, Default)]
 pub struct MapStreet {
     pub name: &'static str,
     pub intersections: [usize; 2],
-    /// 1 for streets running along z (+0x2c).
+    /// 1 for streets running along z.
     pub north_south: i32,
     pub left_lanes: i32,
     pub right_lanes: i32,
-    /// The left lanes from the far side in, then the right lanes from the centre out (+0x38 count, +0x3c).
+    /// The left lanes from the far side in, then the right lanes from the centre out.
     pub lanes: Vec<Lane>,
-    /// The unit direction from the first intersection to the second (+0x1fc) and across it (+0x208).
+    /// The unit direction from the first intersection to the second and across it.
     pub dir: Vec3,
     pub side: Vec3,
-    /// The box the street's road covers (+0x214, +0x220).
+    /// The box the street's road covers.
     pub bounds_min: Vec3,
     pub bounds_max: Vec3,
 }
 
-/// A node of the street route graph (build_street_route_graph, 0x48 each): the middle of a street's last lane
+/// A node of the street route graph (build_street_route_graph): the middle of a street's last lane
 /// (`end` 0, heading to its second intersection) or first lane (`end` 1, heading back), and the nodes it leads to.
 #[derive(Clone, Debug, Default)]
 pub struct RouteNode {
@@ -79,7 +79,7 @@ pub struct StreetMap {
     pub intersections: Vec<StreetIntersection>,
     pub streets: Vec<MapStreet>,
     pub route_nodes: Vec<RouteNode>,
-    /// The grid extent of the intersections (level_data +0x44, +0x50; only x and z are set).
+    /// The grid extent of the intersections (only x and z are set).
     pub min: IVec3,
     pub max: IVec3,
     /// The intersections and streets binned by their bounds, for finding the ones a point is in.

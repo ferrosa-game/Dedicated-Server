@@ -15,7 +15,7 @@ pub const DRIVE_A: i32 = 0;
 pub const DRIVE_C: i32 = 2;
 pub const DRIVES: usize = 3;
 
-/// What the computer is running (item +0x165c).
+/// What the computer is running.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[repr(i32)]
 pub enum Mode {
@@ -26,8 +26,7 @@ pub enum Mode {
     Snake = 3,
 }
 
-/// A drive's current directory: the path from the root (item +0x13f8 + drive * 0x48: +4 depth, +8 on the entries,
-/// entry 0 being the root).
+/// A drive's current directory: the path from the root (entry 0 being the root).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DirStack {
     pub depth: i32,
@@ -40,9 +39,9 @@ impl DirStack {
     }
 }
 
-/// DIR or COPY running in the background (item +0x1510): which (+0x1518, 1 DIR, 0 COPY), ticks to the next step
-/// (+0x151c), the drive and directory (+0x1520, +0x1524), how far DIR has listed (+0x1528 directories, +0x152c
-/// files), the file COPY makes (+0x1530 name, +0x1550 content) and the keys typed meanwhile (+0x1554 count, 64 kept).
+/// DIR or COPY running in the background: which (1 DIR, 0 COPY), ticks to the next step, the drive and directory,
+/// how far DIR has listed (directories, then files), the file COPY makes (name and content) and the keys typed
+/// meanwhile (64 kept).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DiskOp {
     pub kind: i32,
@@ -65,7 +64,7 @@ pub const DISK_OP_DIR: i32 = 1;
 pub struct Computer {
     pub current_line: i32,
     pub top_line: i32,
-    /// The cursor's line * 64 + column (item +0x370), -1 hidden.
+    /// The cursor's line * 64 + column, -1 hidden.
     pub cursor: i32,
     pub lines: [[u8; COLUMNS]; LINES],
     pub colors: [[u8; COLUMNS]; LINES],
@@ -74,7 +73,7 @@ pub struct Computer {
     pub drive: i32,
     pub dirs: [DirStack; DRIVES],
     pub op: DiskOp,
-    /// The corporation whose base the computer is in (item +0x1658), -1 for none.
+    /// The corporation whose base the computer is in, -1 for none.
     pub team: i32,
     pub mode: Mode,
     pub decrypt: decrypt::Decrypter,

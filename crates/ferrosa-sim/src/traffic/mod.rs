@@ -9,13 +9,13 @@ pub mod motion;
 pub mod route;
 pub mod spawn;
 
-/// The route steps a car's record holds (+0x8c, 0x14 each, up to +0x584).
+/// The route steps a car's record holds.
 pub const MAX_ROUTE: usize = 63;
 /// The streets the Round City traffic hack keeps cars off and treats as one loop.
 pub const LOOP_STREET: i32 = 67;
 pub const LOOP_STREET_2: i32 = 68;
 pub const HIDDEN_STREET: i32 = 23;
-/// Each street lists at most this many of the cars on it (+0x22c count, +0x230).
+/// Each street lists at most this many of the cars on it.
 pub const MAX_STREET_CARS: usize = 256;
 
 /// is_bot: driven by the traffic, parked, or taken over by a player.
@@ -32,15 +32,15 @@ pub struct RouteStep {
     pub turn: i32,
 }
 
-/// A traffic car (traffic_cars, 0x5fc each): a car that drives itself along the streets, simulated on its own away from
+/// A traffic car: a car that drives itself along the streets, simulated on its own away from
 /// players and as a real vehicle near them.
 #[derive(Clone, Debug)]
 pub struct TrafficCar {
     pub kind: ferrosa_protocol::clientbound::game::VehicleKind,
-    /// The bot driving it (+0x04) and the vehicle it is while near a player (+0x08), -1 for none.
+    /// The bot driving it and the vehicle it is while near a player, -1 for none.
     pub human: i32,
     pub vehicle: i32,
-    /// How near the nearest player is (+0x0c): 2 within range, 1 just outside it, 0 away.
+    /// How near the nearest player is: 2 within range, 1 just outside it, 0 away.
     pub state: i32,
     pub pos: Vec3,
     pub vel: Vec3,
@@ -48,8 +48,7 @@ pub struct TrafficCar {
     pub rot: RotMatrix,
     pub steer: f32,
     pub target_speed: f32,
-    /// How far the body reaches ahead of (+0x58) and behind (+0x5c) its position, and the distance between its axles
-    /// (+0x60).
+    /// How far the body reaches ahead of and behind its position, and the distance between its axles.
     pub front: f32,
     pub rear: f32,
     pub wheelbase: f32,
@@ -60,28 +59,28 @@ pub struct TrafficCar {
     pub route_index: i32,
     pub route_len: i32,
     pub route: [RouteStep; MAX_ROUTE],
-    /// The street being driven (+0x590, -1 while crossing an intersection), the end it was entered from (+0x594) and
-    /// the intersection being crossed (+0x598).
+    /// The street being driven (-1 while crossing an intersection), the end it was entered from and
+    /// the intersection being crossed.
     pub street: i32,
     pub intersection: i32,
-    /// The lane driven (+0x59c), the lane being moved to (+0x5a0) and the lane to take on the next street (+0x5a4).
+    /// The lane driven, the lane being moved to and the lane to take on the next street.
     pub lane: i32,
     pub next_lane: i32,
     pub target_lane: i32,
-    /// How far the move to `next_lane` has got (+0x5ac), 0 to 1.
+    /// How far the move to `next_lane` has got, 0 to 1.
     pub lane_change: f32,
-    /// Ticks spent stopped while meaning to move (+0x5b0); past 179 the car backs out.
+    /// Ticks spent stopped while meaning to move; past 179 the car backs out.
     pub stuck: i32,
-    /// The street and intersection the car's position is in (+0x5b4, +0x5b8).
+    /// The street and intersection the car's position is in.
     pub physical_street: i32,
     pub physical_intersection: i32,
-    /// The car's front (+0x5bc) and back (+0x5c0) along its street from the street's first intersection.
+    /// The car's front and back along its street from the street's first intersection.
     pub front_proj: f32,
     pub rear_proj: f32,
-    /// How far the car reaches from each end of its street, farthest (+0x5c4, +0x5c8) and nearest (+0x5cc, +0x5d0).
+    /// How far the car reaches from each end of its street, farthest and nearest.
     pub far: [f32; 2],
     pub near: [f32; 2],
-    /// The lanes of its street the car covers (+0x5d4).
+    /// The lanes of its street the car covers.
     pub lane_mask: i32,
     pub color: i32,
 }
@@ -96,7 +95,7 @@ impl TrafficCar {
     }
 }
 
-/// An intersection's traffic lights (+0x44 phase, +0x48 timer, +0x4c cycle, +0x50 lights): straight on and right for
+/// An intersection's traffic lights: straight on and right for
 /// each way in (0 to 3) and left (4 to 7), 2 green, 1 amber, 0 red.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Signals {
@@ -110,13 +109,13 @@ pub struct Signals {
 #[derive(Clone, Debug, Default)]
 pub struct Traffic {
     pub cars: Vec<TrafficCar>,
-    /// How many cars have been made in each slot (raw 0x2ed48c20).
+    /// How many cars have been made in each slot.
     pub generations: Vec<i32>,
     pub street_cars: Vec<Vec<usize>>,
     pub signals: Vec<Signals>,
     /// hack_roundcity_traffic: on Round City, cars keep off two streets and treat the loop as one.
     pub roundcity: bool,
-    /// The co-op wave (0x44f87324), which speeds up aggressive cars.
+    /// The co-op wave, which speeds up aggressive cars.
     pub coop_level: i32,
     pub coop: bool,
 }

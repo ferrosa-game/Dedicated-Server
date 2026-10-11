@@ -153,11 +153,11 @@ pub struct Sim {
     pub(crate) bullets: Vec<bullets::Bullet>,
     pub(crate) vehicles: ferrosa_physics::Table<crate::vehicle::Vehicle>,
     pub(crate) vehicle_types: Vec<crate::vehicle::types::VehicleType>,
-    /// The world mode clock (0xe3b21e0).
+    /// The world mode clock.
     pub(crate) world_time: i32,
-    /// Per account, the spawn timer kept while its player is away (account record +0x48, not saved to disk).
+    /// Per account, the spawn timer kept while its player is away (not saved to disk).
     pub(crate) account_spawn_timers: HashMap<u32, i32>,
-    /// Each account's name lock (account record +0x38, memory only): while above 0 the account's name is forced on the
+    /// Each account's name lock (memory only): while above 0 the account's name is forced on the
     /// player at join; it counts down every world save.
     pub(crate) account_name_locks: HashMap<u32, i32>,
     /// The walkie-talkies on each channel (rebuilt by logic_item, read by calculate_voice).
@@ -167,8 +167,7 @@ pub struct Sim {
     pub(crate) phase_times: tps::PhaseTimes,
     /// Each corporation's manager, applicants and account.
     pub(crate) corp_state: [corporations::CorpState; 6],
-    /// The game timer (game_mode_state +0x234), the round's elapsed ticks (+0x238) and the intermission's starting time
-    /// (+0x23c).
+    /// The game timer, the round's elapsed ticks and the intermission's starting time.
     pub(crate) game_timer: i32,
     pub(crate) round_elapsed: i32,
     pub(crate) round_max_time: i32,
@@ -189,7 +188,7 @@ pub struct Sim {
     pub(crate) do_traffic: Option<u32>,
 }
 
-/// What stats.txt counts since the server started: mission deals (0x7d078a4) and bullets (0x7d078a0).
+/// What stats.txt counts since the server started: mission deals and bullets.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ServerStats {
     pub missions: u32,

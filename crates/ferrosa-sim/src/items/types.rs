@@ -20,17 +20,17 @@ pub struct ItemType {
     pub pockets: [i32; 5],
     pub hold_pos: [Vec3; 2],
     pub hold_rot: [[f32; 4]; 2],
-    /// Ticks between shots (+0x18).
+    /// Ticks between shots.
     pub fire_rate: i32,
-    /// Index into the bullet table (+0x1c).
+    /// Index into the bullet table.
     pub bullet_type: i32,
-    /// Muzzle speed per tick (+0x28).
+    /// Muzzle speed per tick.
     pub bullet_velocity: f32,
-    /// How far a shot strays (+0x2c).
+    /// How far a shot strays.
     pub bullet_spread: f32,
-    /// Which item types this one mounts on (+0x11c), e.g. a magazine on its gun.
+    /// Which item types this one mounts on, e.g. a magazine on its gun.
     pub can_mount_to: [i32; ItemKind::COUNT],
-    /// Where a gun sits relative to its holder's right shoulder, along the hold matrix (+0x1394, gunHoldingPos).
+    /// Where a gun sits relative to its holder's right shoulder, along the hold matrix (gunHoldingPos).
     pub gun_hold_pos: Vec3,
 }
 

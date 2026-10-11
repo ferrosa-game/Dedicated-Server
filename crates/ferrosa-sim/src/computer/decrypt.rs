@@ -22,7 +22,7 @@ const REVEAL_TRIES: i32 = 1000;
 const CTRL: i32 = 0x100;
 const STATUS_LINE: usize = 1;
 
-/// DECRYPT's state (item +0x1660 on): the wrapped plain text, the file's content, its cipher and the inverse, how
+/// DECRYPT's state: the wrapped plain text, the file's content, its cipher and the inverse, how
 /// often each enciphered letter appears, the player's guess for each, the letter picked and the auto reveal timer.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Decrypter {

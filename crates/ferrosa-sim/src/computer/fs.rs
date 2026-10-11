@@ -1,23 +1,23 @@
-/// The computers' file system: 1024 volumes (0x6e067a0, 0x2828 each) of up to 256 directories and 256 files, and
-/// 8192 file contents (0xdaa2080, 0x488 each) the files point at.
+/// The computers' file system: 1024 volumes of up to 256 directories and 256 files, and
+/// 8192 file contents the files point at.
 pub const VOLUMES: usize = 1024;
 pub const CONTENTS: usize = 8192;
 const MAX_FILES: usize = 256;
 const NAME_LEN: usize = 15;
-/// A volume's capacity (volume +0x4): a disk holds 360, a computer 10000. COPY onto a volume of 399 or less fails
+/// A volume's capacity: a disk holds 360, a computer 10000. COPY onto a volume of 399 or less fails
 /// once it has 3 files.
 pub const COMPUTER_CAPACITY: i32 = 10000;
 pub const SMALL_VOLUME: i32 = 399;
 pub const SMALL_VOLUME_FILES: usize = 2;
 
-/// A directory (16 bytes from volume +0xc): its name and its parent. Entry 0 is the root.
+/// A directory: its name and its parent. Entry 0 is the root.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Dir {
     pub name: String,
     pub parent: i32,
 }
 
-/// A file (24 bytes from volume +0x1010): the content it holds, its name and its directory.
+/// A file: the content it holds, its name and its directory.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct File {
     pub data: i32,
@@ -32,8 +32,8 @@ pub struct Volume {
     pub files: Vec<File>,
 }
 
-/// A file's content (0x488): whether it is taken (+0), its text (+0x4), whether it is enciphered (+0x404) and the
-/// cipher, a permutation of the 26 letters (+0x408). Some code writes a content without taking it.
+/// A file's content: whether it is taken, its text, whether it is enciphered and the
+/// cipher, a permutation of the 26 letters. Some code writes a content without taking it.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Content {
     pub active: bool,

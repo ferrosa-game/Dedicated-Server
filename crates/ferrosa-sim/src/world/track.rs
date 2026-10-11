@@ -43,7 +43,7 @@ const RAMP_TURN: f64 = 45.0_f64.to_radians();
 const RAMP_RADIUS: f32 = 64.0;
 const RAMP_HALF_WIDTH: f32 = 16.0;
 
-/// A dynamic level mesh (0x462d7dc0 + 0xf120 each): a piece of the race track or a ramp.
+/// A dynamic level mesh: a piece of the race track or a ramp.
 #[derive(Clone, Debug, Default)]
 pub struct TrackMesh {
     pub kind: i32,
@@ -67,7 +67,7 @@ pub struct TrackMesh {
 pub struct Track {
     pub meshes: Vec<TrackMesh>,
     pub grid: Vec<Vec<i32>>,
-    /// Where trains are put (0x1d2c1280): position and facing.
+    /// Where trains are put: position and facing.
     pub spawns: Vec<(Vec3, f32)>,
 }
 

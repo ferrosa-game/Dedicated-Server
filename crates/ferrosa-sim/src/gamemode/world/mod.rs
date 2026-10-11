@@ -168,7 +168,7 @@ impl WorldConfig {
     }
 }
 
-/// Where a player's human stood when the day ended (player +0x3818 on), to stand again after the reset.
+/// Where a player's human stood when the day ended, to stand again after the reset.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SavedBody {
     pub pos: Vec3,
@@ -177,7 +177,7 @@ pub struct SavedBody {
     pub seat: usize,
 }
 
-/// A vehicle a key was saved with at the end of the day (0xe3b2204 + 0x40 each): respawned at the reset where it was,
+/// A vehicle a key was saved with at the end of the day: respawned at the reset where it was,
 /// the key then pointing at the new one.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SavedVehicle {

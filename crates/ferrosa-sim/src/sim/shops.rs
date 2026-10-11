@@ -15,7 +15,7 @@ use crate::{
     world::building::{BURGER_SHOP, BuildingRecord, CAR_DEALER, CLOTHING_STORE, GUN_STORE, ShopEntry},
 };
 
-/// A gun store's stock (init_car_dealership 0x427040, run at reset_game and every 18000 clock units), each at its item
+/// A gun store's stock (init_car_dealership, run at reset_game and every 18000 clock units), each at its item
 /// type's price.
 const GUN_STORE_STOCK: [u8; 12] = [11, 12, 7, 8, 1, 2, 3, 4, 9, 10, 14, 13];
 /// A dealership holds up to eight cars; each tick of a restock a car is sold off with a 1 in 8 chance.

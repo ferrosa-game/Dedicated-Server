@@ -37,18 +37,18 @@ const IMPULSE: f32 = 3.0;
 /// bullet_data: each bullet type's mass (damage and recoil) and drag.
 pub const BULLET_DATA: [(f32, f32); 4] = [(0.01, 0.004560367), (0.0062, 0.0039160457), (0.008, 0.007952156), (0.016, 0.005832072)];
 
-/// A bullet in flight (bullets, 0x5c each).
+/// A bullet in flight.
 #[derive(Clone, Debug)]
 pub struct Bullet {
     pub kind: i32,
-    /// Ticks left (+0x04); a hit sets it to 0.
+    /// Ticks left; a hit sets it to 0.
     pub time: i32,
     pub player: Option<PlayerId>,
     pub mass: f32,
-    /// Taken from the vertical speed every tick (+0x10): create_bullet stores the bytes "Pg2;", a little under
+    /// Taken from the vertical speed every tick: create_bullet stores the bytes "Pg2;", a little under
     /// 9.8 / 60².
     pub gravity: f32,
-    /// Where it was before this tick's move (+0x20) and where it is now (+0x14).
+    /// Where it was before this tick's move and where it is now.
     pub prev: Vec3,
     pub pos: Vec3,
     pub vel: Vec3,

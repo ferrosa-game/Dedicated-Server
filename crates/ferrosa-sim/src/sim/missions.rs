@@ -14,7 +14,7 @@ use ferrosa_protocol::{
 use super::Sim;
 use crate::{PlayerId, items::state::ItemState};
 
-/// A corporation holds sixteen mission slots (+0x45c, 0x45c each).
+/// A corporation holds sixteen mission slots.
 pub const MISSION_SLOTS: usize = 16;
 /// A mission text event carries 64 bytes of the text.
 const TEXT_LINE: usize = 64;
@@ -27,36 +27,30 @@ const GUARD_MAGAZINES: i32 = 4;
 /// The chase's target sits at no mission spot.
 const CHASE_LOCATION: i32 = 255;
 
-/// One mission of a corporation (0x45c bytes, the fields read so far).
+/// One mission of a corporation (the fields read so far).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Mission {
-    /// +0
     pub active: bool,
-    /// +4: set once the mission is decided.
+    /// set once the mission is decided.
     pub done: bool,
-    /// +8: the mission counter when it was made, shared by the corporations of one deal.
+    /// the mission counter when it was made, shared by the corporations of one deal.
     pub id: i32,
-    /// +0xc: 1 acquisition by car chase, 2 sell a disk, 3 buy it, 4 buy it unfunded, 7 two-team sellers, 8 their buyer.
+    /// 1 acquisition by car chase, 2 sell a disk, 3 buy it, 4 buy it unfunded, 7 two-team sellers, 8 their buyer.
     pub kind: i32,
-    /// +0x10 and +0x14: the disks of the deal.
+    /// The disks of the deal.
     pub item: i32,
     pub item2: i32,
-    /// +0x1c and +0x20
     pub team1: i32,
     pub team2: i32,
-    /// +0x3c
     pub disk_type: i32,
-    /// +0x40
     pub value: i32,
-    /// +0x44: the world clock the mission runs until.
+    /// The world clock the mission runs until.
     pub deadline: i32,
-    /// +0x48: the mission spot the disk waits at, or -1 for the table.
+    /// The mission spot the disk waits at, or -1 for the table.
     pub location: i32,
-    /// +0x4c
     pub provided_cash: i32,
-    /// +0x54
     pub rate: f32,
-    /// +0x5c: the line settle_mission_result writes, kept as whether it expired and the rating it gave (None
+    /// The line settle_mission_result writes, kept as whether it expired and the rating it gave (None
     /// before, and after reset_game clears it).
     pub result: Option<(bool, i32)>,
 }
@@ -88,20 +82,20 @@ const SUCCESS_RATING: i32 = 10;
 /// Each rating point a member gains also pays 10.
 const RATING_MONEY: i32 = 10;
 
-/// The mission globals (0x44da5bc0 on).
+/// The mission globals.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MissionGlobals {
-    /// Deals made since the reset (0x44da5bc0).
+    /// Deals made since the reset.
     pub counter: i32,
-    /// The next disk colour (0x44da5bc4).
+    /// The next disk colour.
     pub disk_index: i32,
-    /// The disks of the last deal (0x44da5ccc, 0x44da5cd0).
+    /// The disks of the last deal.
     pub last_disks: [i32; 2],
-    /// Where the last car chase's target is (0x44da5cf0).
+    /// Where the last car chase's target is.
     pub target_location: i32,
-    /// Players per corporation given missions in the last generation (0x44da5cf4).
+    /// Players per corporation given missions in the last generation.
     pub average_players: i32,
-    /// The traffic car of the last car chase (0xa8f16e0).
+    /// The traffic car of the last car chase.
     pub chase_car: i32,
 }
 
