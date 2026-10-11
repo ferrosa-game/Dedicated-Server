@@ -826,7 +826,6 @@ impl super::ModeHooks for Hooks {
             bot_lobby: true,
             ready_start: false,
             round_money_updates: true,
-            announce_chat: true,
             ..Default::default()
         }
     }

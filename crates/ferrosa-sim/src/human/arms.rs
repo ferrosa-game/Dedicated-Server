@@ -207,6 +207,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
     let pose = add_turn(pose, &mut frame, 1, body_yaw);
     let chest_damping = relative_spin_damping(h, 1, 2);
     drive_spine_joint(h, bodies, 1, 2, pose, chest_damping, &mut frames[1]);
+
     let aim_poses = (has_gun && h.vehicle.is_none()).then(|| aim_orientations(h, aim));
     if let Some([waist, chest, _]) = aim_poses {
         aim_spine_joint(h, bodies, 0, 1, waist);
@@ -221,11 +222,13 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
         let axis = frame[2];
         rotate_orientation(&mut frame, axis, 11.25_f32.to_radians());
     }
+
     let mut pose = add_turn(pose, &mut frame, 0, 0.5 * h.view_pitch + 0.25 * h.free_look_pitch);
     if let Some([_, _, aimed]) = aim_poses {
         pose = quaternion_multiply(aimed, pitch_turn(h.view_pitch));
         pose = quaternion_multiply(pose, yaw_turn(0.25 * h.free_look_yaw));
     }
+
     drive_spine_joint(h, bodies, 2, 3, pose, chest_damping, &mut frames[2]);
     h.locomotion.spine_frames = frames;
 
@@ -234,42 +237,52 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
         let first = 4 + 3 * k;
         let held = held_item(h, touch, k);
         let hold = held.map(|(item, hand)| hold_frame(h, bodies, touch, k, item, hand, -aim, aim_poses.map(|p| p[2])));
+
         if k == 0 {
             let jitter = calculate_spread_vector(seed, 1.0 / 128.0, 0.0);
             let sway = h.hand_sway;
             h.hand_sway_vel = (sway * (-1.0 / 256.0) + (jitter + h.hand_sway_vel)) * 0.9375;
             h.hand_sway = h.hand_sway_vel + sway;
         }
+
         let mut swing = (h.locomotion.stride_balance as f64 * 22.5_f64.to_radians()) as f32;
         if h.movement_mode > 0 {
             swing *= 0.5;
         }
+
         if k == 1 {
             swing = -swing;
         }
+
         let (mut angle, mut scale) = match (h.movement_mode != 0, h.locomotion.jump_charge > 0) {
             (false, true) => (45.0_f32.to_radians(), 0.75f32),
             (false, false) => ((swing as f64 + 22.5_f64.to_radians()) as f32, 0.75),
             (true, true) => (45.0_f32.to_radians(), 0.875),
             (true, false) => ((swing as f64 + 11.25_f64.to_radians()) as f32, 0.875),
         };
+
         if state & !2 == 1 {
             angle = (90.0_f64.to_radians() - (h.view_pitch + h.free_look_pitch) as f64) as f32;
             scale = 0.9375;
         }
+
         let a = angle as f64;
+
         let (y, z) = if h.vehicle.is_some() {
             ((SEATED_REACH_Y * scale as f64) as f32, (scale as f64 * (21.0 / 32.0)) as f32)
         } else {
             (((-0.65625 * a.cos()) * scale as f64) as f32, (scale as f64 * (-a.sin() * 0.65625)) as f32)
         };
+
         let mut target = match hold {
             Some((m, v)) => 0.0625 * m[1] + v - BONES[first].joint,
             None => Vec3::new(if k == 0 { -0.0625 } else { 0.0625 }, y, z),
         };
+
         if k == 1 && h.inventory[0].count <= 0 && h.inventory[1].count <= 0 && h.input_flags & (LEFT_MOUSE | RIGHT_MOUSE) == LEFT_MOUSE | RIGHT_MOUSE {
             target = point_target(h);
         }
+
         if state != 2 && h.is_on_ground && 0.5 > h.locomotion.torso_rot[1].y && h.input_flags & CROUCH != 0 {
             target = crouch_reach(h, map, first);
         }
@@ -278,9 +291,11 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
         let q = rot_matrix_to_quaternion(&m);
         let mut end_rot = [-q[0], -q[1], -q[2], q[3]];
         let mut max_turn = if h.action_type != 0 { 11.25_f32.to_radians() } else { 45.0_f32.to_radians() };
+
         if h.locomotion.jump_charge > 0 || state == 3 {
             max_turn = 45.0_f32.to_radians();
         }
+
         if let Some((item, hand)) = held {
             let kind = touch.items.get(item).unwrap().item_type;
             let mut twist = match kind {
@@ -288,63 +303,78 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
                 ItemKind::M16 => 78.75_f32.to_radians(),
                 _ => 45.0_f32.to_radians(),
             };
+
             if k == 0 {
                 twist = -twist;
             }
+
             if h.input_flags & DROP_ITEM != 0 || h.action_type == 0 {
                 twist = 0.0;
             }
+
             let mut spin_limit = [0.0; 3];
             if 1.0 > hp {
                 let v = (hp * 0.0625) * 0.25 + (1.0 / 256.0);
                 spin_limit[0] = v;
                 spin_limit[1] = v;
             }
+
             let params = IkParams { length: 21.0 / 32.0, twist, max_turn, clamp_max: 16.875_f32.to_radians(), spin_limit, flags: 0x16 + (1.0 > hp) as u32 };
             three_bone_ik(h, bodies, 2, first, target, &IDENTITY, Vec3::ZERO, &params, &mut end_rot);
             attach_item_to_bone(h, bodies, touch, first + 2, item, hand);
             if touch.types[kind as usize].is_gun && k == 1 && h.input_flags & DROP_ITEM == 0 && h.action_type != 0 && h.vehicle.is_none() {
                 arm_item_collision(h, bodies, touch, item);
             }
+
             continue;
         }
+
         let mut flags = 4 + (1.0 > hp) as u32;
         let other_hand_input = 1 << (k ^ 1);
         let one_arm = h.input_flags & other_hand_input == other_hand_input;
         if one_arm {
             max_turn = 22.5_f32.to_radians();
         }
+
         let airborne = !one_arm
             && h.vehicle.is_none()
             && ((state == 1 && h.input_flags & CROUCH == 0) || (state == 3 && !(0.125 + h.locomotion.feet[0].swing_phase < 1.0)));
+
         let params = if airborne {
             IkParams { length: 21.0 / 32.0, twist: 0.0, max_turn, clamp_max: 4.21875_f32.to_radians(), spin_limit: [0.0625; 3], flags }
         } else {
             flags |= 16;
             let twist = if k == 0 { -0.0 } else { 0.0 };
             let mut spin_limit = [0.0; 3];
+
             if 1.0 > hp {
                 let v = (hp * 0.0625) * 0.25 + (1.0 / 256.0);
                 spin_limit[0] = v;
                 spin_limit[1] = v;
             }
+
             IkParams { length: 21.0 / 32.0, twist, max_turn, clamp_max: 16.875_f32.to_radians(), spin_limit, flags }
         };
+
         three_bone_ik(h, bodies, 2, first, target, &IDENTITY, Vec3::ZERO, &params, &mut end_rot);
+
         if state == 2 {
             let lean = (h.bones[0].rot[2].y as f64).asin() as f32;
             let lean = if lean > 0.0 { lean * 4.0 } else { lean * 0.25 };
+
             let (y, z) = if lean as f64 > 157.5_f64.to_radians() {
                 (0.45472196, -0.18835203)
             } else {
                 let (s, c) = (lean as f64).sin_cos();
                 (((-0.65625 * c) * 0.75) as f32, ((0.65625 * -s) * 0.75) as f32)
             };
+
             let lean = if lean as f64 > 157.5_f64.to_radians() { 157.5_f32.to_radians() } else { lean };
             let target = Vec3::new(if k == 0 { -0.09375 } else { 0.09375 }, y, z);
             let twist = if lean > 0.0 { lean * 0.5 } else { 0.0 };
             let twist = if k == 0 { -twist } else { twist };
             let params = IkParams { twist, spin_limit: [0.0625; 3], ..params };
+
             three_bone_ik(h, bodies, 2, first, target, &IDENTITY, Vec3::ZERO, &params, &mut end_rot);
         }
     }

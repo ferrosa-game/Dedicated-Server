@@ -242,9 +242,7 @@ impl Sim {
                     return;
                 }
                 "/heal" => {
-                    if let Some(p) = self.players.get(player_id.idx())
-                        && let Some(human) = p.human
-                    {
+                    if let Some(p) = self.players.get(player_id.idx()) && let Some(human) = p.human {
                         let human = self.humans.get_mut(human).unwrap();
 
                         human.health.chest = 100;
@@ -269,10 +267,14 @@ impl Sim {
             return self.admin_message(player_id, &action.message);
         }
 
-        let speaker = self.players.get(player_id.idx()).and_then(|p| p.human).filter(|&h| self.humans.get(h).is_some_and(|h| h.health.vitality > 0));
+        let speaker = self
+            .players
+            .get(player_id.idx())
+            .and_then(|p| p.human)
+            .filter(|&h| self.gamestate != GameState::Restarting && self.humans.get(h).is_some_and(|h| h.health.vitality > 0));
         let volume = action.volume as i32;
 
-        match speaker.filter(|_| !self.rules.announce_chat) {
+        match speaker {
             None => self.send_chat(&action.message, ChatType::Announce, player_id.idx() as i32, volume),
             Some(human) => self.send_chat(&action.message, ChatType::Chat, human as i32, volume),
         }
