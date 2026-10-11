@@ -3,7 +3,7 @@ resolver="3"
 members = ["crates/ferrosa-bin", "crates/ferrosa-map","crates/ferrosa-math", "crates/ferrosa-net", "crates/ferrosa-physics", "crates/ferrosa-protocol", "crates/ferrosa-sim"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.2"
 edition = "2024"
 authors = ["Infinity Dev"]
 
