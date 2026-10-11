@@ -269,7 +269,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
         let a = angle as f64;
 
         let (y, z) = if h.vehicle.is_some() {
-            ((SEATED_REACH_Y * scale as f64) as f32, (scale as f64 * (21.0 / 32.0)) as f32)
+            ((SEATED_REACH_Y * scale as f64) as f32, (scale as f64 * -(21.0 / 32.0)) as f32)
         } else {
             (((-0.65625 * a.cos()) * scale as f64) as f32, (scale as f64 * (-a.sin() * 0.65625)) as f32)
         };
