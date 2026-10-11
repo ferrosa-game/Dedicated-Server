@@ -56,7 +56,7 @@ macro_rules! timed {
 }
 pub(crate) use timed;
 
-/// How long each phase of the tick takes, printed every REPORT_TICKS ticks, slowest first, when the ferrosa_TIMINGS
+/// How long each phase of the tick takes, printed every REPORT_TICKS ticks, slowest first, when the FERROSA_TIMINGS
 /// environment variable is set.
 #[derive(Default)]
 pub struct PhaseTimes {
@@ -68,7 +68,7 @@ pub struct PhaseTimes {
 
 impl PhaseTimes {
     pub(crate) fn from_env() -> Self {
-        Self { enabled: std::env::var_os("ferrosa_TIMINGS").is_some(), ..Default::default() }
+        Self { enabled: std::env::var_os("FERROSA_TIMINGS").is_some(), ..Default::default() }
     }
 
     pub(crate) fn add(&mut self, name: &'static str, time: Duration) {
