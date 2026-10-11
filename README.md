@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/ferrosa-logo-dark.svg">
+    <img src="assets/ferrosa-logo.svg" alt="Ferrosa" width="600">
+  </picture>
+</p>
+
 # Ferrosa Dedicated Server
 
 A Sub Rosa dedicated server written in Rust: a port of the original Sub Rosa dedicated server.

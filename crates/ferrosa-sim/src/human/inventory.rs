@@ -255,14 +255,18 @@ pub fn queue_inventory_action(h: &mut Human, a: i32, b: i32) {
 /// human_action_simulation: runs the oldest queued inventory action.
 pub fn action_simulation(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut Touchables, out: &mut Vec<HumanOutput>) {
     h.action_type = -1;
+
     if h.actions_finished == h.actions_queued {
         return;
     }
+
     let f = h.actions_finished as usize;
     let a = h.actions[f];
+
     h.action_progress = a.progress;
     h.action_type = a.kind;
     h.action_duration = (a.progress * 100.0) as i32;
+
     match a.kind {
         0 => {
             if !drop(h, bodies, touch, f) {
@@ -283,6 +287,7 @@ pub fn action_simulation(h: &mut Human, human_id: usize, bodies: &mut RigidBodie
         4 => use_computer(h, human_id, bodies, touch),
         _ => {}
     }
+
     h.actions_finished = (h.actions_finished + 1) & 7;
 }
 
@@ -513,7 +518,7 @@ fn move_item(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &m
             link_item_to_human(h, human_id, bodies, touch, s.items[0] as usize, hand as usize);
         }
     }
-    
+
     true
 }
 
@@ -594,7 +599,9 @@ fn use_computer(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch:
     if h.vehicle.is_some() {
         return;
     }
+
     let Some(item_id) = item_in_sight(h, touch, |i| i.parent_human == -1 && i.parent_item == -1) else { return };
+
     if touch.items.get(item_id).is_some_and(|i| i.item_type == ItemKind::Computer) && h.inventory[0].count == 0 {
         link_item_to_human(h, human_id, bodies, touch, item_id, 0);
     }
