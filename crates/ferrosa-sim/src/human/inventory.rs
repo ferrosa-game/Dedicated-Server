@@ -361,6 +361,7 @@ fn mount(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut T
         h.action_hand = -1;
         return true;
     }
+    h.action_hand = hand;
     let hand = hand as usize;
     let other = hand ^ 1;
     let progress = STEP + h.actions[f].progress;
@@ -437,32 +438,40 @@ fn can_move(h: &Human, touch: &Touchables, hand: i32, pocket: i32) -> bool {
 /// Returns whether the action is finished.
 fn move_item(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut Touchables, f: usize) -> bool {
     let (slot, pocket) = (h.actions[f].slot, h.actions[f].arg);
+
     if !(0..5).contains(&pocket) {
         return true;
     }
+
     let hand = if slot <= 1 {
         if slot == -1 {
             h.action_hand = -1;
             h.action_slot = pocket;
             return true;
         }
+
         slot
     } else {
         let mut hand = 1;
         let s = &h.inventory[(pocket + 2) as usize];
+
         if s.count > 0 {
             let kind = touch.items.get(s.items[0] as usize).map_or(ItemKind::Auto5, |i| i.item_type);
             let magazine = touch.types[kind as usize].magazine_ammo > 0 && !matches!(kind, ItemKind::Grenade | ItemKind::Bandage);
             hand = (magazine as i32) ^ 1;
         }
+
         if h.inventory[hand as usize].count == 0 {
             hand ^= 1;
         }
+
         if slot == 2 {
             hand ^= 1;
         }
+
         if !can_move(h, touch, hand, pocket) {
             hand ^= 1;
+
             if !can_move(h, touch, hand, pocket) {
                 h.actions[f].slot = -1;
                 h.action_hand = -1;
@@ -470,13 +479,16 @@ fn move_item(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &m
                 return true;
             }
         }
+
         h.actions[f].slot = hand;
         hand
     };
+
     let progress = (1.0 / 15.0) + h.actions[f].progress;
     h.actions[f].progress = progress;
     h.action_hand = hand;
     h.action_slot = pocket;
+
     if can_move(h, touch, hand, pocket) {
         if progress < 1.0 {
             return false;
@@ -484,19 +496,24 @@ fn move_item(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &m
     } else {
         h.actions[f].progress = 1.0;
     }
+
     let held = h.inventory[hand as usize];
+
     if held.count > 0 {
         let item = held.items[0] as usize;
         let kind = touch.items.get(item).map_or(0, |i| i.item_type as usize);
+
         if touch.types[kind].pockets[pocket as usize] != 0 && item <= 1023 {
             link_item_to_human(h, human_id, bodies, touch, item, (pocket + 2) as usize);
         }
     } else if held.count == 0 {
         let s = h.inventory[(pocket + 2) as usize];
+
         if s.count > 0 && s.items[0] <= 1023 {
             link_item_to_human(h, human_id, bodies, touch, s.items[0] as usize, hand as usize);
         }
     }
+    
     true
 }
 
