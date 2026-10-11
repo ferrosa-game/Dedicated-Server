@@ -28,12 +28,7 @@ use tokio::sync::mpsc;
 use self::tps::timed;
 use self::traffic::traffic_section;
 use crate::{
-    Client, ConnId, Inbound, Outbound, PlayerId, SimJoinMsg, SimMsg,
-    gamemode::round,
-    human::inventory,
-    items,
-    player::Player,
-    world::{World, map::Map},
+    Client, ConnId, Inbound, Outbound, PlayerId, SimJoinMsg, SimMsg, human::inventory, items, player::Player, time::game_minutes, world::{World, map::Map},
 };
 use rayon::prelude::*;
 
@@ -240,9 +235,9 @@ impl Sim {
             tick_stats: tps::TickStats::default(),
             phase_times: tps::PhaseTimes::from_env(),
             corp_state: Default::default(),
-            game_timer: round::ROUND_MAX_TIME,
+            game_timer: game_minutes(2),
             round_elapsed: 0,
-            round_max_time: round::ROUND_MAX_TIME,
+            round_max_time: game_minutes(2),
             modes: crate::gamemode::Modes::load(),
             npcs: Vec::new(),
             admin: admin::AdminState::load(Path::new("serveradmin.txt")),

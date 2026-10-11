@@ -5,8 +5,7 @@ use ferrosa_protocol::clientbound::game::{
 };
 
 use super::Sim;
-use crate::input::ItemInput;
-use crate::time::TICKS_PER_MINUTE;
+use crate::{input::ItemInput, time::game_minutes};
 use crate::{
     PlayerId,
     items::{Item, state::ItemState},
@@ -22,7 +21,6 @@ pub mod key;
 pub mod phone;
 
 const NEVER_DESPAWN: i32 = 65535;
-const GROUND_DESPAWN: i32 = 5 * TICKS_PER_MINUTE;
 
 impl Sim {
     /// The per-item part of logic_item: despawn timers, then each type's behaviour, then the item's keys move to
@@ -183,7 +181,7 @@ impl Sim {
                     item.despawn_time = refresh(d);
                     false
                 } else {
-                    item.despawn_time = GROUND_DESPAWN;
+                    item.despawn_time = game_minutes(5);
                     true
                 }
             } else {
@@ -200,10 +198,10 @@ impl Sim {
             return;
         }
         let d = item.despawn_time;
-        let next = if d <= GROUND_DESPAWN { d - 1 } else { GROUND_DESPAWN - 1 };
+        let next = if d <= game_minutes(5) { d - 1 } else { game_minutes(5) - 1 };
         item.despawn_time = next;
         if !item.children.is_empty() {
-            item.despawn_time = GROUND_DESPAWN;
+            item.despawn_time = game_minutes(5);
             if modeless {
                 item.despawn_time = NEVER_DESPAWN;
             }

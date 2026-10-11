@@ -9,7 +9,7 @@ use crate::{PlayerId, items::state::ItemState};
 use crate::{
     items,
     sim::{Sim, missions},
-    time::TICKS_PER_MINUTE,
+    time::game_minutes
 };
 
 pub mod menus;
@@ -17,8 +17,6 @@ pub mod round_missions;
 
 /// The round corporations: Goldmen, Monsota and OXS.
 const ROUND_CORPS: usize = 3;
-/// The intermission starts at 7200 ticks; spawning begins below 5400, where the round is set up.
-pub const ROUND_MAX_TIME: i32 = 2 * TICKS_PER_MINUTE;
 const ROUND_START: i32 = 5400;
 /// With nobody on a team the intermission timer rests at 6900.
 const IDLE_TIME: i32 = 6900;
@@ -566,8 +564,8 @@ impl Sim {
 
         self.gamestate = GameState::Intermission;
         self.round_elapsed = 0;
-        self.round_max_time = ROUND_MAX_TIME;
-        self.game_timer = ROUND_MAX_TIME;
+        self.round_max_time = game_minutes(2);
+        self.game_timer = game_minutes(2);
         self.reset_corporation_rounds();
         self.reset_lobby_players_and_world();
     }

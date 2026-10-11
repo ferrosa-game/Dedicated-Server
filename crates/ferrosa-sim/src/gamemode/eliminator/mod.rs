@@ -8,7 +8,7 @@ use ferrosa_protocol::{
     },
 };
 
-use crate::time::{TICKS_PER_MINUTE, TICKS_PER_SECOND};
+use crate::time::{TICKS_PER_SECOND, game_minutes};
 use crate::{
     PlayerId,
     sim::{Sim, missions::MISSION_SPOTS},
@@ -19,17 +19,11 @@ pub const MAX_GROUPS: usize = 8;
 /// The lobby waits at 1800 ticks with two or fewer ready, and drops to 180 once everyone is ready.
 const LOBBY_TIME: i32 = 1800;
 const ALL_READY_TIME: i32 = 180;
-const GAME_TIME: i32 = 15 * TICKS_PER_MINUTE;
-const RESTART_TIME: i32 = 20 * TICKS_PER_SECOND;
 /// The streets' intersections 18, 40, 50 and 51 are never spawned at (a bit mask over the first 52).
 const BLOCKED_INTERSECTIONS: u64 = 0xc000100040000;
 const LAST_MASKED_INTERSECTION: usize = 51;
 const SPAWN_LIFT: f32 = 1.0;
 const LANE_WIDTH: f32 = 4.0;
-/// Positions start going out after 2 minutes, to the eliminators from 3; supplies drop every minute after that.
-const REVEAL_START: i32 = 2 * TICKS_PER_MINUTE - 1;
-const ELIMINATOR_REVEAL_START: i32 = 3 * TICKS_PER_MINUTE - 1;
-const DROP_PERIOD: u32 = TICKS_PER_MINUTE as u32;
 /// The tables' items are 0.375 apart; a restock first clears 16 such steps within 0.5.
 const TABLE_STEP: f32 = 0.375;
 const CLEAR_STEPS: usize = 16;
@@ -156,7 +150,7 @@ impl Sim {
             self.modes.eliminator.groups[i].current = pos;
         }
         self.gamestate = GameState::InGame;
-        self.game_timer = GAME_TIME;
+        self.game_timer = game_minutes(15);
         self.round_elapsed = 0;
     }
 
@@ -329,11 +323,11 @@ impl Sim {
         let ready = self.players.iter().filter(|(_, p)| !p.is_bot && p.is_ready).count();
         let elapsed = self.round_elapsed;
         let interval = TICKS_PER_SECOND
-            * if elapsed < 5 * TICKS_PER_MINUTE {
+            * if elapsed < game_minutes(5) {
                 45
-            } else if elapsed < 8 * TICKS_PER_MINUTE {
+            } else if elapsed < game_minutes(8) {
                 30
-            } else if elapsed < 11 * TICKS_PER_MINUTE {
+            } else if elapsed < game_minutes(11) {
                 15
             } else {
                 5
@@ -348,18 +342,18 @@ impl Sim {
             CheckEliminators,
         }
         let mut next = Next::Check;
-        if elapsed > REVEAL_START {
+        if elapsed > game_minutes(2) {
             let mut checked_drop = false;
             if self.game_timer % interval == 0 {
                 if n == 0 {
-                    next = if elapsed > ELIMINATOR_REVEAL_START { Next::Drop } else { Next::CheckEliminators };
+                    next = if elapsed > game_minutes(3) { Next::Drop } else { Next::CheckEliminators };
                     checked_drop = true;
                 } else {
                     for i in 0..n {
                         let g = &mut self.modes.eliminator.groups[i];
                         g.revealed = g.current;
                         let g = *g;
-                        if self.round_elapsed > ELIMINATOR_REVEAL_START {
+                        if self.round_elapsed > game_minutes(3) {
                             self.push_mission(g.eliminator, 1, 0, 0, Some(g.revealed));
                         }
                         let now = self.player_human_pos(g.target).unwrap_or(self.modes.eliminator.last_target);
@@ -368,7 +362,7 @@ impl Sim {
                     }
                 }
             }
-            if !checked_drop && self.round_elapsed > ELIMINATOR_REVEAL_START && (self.round_elapsed as u32).is_multiple_of(DROP_PERIOD) {
+            if !checked_drop && self.round_elapsed > game_minutes(3) && (self.round_elapsed as u32).is_multiple_of(game_minutes(1) as u32) {
                 next = Next::Drop;
             }
         }
@@ -407,8 +401,9 @@ impl Sim {
     fn end_eliminator(&mut self, a: i32, b: i32, c: i32) {
         self.set_eliminator_scores(a, b, c);
         self.gamestate = GameState::Restarting;
-        self.game_timer = RESTART_TIME;
+        self.game_timer = 20 * TICKS_PER_SECOND;
         let people: Vec<i32> = self.players.iter().filter(|(_, p)| !p.is_bot).map(|(i, _)| i as i32).collect();
+
         for pid in people {
             for i in 0..self.modes.eliminator.count {
                 let g = self.modes.eliminator.groups[i];
@@ -427,20 +422,25 @@ impl Sim {
         self.create_item(ItemKind::Grenade, p, None, IDENTITY);
         let spot = MISSION_SPOTS[rand::random_range(0..8) as usize];
         let (gun, mag) = random_gun();
+
         for j in 0..4 {
             let v = crate::human::arms::calculate_spread_vector(&mut self.noise_seed, DROP_GUN_SPREAD, 0.0);
             let p = Vec3::new(v.x + spot.x, 0.0 + spot.y, v.z + spot.z);
             self.create_item(if j == 0 { gun } else { mag }, p, None, IDENTITY);
         }
+
         let mut tables = 7;
+
         if ready <= 14 {
             let s = rand::random_range(0..3);
             tables = 1 << s;
+
             if ready > 7 {
                 let s2 = s + 1;
                 tables |= if s2 == 3 { 1 } else { 1 << s2 };
             }
         }
+
         for k in 0..3 {
             if tables >> k & 1 != 0 {
                 self.restock_eliminator_table(k);
@@ -454,26 +454,35 @@ impl Sim {
         let base = &self.world.map.level.bases[k];
         let rot = base.frame();
         let r0 = rot[0];
+
         let mut p = step(base.table, r0);
         let mut q = Vec3::new(p.x, p.y - CLEAR_DROP, p.z);
+
         for _ in 0..CLEAR_STEPS {
             self.distance_based_item_despawning(q, CLEAR_RADIUS);
             q = step(q, r0);
         }
+
         for _ in 0..TABLE_GUNS {
             let (gun, mag) = random_gun();
             self.create_item(gun, p, None, rot);
+
             for _ in 0..3 {
                 p = step(p, r0);
                 self.create_item(mag, p, None, rot);
             }
+
             p = step(p, r0);
         }
+
         self.create_item(ItemKind::Grenade, p, None, rot);
         p = step(p, r0);
+
         let two = rand::random::<bool>();
+
         self.create_item(ItemKind::Bandage, p, None, rot);
         p = step(p, r0);
+
         if two {
             self.create_item(ItemKind::Bandage, p, None, rot);
         }
@@ -495,8 +504,7 @@ impl Sim {
     }
 }
 
-/// An eliminator death adds 18000 ticks split between a third of the starting players, up to 50400.
-const DEATH_CUT_TIME: i32 = 5 * TICKS_PER_MINUTE;
+/// An eliminator death adds 18000 ticks split between a third of the starting players, up to 50400.\
 const DEATH_CUT_CAP: i32 = 50400;
 
 impl Sim {
@@ -505,10 +513,12 @@ impl Sim {
     pub(crate) fn broadcast_death_cut_time(&mut self, pid: PlayerId) {
         let Some(name) = self.players.get(pid.idx()).map(|p| p.username.clone()) else { return };
         self.send_chat(&format!("{name} has died"), ChatType::EliminatorAnnouncement, -1, 0);
+
         let timer = self.game_timer;
         let thirds = self.modes.eliminator.ready / 3;
+
         if timer <= DEATH_CUT_CAP && thirds > 0 {
-            self.game_timer = (DEATH_CUT_TIME / thirds + timer).min(DEATH_CUT_CAP);
+            self.game_timer = (game_minutes(5) / thirds + timer).min(DEATH_CUT_CAP);
         }
     }
 }

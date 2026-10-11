@@ -19,10 +19,6 @@ use super::{
 use crate::input::Input;
 use ferrosa_protocol::clientbound::game::ItemKind;
 
-/// A seated human's empty hands reach straight ahead: the arm length turned a quarter turn, as the binary stores it.
-/// This is possibly a decomp artifact
-const SEATED_REACH_Y: f64 = 2.868559968872221e-08;
-
 fn hash_noise(n: i32) -> f32 {
     let h = (n << 13) ^ n;
     let m = h.wrapping_mul(h).wrapping_mul(15731).wrapping_add(789221);
@@ -269,7 +265,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
         let a = angle as f64;
 
         let (y, z) = if h.vehicle.is_some() {
-            ((SEATED_REACH_Y * scale as f64) as f32, (scale as f64 * -(21.0 / 32.0)) as f32)
+            (0.0, (scale as f64 * -(21.0 / 32.0)) as f32)
         } else {
             (((-0.65625 * a.cos()) * scale as f64) as f32, (scale as f64 * (-a.sin() * 0.65625)) as f32)
         };

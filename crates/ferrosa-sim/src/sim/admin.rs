@@ -4,7 +4,7 @@ use ferrosa_physics::rotation::IDENTITY;
 use ferrosa_protocol::{
     Team,
     clientbound::{
-        admin_list::{ADMIN_LIST_ROWS, AdminList},
+        admin_list::AdminList,
         game::{ItemKind, VehicleKind, events::chat::ChatType},
     },
     frame_packet,
@@ -434,7 +434,7 @@ impl Sim {
 
     /// send_adminpacket for each admin connection whose turn it is.
     pub(crate) fn send_admin_lists(&mut self) {
-        let packet = AdminList { rows: vec![None; ADMIN_LIST_ROWS] };
+        let packet = AdminList { rows: vec![None; 256] };
         let tick = self.tick;
 
         for (index, conn) in self.connection_order().into_iter().enumerate() {

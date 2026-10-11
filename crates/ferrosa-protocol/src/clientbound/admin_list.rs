@@ -1,8 +1,5 @@
 use crate::codec::WireWrite;
 
-/// Rows in the admin list (the game's admin_data table, 0x50 bytes each).
-pub const ADMIN_LIST_ROWS: usize = 256;
-
 /// One filled row of the admin list: an account id, its name and phone number.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AdminListEntry {

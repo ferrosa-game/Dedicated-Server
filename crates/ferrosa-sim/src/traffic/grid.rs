@@ -1,7 +1,7 @@
 use glam::Vec3;
 
 use super::{MAX_STREET_CARS, Traffic, maxss, minss};
-use crate::world::streets::StreetMap;
+use crate::{time::TICKS_PER_SECOND_F32, world::streets::StreetMap};
 
 /// A car covers the lanes whose start line its bounds come within this of.
 const LANE_REACH: f32 = 2.0;
@@ -9,7 +9,6 @@ const NO_CAR: f32 = 65536.0;
 /// lane_clearance keeps this far behind the car ahead and closes the rest of the gap over two seconds.
 const FOLLOW_GAP: f32 = 2.0;
 const CLOSE_RATE: f32 = 0.5;
-const TICKS_PER_SECOND: f32 = crate::time::TICKS_PER_SECOND as f32;
 
 fn inside(min: Vec3, max: Vec3, p: Vec3) -> bool {
     p.x >= min.x && max.x >= p.x && p.z >= min.z && max.z >= p.z && p.y >= min.y && max.y >= p.y
@@ -133,7 +132,7 @@ pub fn lane_clearance(traffic: &Traffic, map: &StreetMap, car: usize, street: i3
             }
             -(o.rear_proj - pos)
         };
-        let v = ((gap - FOLLOW_GAP) * CLOSE_RATE) / TICKS_PER_SECOND + o.speed();
+        let v = ((gap - FOLLOW_GAP) * CLOSE_RATE) / TICKS_PER_SECOND_F32 + o.speed();
         best = minss(maxss(0.0, v), best);
     }
     best

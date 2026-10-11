@@ -10,14 +10,11 @@ use super::{
     vehicles::{TYRE_BURST, WINDOW_BROKEN},
 };
 use crate::{
-    PlayerId,
-    human::{
+    PlayerId, human::{
         BoneId,
         damage::{BoneHit, damage_human, trace_ray_human},
         physics::{HumanOutput, add_bullet_hole},
-    },
-    vehicle::physics::{VehicleHit, VehiclePart, trace_vehicle_parts},
-    world::{
+    }, time::TICKS_PER_SECOND_F32, vehicle::physics::{VehicleHit, VehiclePart, trace_vehicle_parts}, world::{
         capsule::CapsuleHit,
         trace::{LevelHit, line_intersect_level},
     },
@@ -32,7 +29,6 @@ const HIT_VEHICLE: i32 = 2;
 const VEHICLE_DAMAGE_SCALE: f32 = 1.5;
 const TYRE_BURST_RADIUS: f32 = 0.75;
 const DAMAGE_SCALE: f32 = 5.5;
-const TICKS_PER_SECOND: f32 = crate::time::TICKS_PER_SECOND as f32;
 const DAMAGE_FLOOR: f32 = 2.0;
 const LIGHT_BONE: f32 = 6.0;
 const LIGHT_BONE_MASS: f32 = 3.0;
@@ -63,8 +59,10 @@ pub fn create_bullet(bullets: &mut Vec<Bullet>, kind: i32, pos: Vec3, vel: Vec3,
     if bullets.len() >= MAX_BULLETS {
         return false;
     }
+
     let mass = BULLET_DATA.get(kind as usize).map_or(0.0, |d| d.0);
     bullets.push(Bullet { kind, time: LIFETIME, player, mass, gravity: BULLET_GRAVITY * gravity_scale, prev: pos, pos, vel });
+
     true
 }
 
@@ -95,7 +93,7 @@ impl Sim {
         self.bullets[i].time = 0;
         let v = b.vel;
         let speed = v.length();
-        let damage = ((b.mass * (speed * VEHICLE_DAMAGE_SCALE)) * TICKS_PER_SECOND - DAMAGE_FLOOR) as i32;
+        let damage = ((b.mass * (speed * VEHICLE_DAMAGE_SCALE)) * TICKS_PER_SECOND_F32 - DAMAGE_FLOOR) as i32;
         let damage = if damage >= 0 { damage } else { 0 };
         let Some(vehicle) = self.vehicles.get_mut(vid) else { return };
         let update = |kind: i32, part: usize| EventUpdateVehicle { vehicle_id: vid as i32, kind, part: part as i32, pos: Vector(hit.pos), velocity: Vector(v) };
@@ -258,19 +256,21 @@ impl Sim {
         if let Some(item) = self.items.get_mut(hit_id).filter(|i| i.item_type == ItemKind::Watermelon) {
             item.health = 0;
         }
+
         for &id in found {
             if let Some(item) = self.items.get_mut(id) {
                 item.physics_settled = false;
                 item.settled_timer = 0;
             }
         }
+
         self.bullets[i].time = 0;
     }
 
     /// A bullet stopped by a human: damage from its mass and speed (more on the head) and a push on the bone hit.
     fn bullet_hit_human(&mut self, i: usize, id: usize, hit: BoneHit) {
         let bullet = self.bullets[i].clone();
-        let mut damage = (bullet.mass * (bullet.vel.length() * DAMAGE_SCALE) * TICKS_PER_SECOND - DAMAGE_FLOOR) as i32;
+        let mut damage = (bullet.mass * (bullet.vel.length() * DAMAGE_SCALE) * TICKS_PER_SECOND_F32 - DAMAGE_FLOOR) as i32;
 
         if damage > 0 {
             let e = EventBulletHit { unk: 0, hit_type: HIT_BODY, pos: Vector(hit.pos), normal: Vector(hit.normal) };

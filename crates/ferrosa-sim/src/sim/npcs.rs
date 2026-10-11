@@ -8,15 +8,13 @@ use ferrosa_protocol::{
 };
 
 use super::Sim;
-use crate::PlayerId;
-use crate::time::TICKS_PER_MINUTE;
+use crate::{PlayerId, time::TICKS_PER_SECOND};
 
 pub const MAX_NPCS: usize = 1024;
 /// An NPC's bot comes in when a living player is within 96 of it, stays while one is within 104, and leaves when
 /// none is; a killed one is back 18000 ticks later. Each NPC is looked at every 32 ticks, in turn.
 const NEAR: f32 = 96.0;
 const KEEP: f32 = 104.0;
-const RESPAWN: i32 = 5 * TICKS_PER_MINUTE;
 const CHECK_MASK: u32 = 0x1f;
 const GUARD: i32 = 0;
 const ZOMBIE: i32 = 1;
@@ -117,7 +115,7 @@ impl Sim {
         }
         let bot = self.npcs[idx].as_mut().and_then(|n| {
             n.human = None;
-            n.timer = RESPAWN;
+            n.timer = 5 * TICKS_PER_SECOND;
             n.bot.take()
         });
         if let Some(pid) = bot {

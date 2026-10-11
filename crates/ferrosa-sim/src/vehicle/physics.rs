@@ -8,13 +8,13 @@ use ferrosa_protocol::clientbound::game::VehicleKind;
 use ferrosa_protocol::clientbound::game::events::sound::Sound;
 
 use super::{Vehicle, types::VehicleType};
-use crate::world::{
+use crate::{time::TICKS_PER_SECOND_F32, world::{
     capsule::{capsule_intersect_triangle, capsule_intersect_triangle_facing},
     collide::{calculate_face_normal, point_in_triangle_oriented, segment_intersect_face},
     map::Map,
     sphere::{segment_intersect_plane_two_sided, segment_intersect_sphere, sphere_intersect_level},
     trace::line_intersect_level,
-};
+}};
 
 const WATER_LEVEL: f32 = 23.0;
 const FALLEN: f32 = -32.0;
@@ -24,7 +24,6 @@ const UNCONTROLLED: i32 = -1;
 const CLUTCH_HELD: i32 = 2;
 const HANDBRAKE: i32 = 4;
 const HUGE: f32 = 65536.0;
-const TICKS_PER_SECOND: f32 = crate::time::TICKS_PER_SECOND as f32;
 const BLOCK_SCALE: f32 = 0.25;
 const DAMAGE_SPEED: f32 = 7.0 / 60.0;
 const CRASH_SPEED: f32 = 1.0 / 30.0;
@@ -112,10 +111,10 @@ fn crash_and_drag(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, out: &mu
     }
     if v.kind != VehicleKind::NoClip {
         if dv > DAMAGE_SPEED {
-            out.push(VehicleOutput::Damage { vehicle: id, amount: (dv * TICKS_PER_SECOND + 10.0) as i32 });
+            out.push(VehicleOutput::Damage { vehicle: id, amount: (dv * TICKS_PER_SECOND_F32 + 10.0) as i32 });
         }
         if dv > CRASH_SPEED {
-            v.crash += dv * TICKS_PER_SECOND * 0.125;
+            v.crash += dv * TICKS_PER_SECOND_F32 * 0.125;
             if v.crash > 2.0 {
                 crash_sound(v, out);
                 v.crash -= 2.0;
@@ -296,7 +295,7 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
         w.steer = w1;
     }
     if v.health > 0 && !v.locked {
-        let rpm = ((v.engine_speed * TICKS_PER_SECOND * TICKS_PER_SECOND) as f64 / FULL_TURN) as i32;
+        let rpm = ((v.engine_speed * TICKS_PER_SECOND_F32 * TICKS_PER_SECOND_F32) as f64 / FULL_TURN) as i32;
         if rpm >= 0 {
             v.engine_rpm = rpm;
             if v.gear > 0 && rpm == 0 {
@@ -505,7 +504,7 @@ const DOOR_CLOSED: i32 = 6;
 fn drive_train(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, track: &crate::world::track::Track, out: &mut Vec<VehicleOutput>) {
     let r2 = v.rot[2];
     let s = v.vel.dot(r2);
-    v.engine_rpm = (s.abs() * SPEEDO_SCALE * TICKS_PER_SECOND) as i32;
+    v.engine_rpm = (s.abs() * SPEEDO_SCALE * TICKS_PER_SECOND_F32) as i32;
     let weight = |i: i32| track.meshes.get(i as usize).map_or(0.0, |m| m.weight);
     let mut target = if v.train_segment == -1 {
         TRAIN_CRUISE
@@ -819,13 +818,13 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
             v.wheels[k].spin = spin;
             let (lim, neg) = if k < 2 {
                 if 1.0 >= v.brake {
-                    let lim = v.brake * 0.5 / TICKS_PER_SECOND;
+                    let lim = v.brake * 0.5 / TICKS_PER_SECOND_F32;
                     (lim, -lim)
                 } else {
                     (0.0, -0.0)
                 }
             } else {
-                let lim = v.brake / TICKS_PER_SECOND;
+                let lim = v.brake / TICKS_PER_SECOND_F32;
                 (lim, -lim)
             };
             let t = if neg > spin {

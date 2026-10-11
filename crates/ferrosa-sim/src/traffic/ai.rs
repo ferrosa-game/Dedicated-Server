@@ -1,7 +1,7 @@
 use glam::Vec3;
 
 use super::{LOOP_STREET, LOOP_STREET_2, Traffic, grid::lane_clearance, lane_count, left_lanes, maxss, minss, random_street, route::plan_route};
-use crate::world::streets::{Lane, MapStreet, StreetMap};
+use crate::{time::TICKS_PER_SECOND_F32, world::streets::{Lane, MapStreet, StreetMap}};
 
 /// Ticks a car may sit still before it backs out (until 319, when the count starts over).
 const STUCK_TICKS: i32 = 179;
@@ -25,7 +25,6 @@ const SLOW: f32 = 2.0 / 15.0;
 const CRAWL: f32 = 0.3;
 const MIN_SPEED: f32 = 2.0 / 15.0;
 const AGGRESSIVE_MIN: f32 = 0.2;
-const TICKS_PER_SECOND: f32 = crate::time::TICKS_PER_SECOND as f32;
 /// The point ahead of the car the remaining distance is measured from, and where the intersection begins.
 const NOSE: f32 = 4.0;
 const AT_JUNCTION: f32 = 1.0;
@@ -73,7 +72,7 @@ fn steer_toward(yaw: f32, target: f32, limit: f64, max: f32) -> f32 {
 
 /// The co-op speed for aggressive cars: (wave * `per` + 16) / 60.
 fn coop_speed(traffic: &Traffic, per: i32) -> f32 {
-    (traffic.coop_level * per + 16) as f32 / TICKS_PER_SECOND
+    (traffic.coop_level * per + 16) as f32 / TICKS_PER_SECOND_F32
 }
 
 /// The stuck count: it climbs while the car is stopped but means to go forwards, and runs on to 319 once past 179.
@@ -316,11 +315,11 @@ fn slow_for_signal(traffic: &mut Traffic, id: usize, remaining: f32, junction: u
     let fast = aggressive && (remaining > FAST_DISTANCE || next_turn == 0);
     let base = if fast { coop_speed(traffic, 8) } else { CRUISE };
     let c = &mut traffic.cars[id];
-    let mut approach = maxss(0.0, ((remaining - STOP_LINE) * 0.5) / TICKS_PER_SECOND);
+    let mut approach = maxss(0.0, ((remaining - STOP_LINE) * 0.5) / TICKS_PER_SECOND_F32);
     if remaining < BRAKING {
         approach = 0.0;
     }
-    c.target_speed = ((id & 7) as f32 * 0.5) / TICKS_PER_SECOND + base;
+    c.target_speed = ((id & 7) as f32 * 0.5) / TICKS_PER_SECOND_F32 + base;
     if !aggressive {
         let light = if next_turn == -1 { way + LEFT_LIGHTS } else { way };
         if traffic.signals.get(junction).is_some_and(|sg| sg.lights[light as usize] <= AMBER) && c.target_speed > approach {

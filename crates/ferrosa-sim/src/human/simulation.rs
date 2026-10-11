@@ -19,15 +19,14 @@ use super::{
     },
     seated::{fall_out, simulate_seated, walk_simulation},
 };
-use crate::time::TICKS_PER_MINUTE;
-use crate::world::map::Map;
+
+use crate::{time::game_minutes, world::map::Map};
 use crate::{
     input::Input,
     items::Touchables,
 };
 
 const TURN_STEP: f32 = 3.0 / 64.0;
-const DESPAWN_TICKS: i32 = TICKS_PER_MINUTE;
 const DEAD_PLAYER_TICKS: i32 = 3480;
 
 /// What human_simulation asks of the sim after a human's tick.
@@ -262,7 +261,7 @@ fn despawn_timer(h: &mut Human, out: &mut Vec<HumanOutput>, keep_bodies: bool) -
     let alive = h.health.vitality > 0;
     if h.health.vitality > 0 {
         if h.player.is_some() {
-            h.despawn_ticks = DESPAWN_TICKS;
+            h.despawn_ticks = game_minutes(1);
             return HumanTick::Keep;
         }
     } else if h.despawn_ticks < DEAD_PLAYER_TICKS
