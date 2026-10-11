@@ -11,6 +11,8 @@ pub mod config;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("[Main] Ferrosa version v{}", env!("CARGO_PKG_VERSION"));
+
     let config = ConfigMain::read_from_file();
     let mode = ferrosa_sim::by_name(&config.gamemode).unwrap_or_else(|| {
         eprintln!("[Config] unknown gamemode {:?} - using round", config.gamemode);
