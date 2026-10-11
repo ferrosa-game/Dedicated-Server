@@ -5,7 +5,7 @@ use ferrosa_protocol::clientbound::game::{
 };
 
 use super::Sim;
-use crate::input::ITEM_USE;
+use crate::input::ItemInput;
 use crate::time::TICKS_PER_MINUTE;
 use crate::{
     PlayerId,
@@ -41,7 +41,7 @@ impl Sim {
             match kind {
                 ItemKind::Key => self.key_logic(id),
                 ItemKind::Radio => {
-                    let pressed = self.items.get(id).is_some_and(|i| i.input_flags & ITEM_USE != 0);
+                    let pressed = self.items.get(id).is_some_and(|i| i.has_input(ItemInput::Use));
                     if let Some(ItemState::Radio { transmitting, .. }) = self.items.get_mut(id).map(|i| &mut i.state) {
                         *transmitting = pressed;
                     }
@@ -76,7 +76,7 @@ impl Sim {
         const LEVER_UP: f32 = 0.03125;
         let in_game = self.gamestate == GameState::InGame;
         let Some(item) = self.items.get(id) else { return };
-        let (kind, holder, input, body_id) = (item.item_type, item.parent_human, item.input_flags, item.body);
+        let (kind, holder, trigger, body_id) = (item.item_type, item.parent_human, item.has_input(ItemInput::Use), item.body);
         let mag = item.children.first().copied();
         let ty = &self.item_types[kind as usize];
         let (fire_rate, bullet_type, velocity, spread, gun_mass) = (ty.fire_rate, ty.bullet_type, ty.bullet_velocity, ty.bullet_spread, ty.mass);
@@ -90,7 +90,7 @@ impl Sim {
         }
         let semi = matches!(kind, ItemKind::Magnum | ItemKind::Pistol);
         let fire_tick = if kind == ItemKind::Magnum { MAGNUM_FIRE_TICK } else { FIRE_TICK };
-        if input & ITEM_USE != 0 {
+        if trigger {
             if kind == ItemKind::Magnum || *trigger_ticks <= 1 || semi {
                 *trigger_ticks += 1;
             }
@@ -222,18 +222,17 @@ impl Sim {
     /// bandage patches up the nearest bleeding or dying human while held.
     fn use_logic(&mut self, id: usize) {
         let Some(item) = self.items.get(id) else { return };
-        let (input, last) = (item.input_flags, item.last_input_flags);
-        let pressed = input & ITEM_USE != 0;
+        let (pressed, was_pressed) = (item.has_input(ItemInput::Use), item.had_input(ItemInput::Use));
         let kind = item.item_type;
         if !pressed {
-            if kind == ItemKind::Burger && last & ITEM_USE != 0 {
+            if kind == ItemKind::Burger && was_pressed {
                 self.burger_logic(id);
             } else if let Some(ItemState::Bandage { progress, .. }) = self.items.get_mut(id).map(|i| &mut i.state) {
                 *progress = 0;
             }
             return;
         }
-        if last & ITEM_USE == 0 {
+        if !was_pressed {
             let toggled = match kind {
                 ItemKind::Briefcase => Some(ItemKind::BriefcaseOpen),
                 ItemKind::BriefcaseOpen => Some(ItemKind::Briefcase),

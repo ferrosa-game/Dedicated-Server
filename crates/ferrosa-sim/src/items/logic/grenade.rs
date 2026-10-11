@@ -2,7 +2,7 @@ use glam::Vec3;
 use ferrosa_math::vector::Vector;
 use ferrosa_protocol::clientbound::game::events::{Event, ServerEvent, explosion::EventExplosion};
 
-use crate::{PlayerId, input::ITEM_SECONDARY, items::state::ItemState, sim::Sim};
+use crate::{PlayerId, input::ItemInput, items::state::ItemState, sim::Sim};
 
 const GRENADE_KILL_RANGE: f32 = 4.0;
 const GRENADE_PUSH_RANGE: f32 = 8.0;
@@ -17,9 +17,7 @@ impl Sim {
     /// 239 and blows up.
     pub(crate) fn grenade_logic(&mut self, id: usize) {
         let item = self.items.get_mut(id).unwrap();
-        let (input, last, holder) = (item.input_flags, item.last_input_flags, item.parent_human);
-
-        let rising = input & ITEM_SECONDARY != 0 && last & ITEM_SECONDARY == 0;
+        let (rising, holder) = (item.pressed(ItemInput::Secondary), item.parent_human);
 
         let holder_player = (holder != -1).then(|| self.humans.get(holder as usize)).flatten().and_then(|h| h.player);
 

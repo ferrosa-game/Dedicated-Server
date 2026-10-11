@@ -3,7 +3,7 @@ use ferrosa_protocol::clientbound::game::{
     events::{Event, ServerEvent, phone_sound::EventPhoneSound, sound::Sound, update_phone::EventUpdatePhone},
 };
 
-use crate::{input::ITEM_USE, sim::Sim};
+use crate::{input::ItemInput, sim::Sim};
 
 const PHONE_BUSY_TICKS: i32 = 359;
 const PHONE_RING_TICKS: i32 = 767;
@@ -68,7 +68,7 @@ impl Sim {
     pub(crate) fn phone_logic(&mut self, id: usize) {
         let tick = self.tick;
         let item = self.items.get_mut(id).unwrap();
-        let rising = item.input_flags & ITEM_USE != 0 && item.last_input_flags & ITEM_USE == 0;
+        let rising = item.pressed(ItemInput::Use);
 
         let Some(p) = item.state.phone_mut() else { return };
         if p.cooldown > 0 {

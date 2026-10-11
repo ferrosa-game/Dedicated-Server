@@ -10,7 +10,7 @@ use super::{
     ik::{IkParams, three_bone_ik},
     locomotion::{FOOT_FREE, calculate_center_of_mass},
 };
-use crate::{input::GRAB, items::Touchables};
+use crate::{input::Input, items::Touchables};
 use crate::{
     vehicle::{HANDBRAKE, Vehicle},
     world::{map::Map, trace::line_intersect_level},
@@ -214,7 +214,7 @@ pub(super) fn simulate_seated(h: &mut Human, bodies: &mut RigidBodies, map: &Map
     pose_bones(h, bodies, map, has_item, scale);
     h.last_vehicle_cooldown = LAST_VEHICLE_TICKS;
     h.last_vehicle = vid as i32;
-    if h.input_flags & GRAB == 0 {
+    if !h.has_input(Input::Grab) {
         h.seat_exit = 0;
         return;
     }

@@ -7,7 +7,7 @@ use ferrosa_protocol::{
 };
 
 use super::Sim;
-use crate::input::{CROUCH, GRAB, LEFT_MOUSE, RELOAD};
+use crate::input::Input;
 use crate::{PlayerId, player::BotTarget, world::trace::line_intersect_level};
 
 /// How far the view may turn from the body, either way.
@@ -131,7 +131,7 @@ impl Sim {
             p.bot.wrecked_ticks += 1;
 
             if p.bot.wrecked_ticks > WRECK_PATIENCE {
-                p.input_bits |= GRAB;
+                p.input_bits |= Input::Grab.mask();
             }
         } else {
             p.bot.wrecked_ticks = 0;
@@ -157,7 +157,7 @@ impl Sim {
                     self.push_bot_action(pid, 1);
                 }
             } else if rand::random_ratio(1, 32) {
-                self.players.get_mut(pid.idx()).unwrap().input_bits |= RELOAD;
+                self.players.get_mut(pid.idx()).unwrap().input_bits |= Input::Reload.mask();
             }
             return;
         }
@@ -292,7 +292,7 @@ impl Sim {
         p.controls.look_yaw = look;
         if UPRIGHT > pelvis_up {
             if (tick & 0x7f) > 64 {
-                p.input_bits |= CROUCH;
+                p.input_bits |= Input::Crouch.mask();
             }
             return;
         }
@@ -384,7 +384,7 @@ impl Sim {
             return (yaw, pitch);
         }
         if self.bot_gun_loaded(hid) && rand::random_ratio(1, 4) {
-            self.players.get_mut(pid.idx()).unwrap().input_bits |= LEFT_MOUSE;
+            self.players.get_mut(pid.idx()).unwrap().input_bits |= Input::LeftMouse.mask();
         }
         (yaw, pitch)
     }
@@ -471,7 +471,7 @@ impl Sim {
             return;
         }
         if self.bot_gun_loaded(hid) {
-            self.players.get_mut(pid.idx()).unwrap().input_bits |= LEFT_MOUSE;
+            self.players.get_mut(pid.idx()).unwrap().input_bits |= Input::LeftMouse.mask();
         }
     }
 

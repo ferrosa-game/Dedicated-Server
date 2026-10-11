@@ -8,7 +8,7 @@ use glam::Vec3;
 use ferrosa_physics::{Bond, ItemPoint, RigidBodies, RotMatrix, Table};
 
 use super::{BoneId, Human, inventory::point_segment_distance};
-use crate::input::GRAB;
+use crate::input::Input;
 
 /// How far from a bone's axis a hand can take hold of it.
 const GRAB_REACH: f32 = 0.25;
@@ -22,15 +22,10 @@ pub const HAND_BONES: [usize; 2] = [BoneId::HandRight as usize, BoneId::HandLeft
 /// What a hand holds on to.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Grab {
-    /// Whether the hand holds on (record +0x10).
     pub holding: bool,
-    /// The human held (record +0x14).
     pub human: usize,
-    /// Its bone held (record +0x1c).
     pub bone: usize,
-    /// The spot held, in the bone's frame (record +0x20).
     pub point: Vec3,
-    /// Where that spot was in the world at the last grab pass, which the arm reaches for.
     pub spot: Vec3,
 }
 
@@ -44,11 +39,13 @@ struct HeldBone {
 
 fn to_world(b: &HeldBone, l: Vec3) -> Vec3 {
     let [r0, r1, r2] = b.rot;
+    
     b.pos + r0 * l.x + r1 * l.y + r2 * l.z
 }
 
 fn to_local(b: &HeldBone, p: Vec3) -> Vec3 {
     let ([r0, r1, r2], d) = (b.rot, p - b.pos);
+
     Vec3::new(r0.dot(d), r1.dot(d), r2.dot(d))
 }
 
@@ -64,13 +61,17 @@ pub fn grab_hands(humans: &mut Table<Human>, bodies: &mut RigidBodies, ticks: u3
 
     for id in humans.ids() {
         let Some(h) = humans.get_mut(id) else { continue };
+
         for (hand, &bone) in HAND_BONES.iter().enumerate() {
             let free = h.health.vitality > 0 && h.vehicle.is_none() && h.inventory[hand].count == 0;
-            if !free || h.input_flags & GRAB == 0 {
+
+            if !free || !h.has_input(Input::Grab) {
                 h.grabs[hand].holding = false;
                 continue;
             }
+
             let palm = h.bones[bone].pos;
+
             if !h.grabs[hand].holding {
                 let nearest = others
                     .iter()
@@ -84,18 +85,24 @@ pub fn grab_hands(humans: &mut Table<Human>, bodies: &mut RigidBodies, ticks: u3
                 }
                 continue;
             }
+
             let g = h.grabs[hand];
+
             let Some(held) = bone_of(g.human, g.bone) else {
                 h.grabs[hand].holding = false;
                 continue;
             };
+
             let spot = to_world(&held, g.point);
+
             if palm.distance(spot) > GRAB_SLIP || h.stamina <= GRAB_STAMINA {
                 h.grabs[hand].holding = false;
                 continue;
             }
+
             h.grabs[hand].spot = spot;
             bodies.create_bond(Bond::ItemPoint(ItemPoint::grab(h.bones[bone].body, held.body, g.point)));
+
             if ticks & 3 == 0 {
                 h.stamina -= 1;
             }

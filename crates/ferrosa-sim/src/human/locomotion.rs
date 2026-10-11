@@ -13,7 +13,7 @@ use super::{
     bones::BONES,
     ik::{IkParams, three_bone_ik},
 };
-use crate::input::{CROUCH, JUMP};
+use crate::input::Input;
 use crate::{
     vehicle::{Vehicle, physics::trace_vehicle, types::VehicleType},
     world::{map::Map, trace::line_intersect_level},
@@ -278,7 +278,7 @@ pub fn probe_ground(h: &mut Human, surface: &Surface) {
 
 /// human_update_movement_target: steers the movement target (where the body wants to be) from the inputs and the current motion.
 pub fn update_movement_target(h: &mut Human, surface: &Surface, ticks: u32) {
-    let target_stance = if h.input_flags & CROUCH != 0 { 0.625 } else { 1.0 };
+    let target_stance = if h.has_input(Input::Crouch) { 0.625 } else { 1.0 };
     let jump_charge = h.locomotion.jump_charge;
 
     let step = if jump_charge > 0 { 0.125 } else { 0.03125 };
@@ -567,7 +567,7 @@ pub fn update_foot_plant_states(h: &mut Human, surface: &Surface, hips: &[Vec3; 
 
     if h.movement_state == 5 {
         h.locomotion.jump_charge = 0;
-        if h.input_flags & CROUCH != 0 {
+        if h.has_input(Input::Crouch) {
             let tc = h.locomotion.torso_center;
             let (f0, f1) = (h.bones[FOOT_BONES[0]].pos, h.bones[FOOT_BONES[1]].pos);
             let d0 = horizontal_len(f0.x - tc.x, f0.z - tc.z);
@@ -901,7 +901,7 @@ pub fn update_foot_ground_constraint(h: &mut Human, bodies: &mut RigidBodies, su
     h.locomotion.feet[k].bond = bodies.create_bond(Bond::GroundContact(c));
     h.is_on_ground = true;
 
-    if state != 3 && h.locomotion.jump_charge > 0 && h.input_flags & JUMP == 0 && mode == FOOT_PLANTED && h.locomotion.feet[k].plant_blend == 0.0 {
+    if state != 3 && h.locomotion.jump_charge > 0 && !h.has_input(Input::Jump) && mode == FOOT_PLANTED && h.locomotion.feet[k].plant_blend == 0.0 {
         start_step(h, k);
     }
 }

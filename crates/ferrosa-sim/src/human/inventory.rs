@@ -7,7 +7,7 @@ use super::{Human, InventorySlot, QueuedAction};
 use ferrosa_protocol::clientbound::game::events::sound::Sound;
 
 use super::physics::HumanOutput;
-use crate::input::{DROP_ITEM, ITEM_SECONDARY, ITEM_USE, LEFT_MOUSE, MODE_KEYS, RELOAD, SHIFT, SWITCH_HANDS};
+use crate::input::{Input, ItemInput};
 use crate::items::{Item, Touchables, attach_child, remove_link};
 
 const PICKUP_REACH: f32 = 1.5;
@@ -141,11 +141,11 @@ pub fn hand_grab_and_inventory(h: &mut Human, human_id: usize, bodies: &mut Rigi
         if !empty {
             computer_and_disk(h, bodies, touch, slot);
         }
-        let released = h.input_flags & LEFT_MOUSE == 0 && h.last_input_flags & LEFT_MOUSE != 0;
+        let released = h.released(Input::LeftMouse);
         if slot == 0 && released && empty {
             grab_item(h, touch);
         }
-        if !probed && released && empty && h.input_flags & MODE_KEYS == 0 {
+        if !probed && released && empty && !h.has_input(Input::ModeKey) {
             probed = true;
             let (head, [_, _, ahead]) = (h.bones[3].pos, h.bones[3].rot);
             let end = ahead * -2.5 + head;
@@ -154,17 +154,15 @@ pub fn hand_grab_and_inventory(h: &mut Human, human_id: usize, bodies: &mut Rigi
         if h.inventory[slot].count > 0
             && let Some(item) = touch.items.get_mut(h.inventory[slot].items[0] as usize)
         {
-            let input = h.input_flags;
-            let this_hand = input & LEFT_MOUSE != 0 && (input & SHIFT != 0) == (slot == 1);
-            let mode_key = input & MODE_KEYS != 0;
-            if input & RELOAD != 0 {
-                item.input_flags |= ITEM_SECONDARY;
-            } else if !mode_key && this_hand && input & DROP_ITEM == 0 {
-                item.input_flags |= ITEM_USE;
+            let this_hand = h.has_input(Input::LeftMouse) && h.has_input(Input::Shift) == (slot == 1);
+            if h.has_input(Input::Reload) {
+                item.input_flags |= ItemInput::Secondary.mask();
+            } else if !h.has_input(Input::ModeKey) && this_hand && !h.has_input(Input::ThrowItem) {
+                item.input_flags |= ItemInput::Use.mask();
             }
         }
     }
-    if h.input_flags & SWITCH_HANDS != 0 && h.last_input_flags & SWITCH_HANDS == 0 {
+    if h.pressed(Input::SwitchHands) {
         swap_hands(h, human_id, bodies, touch);
     }
     let mut armed = false;
@@ -190,13 +188,13 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
     if kind == ItemKind::Computer {
         let (p, [_, _, r2]) = (h.bones[0].pos, h.bones[0].rot);
         let end = r2 * COMPUTER_REACH + p;
-        let clicked = h.input_flags & LEFT_MOUSE == 0 && h.last_input_flags & LEFT_MOUSE != 0;
+        let clicked = h.released(Input::LeftMouse);
         if point_segment_distance(p, end, pos) > COMPUTER_HOLD || clicked {
             unlink_item(h, bodies, touch, item_id);
         }
         return;
     }
-    if !kind.is_disk() || h.input_flags & LEFT_MOUSE != 0 || h.last_input_flags & LEFT_MOUSE == 0 {
+    if !kind.is_disk() || !h.released(Input::LeftMouse) {
         return;
     }
     let (p, [_, _, r2]) = (h.bones[3].pos, h.bones[3].rot);

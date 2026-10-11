@@ -22,7 +22,7 @@ use super::{
 use crate::time::TICKS_PER_MINUTE;
 use crate::world::map::Map;
 use crate::{
-    input::{GRAB, JUMP, RAGDOLL},
+    input::Input,
     items::Touchables,
 };
 
@@ -150,7 +150,7 @@ pub(crate) fn simulate_human(
             fall_out(h, touch, vid);
         }
 
-        if h.input_flags & GRAB != 0 && h.last_input_flags & GRAB == 0 {
+        if h.pressed(Input::Grab) {
             h.seat_exit = 1;
         }
     } else {
@@ -205,7 +205,7 @@ pub(crate) fn simulate_human(
 fn walk_and_collide(h: &mut Human, bodies: &mut RigidBodies, map: &mut Map, touch: &mut Touchables, nearby: &[usize], out: &mut Vec<HumanOutput>) {
     let alive = h.health.vitality > 0;
     let standing = alive && h.health.health > 49;
-    if alive && h.movement_state == 0 && h.input_flags & JUMP != 0 && h.locomotion.jump_charge <= 31 {
+    if alive && h.movement_state == 0 && h.has_input(Input::Jump) && h.locomotion.jump_charge <= 31 {
         h.locomotion.jump_charge += 1;
     }
     for bone in h.bones.iter_mut() {
@@ -220,7 +220,7 @@ fn walk_and_collide(h: &mut Human, bodies: &mut RigidBodies, map: &mut Map, touc
         && h.locomotion.feet[1].mode == FOOT_PLANTED
         && h.bones[BoneId::FootLeft as usize].ground_contact != 0
         && h.bones[BoneId::FootRight as usize].ground_contact != 0;
-    if h.movement_state != 3 && h.locomotion.jump_charge > 0 && h.input_flags & JUMP == 0 && feet_down {
+    if h.movement_state != 3 && h.locomotion.jump_charge > 0 && !h.has_input(Input::Jump) && feet_down {
         start_step(h, 1);
     }
     bone_world_contacts(h, bodies, map, out);
@@ -472,12 +472,12 @@ fn simulate_movement(h: &mut Human, bodies: &mut RigidBodies, surface: &Surface,
                 h.movement_state = 1;
                 h.locomotion.active_foot = 0;
             }
-            2 if h.input_flags & RAGDOLL == 0 => h.movement_state = 0,
+            2 if !h.has_input(Input::Ragdoll) => h.movement_state = 0,
             3 => return Some(step_locomotion_ik(h, bodies, surface)),
             _ => {}
         }
     }
-    if h.input_flags & RAGDOLL != 0 {
+    if h.has_input(Input::Ragdoll) {
         h.movement_state = 2;
     }
     match h.movement_state {
