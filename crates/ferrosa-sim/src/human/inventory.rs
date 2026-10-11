@@ -433,8 +433,7 @@ fn can_move(h: &Human, touch: &Touchables, hand: i32, pocket: i32) -> bool {
         let Some(item) = touch.items.get(held.items[0] as usize) else { return false };
         touch.types[item.item_type as usize].pockets[pocket as usize] != 0 && in_pocket <= 1
     } else {
-        // TODO: a hand holding on to something (grab state, record 0x6c48 + hand * 0x38) cannot take from a pocket
-        in_pocket > 0
+        !h.grabs[hand as usize].holding && in_pocket > 0
     }
 }
 

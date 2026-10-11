@@ -138,6 +138,8 @@ impl Sim {
             }
         }
 
+        crate::human::grab::grab_hands(&mut self.humans, &mut self.bodies, self.tick);
+
         self.apply_human_outputs(out);
         self.apply_team_doors();
 

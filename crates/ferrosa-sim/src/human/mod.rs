@@ -8,6 +8,7 @@ pub mod arms;
 pub mod bones;
 pub mod create;
 pub mod damage;
+pub mod grab;
 pub mod ik;
 pub mod inventory;
 pub mod locomotion;
@@ -157,11 +158,10 @@ pub struct Human {
     /// or the look around a seat.
     pub look_yaw: f32,
     pub look_pitch: f32,
-    /// The body heading the client last saw (control 8, record 0x170), which the look yaw is relative to.
+    /// The body heading the client last saw, which the look yaw is relative to.
     pub client_body_yaw: f32,
-    /// The vehicles whose bounds overlap the human's (record +0x218 count, +0x21c ids), at most 8.
+    /// The vehicles whose bounds overlap the human's, max 8.
     pub nearby_vehicles: Vec<usize>,
-    /// Whether the human is bleeding (record 0x6d80): a hit starts it, bandaging or death stops it.
     pub bleeding: bool,
     pub pos: Vec3,
     pub aabb_min: Vec3,
@@ -171,6 +171,7 @@ pub struct Human {
     pub bones: Vec<Bone>,
     pub joints: Vec<Joint>,
     pub locomotion: Locomotion,
+    pub grabs: [grab::Grab; 2],
 }
 
 pub const INVENTORY_SLOTS: usize = 7;

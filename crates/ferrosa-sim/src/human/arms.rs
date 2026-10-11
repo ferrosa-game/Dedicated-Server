@@ -275,9 +275,14 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
         };
 
         let brace = hold.is_none().then(|| briefcase_side(h, bodies, touch, k, -aim, aim_poses.map(|p| p[2]))).flatten();
+        let grab = &h.grabs[1 - k];
         let mut target = match (hold, brace) {
             (Some((m, v)), _) => 0.0625 * m[1] + v - BONES[first].joint,
             (None, Some(p)) => p - BONES[first].joint,
+            (None, None) if grab.holding => {
+                let ([r0, r1, r2], d) = (h.bones[2].rot, grab.spot - h.bones[2].pos);
+                Vec3::new(r0.dot(d), r1.dot(d), r2.dot(d)) - BONES[first].joint
+            }
             (None, None) => Vec3::new(if k == 0 { -0.0625 } else { 0.0625 }, y, z),
         };
 

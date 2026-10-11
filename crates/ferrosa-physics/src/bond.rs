@@ -42,6 +42,8 @@ pub struct ItemPoint {
     pub rest: f32,
     /// A vehicle's own bond (vehicle_bond_something), kept from tick to tick.
     pub permanent: bool,
+    /// The error gain and stiffness (bond +0x20 and +0x24) when set by the bond's maker rather than by the bodies.
+    pub gains: Option<(f32, f32)>,
     solve: PointSolve,
 }
 
@@ -57,12 +59,18 @@ struct PointSolve {
 
 impl ItemPoint {
     pub fn new(body_a: usize, body_b: usize, anchor_a: Vec3, anchor_b: Vec3) -> Self {
-        Self { body_a, body_b, anchor_a, anchor_b, rest: 0.0, permanent: false, solve: PointSolve::default() }
+        Self { body_a, body_b, anchor_a, anchor_b, rest: 0.0, permanent: false, gains: None, solve: PointSolve::default() }
     }
 
     /// vehicle_bond_something: a lasting point bond between two bodies of one vehicle.
     pub fn vehicle(body_a: usize, body_b: usize, anchor_a: Vec3, anchor_b: Vec3) -> Self {
         Self { permanent: true, ..Self::new(body_a, body_b, anchor_a, anchor_b) }
+    }
+
+    /// A hand holding on to another human's bone (human_update_hand_grab_and_inventory): a softer pull than an
+    /// item's.
+    pub fn grab(hand: usize, bone: usize, anchor: Vec3) -> Self {
+        Self { gains: Some((0.0625, 0.1875)), ..Self::new(hand, bone, Vec3::ZERO, anchor) }
     }
 
     pub(crate) fn prepare(&mut self, bodies: &Table<RigidBody>) {
@@ -74,7 +82,7 @@ impl ItemPoint {
         let c = -self.rest;
         let mut corr = n * c + d;
         let both_vehicles = matches!(a.kind, RigidBodyType::Vehicle) && matches!(b.kind, RigidBodyType::Vehicle);
-        let (k, stiffness) = if both_vehicles { (1.0 / 256.0, 0.125) } else { (0.1875, 0.1875) };
+        let (k, stiffness) = self.gains.unwrap_or(if both_vehicles { (1.0 / 256.0, 0.125) } else { (0.1875, 0.1875) });
         if !both_vehicles && matches!(b.kind, RigidBodyType::Item) {
             let len = corr.length();
             if len > 0.125 {

@@ -145,6 +145,7 @@ pub fn create_human(humans: &mut Table<Human>, bodies: &mut RigidBodies, pos: Ve
         bones,
         joints,
         locomotion: Locomotion::default(),
+        grabs: Default::default(),
     };
     humans.insert(human)
 }
