@@ -70,7 +70,7 @@ impl SrkPlayerData {
 impl SrkData {
     pub fn load(path: &Path) -> Result<Self, LoaderError> {
         if !Path::new(path).exists() {
-            let data = SrkData { player_count: 0, players: vec![], server_id: 800815, version: 1 };
+            let data = SrkData { player_count: 0, players: vec![], server_id: rand::random_range(1..=u32::MAX), version: 1 };
 
             data.save(path)?;
             return Ok(data);

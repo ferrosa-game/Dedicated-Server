@@ -1,5 +1,6 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, path::Path, sync::Arc};
 
+use ferrosa_map::file_types::srk::SrkData;
 use ferrosa_net::{Edge, ServerListing, masterserver::MasterServer};
 use ferrosa_sim::{Inbound, Sim};
 use tokio::{net::UdpSocket, sync::mpsc};
@@ -48,6 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap();
     }
 
+    let srk = SrkData::load(Path::new("server.srk")).unwrap();
     let server_listing = ServerListing {
         build: 38,
         address: [4, 43, 217, 32],
@@ -56,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         password_protected: !config.server_password.is_empty(),
         server_password: config.server_password.clone(),
         port: config.port,
-        server_id: 80085,
+        server_id: srk.server_id,
         server_name: config.server_name.clone(),
     };
 
