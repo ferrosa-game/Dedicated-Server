@@ -392,7 +392,10 @@ impl Sim {
 
         timed!(self, "player simulation", self.player_simulation());
 
-        timed!(self, "physics", self.physics_tick());
+        if matches!(self.gamestate, GameState::InGame | GameState::Idle | GameState::Intermission) {
+            timed!(self, "physics", self.physics_tick());
+        }
+        
         timed!(self, "broadcast", self.broadcast_tick());
         self.send_admin_lists();
 
