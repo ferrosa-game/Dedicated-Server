@@ -1,5 +1,4 @@
 use glam::Vec3;
-use ferrosa_math::vector::Vector;
 use ferrosa_physics::rotation::{IDENTITY, rot_matrix_to_quaternion, rotate_orientation};
 use ferrosa_protocol::clientbound::game::{
     ServerVehicleObject, VehicleKind,
@@ -121,7 +120,9 @@ impl Sim {
     ) -> Option<usize> {
         let id = spawn_vehicle(&mut self.vehicles, &mut self.bodies, &self.vehicle_types, kind, color, pos, rot, None)?;
         let e = EventUpdateVehicleTypeColor { vehicle_id: id as i32, vehicle_type: kind, vehicle_color: color as u8 };
+
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateVehicleTypeColor(e) });
+
         Some(id)
     }
 
@@ -134,19 +135,23 @@ impl Sim {
             .ok()
             .and_then(|k| ferrosa_protocol::clientbound::game::VehicleKind::try_from(k).ok())
             .filter(|&k| self.vehicle_types.get(k as usize).is_some_and(|t| !t.nodes.is_empty()));
+
         let Some(kind) = kind else {
             let ready: Vec<String> =
                 self.vehicle_types.iter().enumerate().filter(|(_, t)| !t.nodes.is_empty()).map(|(k, t)| format!("{k} {}", t.name)).collect();
             self.send_chat(&format!("Vehicle types: {}", ready.join(", ")), ferrosa_protocol::clientbound::game::events::chat::ChatType::Announce, -1, 0);
             return;
         };
+
         let Some(player) = self.players.get(player_id.idx()) else { return };
         let mut rot = IDENTITY;
         rotate_orientation(&mut rot, Vec3::Y, player.view_yaw);
-        let ahead = player.camera_pos.0 - rot[0] * SPAWN_DISTANCE;
+
+        let ahead = player.camera_pos - rot[0] * SPAWN_DISTANCE;
         let map = &self.world.map;
         let ground = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, ahead + Vec3::Y * GROUND_SEARCH, ahead - Vec3::Y * GROUND_SEARCH);
         let pos = ground.map_or(ahead, |g| Vec3::new(ahead.x, g.hit.pos.y + RIDE_HEIGHT, ahead.z));
+
         match self.spawn_vehicle(kind, color, pos, rot) {
             Some(id) => println!("[Sim] Spawned vehicle {kind:?} #{id} at {pos:?}"),
             None => println!("[Sim] Vehicle table full"),
@@ -170,7 +175,7 @@ impl Sim {
                 let object = ServerVehicleObject {
                     vehicle_id: id as u16,
                     traffic_car: v.traffic_car,
-                    pos: Vector(v.pos),
+                    pos: v.pos,
                     rot: rot_matrix_to_quaternion(&v.rot),
                     steer,
                     wheels,
@@ -223,7 +228,7 @@ impl Sim {
                 VehicleOutput::Sound { sound, pos, volume, pitch } => self.apply_human_outputs(vec![HumanOutput::Sound { sound, pos, volume, pitch }]),
                 VehicleOutput::Damage { vehicle, amount } => self.vehicle_take_damage(vehicle, amount),
                 VehicleOutput::Update { vehicle, kind, part, pos, vel } => {
-                    let e = EventUpdateVehicle { vehicle_id: vehicle as i32, kind, part, pos: Vector(pos), velocity: Vector(vel) };
+                    let e = EventUpdateVehicle { vehicle_id: vehicle as i32, kind, part, pos, velocity: vel };
                     self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateVehicle(e) });
                 }
             }
@@ -243,7 +248,7 @@ impl Sim {
         v.health -= amount;
 
         if v.health <= 0 {
-            let e = EventUpdateVehicle { vehicle_id: id as i32, kind: WRECKED, part: 0, pos: Vector(v.pos), velocity: Vector(v.vel) };
+            let e = EventUpdateVehicle { vehicle_id: id as i32, kind: WRECKED, part: 0, pos: v.pos, velocity: v.vel };
             self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateVehicle(e) });
         }
     }
@@ -283,7 +288,7 @@ impl Sim {
             self.bodies.remove(bogie);
         }
         self.bodies.remove(v.body);
-        let e = EventUpdateVehicle { vehicle_id: id as i32, kind: DELETED, part: 0, pos: Vector(v.pos), velocity: Vector(Vec3::ZERO) };
+        let e = EventUpdateVehicle { vehicle_id: id as i32, kind: DELETED, part: 0, pos: v.pos, velocity: Vec3::ZERO };
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateVehicle(e) });
     }
 

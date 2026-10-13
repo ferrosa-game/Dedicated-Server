@@ -1,7 +1,7 @@
 use binrw::BinRead;
-use glam::UVec3;
-use ferrosa_math::vector::{IntVector, Vector};
+use glam::{UVec3, Vec3};
 
+use crate::{br_uvec3, br_vec3};
 use crate::Char64;
 
 #[derive(BinRead, Debug, Default, Clone)]
@@ -22,7 +22,8 @@ pub struct BuildingFileTile {
 #[derive(BinRead, Debug, Clone)]
 #[brw(little)]
 pub struct BuildingFileWaypoint {
-    pub waypoint: Vector,
+    #[br(parse_with = br_vec3)]
+    pub waypoint: Vec3,
     pub zero: u32,
 }
 
@@ -46,7 +47,8 @@ pub struct BuildingFile {
     pub length: u32,
     pub height: u32,
     //#[br(if(version > 12))]
-    pub offsets: Option<IntVector>,
+    #[br(parse_with = br_uvec3)]
+    pub offsets: UVec3,
 
     pub texture_count: u32,
     #[br(count = texture_count)]
@@ -158,7 +160,7 @@ impl BuildingFile {
         }
 
         // load_map: offset.x' = length - 1 - offset.z, offset.z' = offset.x (may go negative)
-        let new_off = self.offsets.map(|o| IntVector(UVec3::new((li - 1 - o.0.z as i32) as u32, o.0.y, o.0.x)));
+        let new_off = UVec3::new((li - 1 - self.offsets.z as i32) as u32, self.offsets.y, self.offsets.x);
         BuildingFile { width: nw, length: nl, tiles, offsets: new_off, ..self.clone() }
     }
 }
@@ -166,9 +168,7 @@ impl BuildingFile {
 /// What rotate_loaded_building_tiles_quarter_turn needs to know about a special block.
 #[derive(Clone, Copy, Debug)]
 pub struct SpecialBlock {
-    /// block_dimensions depth of the resolved global block id
     pub footprint: i32,
-    /// the global id is in builtin_block_count..custom_block_start_id, so its orientation cycles
     pub rotates: bool,
 }
 

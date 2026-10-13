@@ -1,10 +1,11 @@
 use binrw::BinRead;
-
-use ferrosa_math::vector::{IntVector, Vector};
+use glam::{UVec3, Vec3};
+use crate::{br_uvec3, br_vec3};
 
 #[derive(BinRead, Debug, Clone)]
 pub struct BlockSurfaceVertex {
-    pub pos: Vector,
+    #[br(parse_with = br_vec3)]
+    pub pos: Vec3,
     #[br(count = 2)]
     pub tex_coord: Vec<f32>,
 }
@@ -23,8 +24,8 @@ pub struct BlockSurface {
 
 #[derive(BinRead, Debug, Clone)]
 pub struct BlockBox {
-    #[br(count = 8)]
-    pub pos: Vec<Vector>,
+    #[br(parse_with = binrw::helpers::count_with(8, br_vec3))]
+    pub pos: Vec<Vec3>,
     #[br(count = 6)]
     pub texture: Vec<u32>,
     pub side_flag: u32,
@@ -34,7 +35,8 @@ pub struct BlockBox {
 #[br(little)]
 pub struct BlockFile {
     pub version: u32,
-    pub size: IntVector,
+    #[br(parse_with = br_uvec3)]
+    pub size: UVec3,
     pub floor: u32,
     pub ceiling: u32,
     pub wall_pz: u32,

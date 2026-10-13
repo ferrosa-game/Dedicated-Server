@@ -1,7 +1,8 @@
 use std::{io::Cursor, path::Path};
+use crate::br_vec3;
 
 use binrw::BinRead;
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
 
 use super::LoaderError;
 use crate::Char64;
@@ -11,8 +12,10 @@ use crate::Char64;
 #[brw(little)]
 pub struct SisEntry {
     pub name: Char64,
-    pub pos: Vector,
-    pub rot: [Vector; 3],
+    #[br(parse_with = br_vec3)]
+    pub pos: Vec3,
+    #[br(map = |a: [[f32; 3]; 3]| a.map(Vec3::from_array))]
+    pub rot: [Vec3; 3],
 }
 
 /// An item set file (data/itemset/*.sis, load_item_set): items placed together in a level cell.

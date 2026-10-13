@@ -1,11 +1,11 @@
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
 
 use crate::codec::WireWrite;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventBulletHit {
-    pub pos: Vector,
-    pub normal: Vector,
+    pub pos: Vec3,
+    pub normal: Vec3,
     pub hit_type: i32,
     pub unk: i32,
 }

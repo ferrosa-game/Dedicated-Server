@@ -7,7 +7,7 @@ authors.workspace = true
 [dependencies]
 bitflags = "2.13.2"
 
-ferrosa-math.workspace = true
+glam.workspace = true
 serde.workspace = true
 
 [lints]

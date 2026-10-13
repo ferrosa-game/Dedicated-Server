@@ -7,7 +7,6 @@ authors.workspace = true
 [dependencies]
 ferrosa-protocol.workspace = true
 ferrosa-map.workspace = true
-ferrosa-math.workspace = true
 ferrosa-physics.workspace = true
 
 rayon.workspace = true

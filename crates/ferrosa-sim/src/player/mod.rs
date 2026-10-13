@@ -91,7 +91,7 @@ pub struct Player {
     pub is_ready: bool,
     pub voice: PlayerVoice,
     pub customization: CharacterCustomization,
-    pub camera_pos: ferrosa_math::vector::Vector,
+    pub camera_pos: Vec3,
     pub view_yaw: f32,
     pub view_pitch: f32,
     pub human: Option<usize>,

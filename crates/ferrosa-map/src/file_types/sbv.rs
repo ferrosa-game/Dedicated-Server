@@ -1,19 +1,19 @@
 use std::{io::Cursor, path::Path};
 
 use binrw::BinRead;
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
+use crate::br_vec3;
 
 use super::LoaderError;
 
-/// A chassis point: its position and a weight.
 #[derive(BinRead, Debug, Clone, Copy)]
 #[brw(little)]
 pub struct SbvNode {
-    pub pos: Vector,
+    #[br(parse_with = br_vec3)]
+    pub pos: Vec3,
     pub weight: f32,
 }
 
-/// A spring between two chassis points.
 #[derive(BinRead, Debug, Clone, Copy)]
 #[brw(little)]
 pub struct SbvEdge {
@@ -22,7 +22,6 @@ pub struct SbvEdge {
     pub b: i32,
 }
 
-/// A face of the body over chassis points.
 #[derive(BinRead, Debug, Clone)]
 #[brw(little)]
 pub struct SbvFace {
@@ -31,7 +30,6 @@ pub struct SbvFace {
     pub indices: Vec<i32>,
 }
 
-/// A vertex of a subshape and (version 2 on) its weights over the subshape's four chassis points.
 #[derive(BinRead, Debug, Clone, Copy)]
 #[brw(little)]
 #[br(import(version: u32))]
@@ -41,7 +39,6 @@ pub struct SbvSubshapeNode {
     pub weights: [f32; 4],
 }
 
-/// Render vertices that follow the chassis, bound to four chassis points.
 #[derive(BinRead, Debug, Clone)]
 #[brw(little)]
 #[br(import(version: u32))]
@@ -55,32 +52,29 @@ pub struct SbvSubshape {
     pub quad: [i32; 4],
 }
 
-/// A group of points.
 #[derive(BinRead, Debug, Clone)]
 #[brw(little)]
 pub struct SbvPart {
     pub count: u32,
-    #[br(count = count)]
-    pub points: Vec<Vector>,
+    #[br(parse_with = binrw::helpers::count_with(count as usize, br_vec3))]
+    pub points: Vec<Vec3>,
 }
 
-/// A wheel mount.
 #[derive(BinRead, Debug, Clone, Copy)]
 #[brw(little)]
 pub struct SbvWheel {
     pub kind: i32,
-    pub pos: Vector,
+    #[br(parse_with = br_vec3)]
+    pub pos: Vec3,
     pub aux: i32,
 }
 
-/// A vehicle body file (data/<name>.sbv, read by load_sbv): chassis points and springs, faces, render vertices,
-/// subshapes, parts and wheel mounts; version 5 files store the offset everything is centred on.
 #[derive(BinRead, Debug, Clone)]
 #[brw(little)]
 pub struct VehicleBodyFile {
     pub version: u32,
-    #[br(if(version > 4))]
-    pub offset: Option<Vector>,
+    #[br(if(version > 4), parse_with = br_vec3, map = Some)]
+    pub offset: Option<Vec3>,
 
     pub node_count: u32,
     #[br(count = node_count)]
@@ -95,8 +89,8 @@ pub struct VehicleBodyFile {
     pub faces: Vec<SbvFace>,
 
     pub vertex_count: u32,
-    #[br(count = vertex_count)]
-    pub vertices: Vec<Vector>,
+    #[br(parse_with = binrw::helpers::count_with(vertex_count as usize, br_vec3))]
+    pub vertices: Vec<Vec3>,
 
     pub subshape_count: u32,
     #[br(args { count: subshape_count as usize, inner: (version,) })]

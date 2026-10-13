@@ -1,7 +1,8 @@
 use std::{io::Cursor, path::Path};
 
+use crate::{br_uvec3, br_vec3};
 use binrw::{BinRead, BinWrite, binread};
-use ferrosa_math::vector::{IntVector, Vector};
+use glam::{UVec3, Vec3};
 
 use crate::{Char64, file_types::LoaderError};
 
@@ -9,7 +10,8 @@ use crate::{Char64, file_types::LoaderError};
 #[br(import(version: u32))]
 pub struct Chunk {
     pub area: u32,
-    pub pos: IntVector,
+    #[br(parse_with = br_uvec3)]
+    pub pos: UVec3,
     #[br(if(version >= 11), count = 512)]
     pub block_type_indices: Vec<u32>,
 
@@ -39,7 +41,8 @@ pub struct ChunkBlockTypes {
 #[derive(BinRead, Clone)]
 pub struct FileBuilding {
     pub name: Char64,
-    pub pos: IntVector,
+    #[br(parse_with = br_uvec3)]
+    pub pos: UVec3,
     pub rot: u32,
 }
 
@@ -70,8 +73,8 @@ pub struct CityFileSBC {
     pub itemset_names: Vec<ItemSet>,
 
     pub num_intersections: u32,
-    #[br(count = num_intersections)]
-    pub intersections: Vec<IntVector>,
+    #[br(parse_with = binrw::helpers::count_with(num_intersections as usize, br_uvec3))]
+    pub intersections: Vec<UVec3>,
 
     pub num_streets: u32,
     #[br(count = num_streets)]
@@ -93,8 +96,9 @@ pub struct CityFileSBC {
 
     #[br(if(version >= 9))]
     pub num_waypoints: u32,
-    #[br(if(version >= 9), count = num_waypoints)]
-    pub waypoints: Vec<Vector>,
+    #[br(if(version >= 9))]
+    #[br(parse_with = binrw::helpers::count_with(num_waypoints as usize, br_vec3))]
+    pub waypoints: Vec<Vec3>,
 }
 
 impl CityFileSBC {

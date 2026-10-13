@@ -96,6 +96,7 @@ impl ItemSets {
     /// type the last of `type_names` its name matches.
     pub(crate) fn load(data_dir: &Path, names: &[String], type_names: &[String], hulls: Vec<Option<ConvexHull>>) -> Self {
         let mut sets = vec![ItemSet::default(), table_set(), melon_set(), box_stack_set()];
+
         for name in names {
             let file = ItemSetFile::load(&data_dir.join("itemset").join(format!("{name}.sis"))).ok();
             let entries = file
@@ -104,14 +105,16 @@ impl ItemSets {
                         .iter()
                         .map(|e| SetEntry {
                             kind: type_names.iter().rposition(|t| t.as_str() == e.name.as_str()).map_or(0, |k| k as i32),
-                            pos: e.pos.0,
-                            rot: e.rot.map(|r| r.0),
+                            pos: e.pos,
+                            rot: e.rot,
                         })
                         .collect()
                 })
                 .unwrap_or_default();
+
             sets.push(ItemSet { entries });
         }
+
         Self { sets, hulls }
     }
 

@@ -1,4 +1,4 @@
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
 
 use crate::codec::WireWrite;
 
@@ -11,8 +11,8 @@ pub struct EventBulletHole {
     pub block_z: i32,
     pub cell: u32,
     pub face: i32,
-    pub pos: Vector,
-    pub vel: Vector,
+    pub pos: Vec3,
+    pub vel: Vec3,
 }
 
 impl WireWrite for EventBulletHole {

@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
 
 pub mod actions;
 pub mod voice;
@@ -57,7 +57,7 @@ pub struct ClientGamePacket {
 
     // Go to next byte if in the middle of one from current written bits
     pub num_sent_objects: u32,
-    pub camera_pos: Vector,
+    pub camera_pos: Vec3,
 
     pub packet_action_count: u8, // 4 bits
     pub total_actions: u8,       // 8 bits
@@ -94,7 +94,7 @@ impl WireRead for ClientGamePacket {
 
         let num_sent_objects = r.u32()?;
 
-        let camera_pos = Vector::new(r.f32()?, r.f32()?, r.f32()?);
+        let camera_pos = Vec3::new(r.f32()?, r.f32()?, r.f32()?);
 
         let packet_action_count = r.bits(4)?;
         let total_actions = r.bits(8)?;

@@ -3,9 +3,9 @@ use std::{
     path::Path,
 };
 
+use crate::br_vec3;
 use binrw::BinRead;
-use ferrosa_math::vector::Vector;
-
+use glam::Vec3;
 use super::{LoaderError, sbv::SbvPart};
 
 const MESH_VERSION: i32 = 2;
@@ -15,7 +15,8 @@ const PARTS_VERSION: i32 = 1;
 #[derive(BinRead, Debug, Clone, Copy)]
 #[brw(little)]
 pub struct TstVertex {
-    pub pos: Vector,
+    #[br(parse_with = br_vec3)]
+    pub pos: Vec3,
     pub id: i32,
 }
 

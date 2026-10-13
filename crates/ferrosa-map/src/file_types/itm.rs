@@ -1,8 +1,8 @@
 use std::{io::Cursor, path::Path};
 
+use crate::br_vec3;
 use binrw::BinRead;
-use ferrosa_math::vector::Vector;
-
+use glam::Vec3;
 use super::LoaderError;
 
 /// A marked point of the item (0 the muzzle, 1 the right hand, 2 the left hand, 4 the second hand's grip).
@@ -10,14 +10,16 @@ use super::LoaderError;
 #[brw(little)]
 pub struct ItmPoint {
     pub kind: i32,
-    pub pos: Vector,
+    #[br(parse_with = br_vec3)]
+    pub pos: Vec3,
 }
 
 /// A render vertex and its texture coordinate.
 #[derive(BinRead, Debug, Clone)]
 #[brw(little)]
 pub struct ItmVertex {
-    pub pos: Vector,
+    #[br(parse_with = br_vec3)]
+    pub pos: Vec3,
     pub uv: [f32; 2],
 }
 
@@ -35,8 +37,10 @@ pub struct ItmFace {
 #[brw(little)]
 pub struct ItmFile {
     pub version: i32,
-    pub center: Vector,
-    pub inertia: Vector,
+    #[br(parse_with = br_vec3)]
+    pub center: Vec3,
+    #[br(parse_with = br_vec3)]
+    pub inertia: Vec3,
     pub point_count: u32,
     #[br(count = point_count)]
     pub points: Vec<ItmPoint>,

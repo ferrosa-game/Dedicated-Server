@@ -1,4 +1,4 @@
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
 
 use crate::codec::WireWrite;
 
@@ -8,10 +8,10 @@ pub mod initial_sync;
 pub mod kick;
 pub mod server_info;
 
-impl WireWrite for Vector {
+impl WireWrite for Vec3 {
     fn write(&self, w: &mut crate::codec::Writer) {
-        w.f32(self.0.x);
-        w.f32(self.0.y);
-        w.f32(self.0.z);
+        w.f32(self.x);
+        w.f32(self.y);
+        w.f32(self.z);
     }
 }

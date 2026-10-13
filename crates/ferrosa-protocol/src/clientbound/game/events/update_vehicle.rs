@@ -1,4 +1,4 @@
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
 
 use crate::codec::WireWrite;
 
@@ -9,8 +9,8 @@ pub struct EventUpdateVehicle {
     pub kind: i32,
     /// The window or wheel it concerns.
     pub part: i32,
-    pub pos: Vector,
-    pub velocity: Vector,
+    pub pos: Vec3,
+    pub velocity: Vec3,
 }
 
 impl WireWrite for EventUpdateVehicle {

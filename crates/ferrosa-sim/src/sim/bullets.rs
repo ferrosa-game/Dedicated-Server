@@ -1,5 +1,4 @@
 use glam::{IVec3, Vec3};
-use ferrosa_math::vector::Vector;
 use ferrosa_protocol::clientbound::game::{
     ItemKind,
     events::{Event, ServerEvent, bullet_hit::EventBulletHit, bullet_hole::EventBulletHole, update_vehicle::EventUpdateVehicle},
@@ -96,7 +95,7 @@ impl Sim {
         let damage = ((b.mass * (speed * VEHICLE_DAMAGE_SCALE)) * TICKS_PER_SECOND_F32 - DAMAGE_FLOOR) as i32;
         let damage = if damage >= 0 { damage } else { 0 };
         let Some(vehicle) = self.vehicles.get_mut(vid) else { return };
-        let update = |kind: i32, part: usize| EventUpdateVehicle { vehicle_id: vid as i32, kind, part: part as i32, pos: Vector(hit.pos), velocity: Vector(v) };
+        let update = |kind: i32, part: usize| EventUpdateVehicle { vehicle_id: vid as i32, kind, part: part as i32, pos: hit.pos, velocity: v };
         let event = match hit.part {
             VehiclePart::Wheel(k) => {
                 let Some(w) = vehicle.wheels.get_mut(k) else { return };
@@ -120,7 +119,7 @@ impl Sim {
                 ServerEvent::UpdateVehicle(update(WINDOW_BROKEN, k))
             }
             VehiclePart::Body(_) => {
-                let e = EventBulletHit { unk: 0, hit_type: HIT_VEHICLE, pos: Vector(hit.pos), normal: Vector(hit.normal) };
+                let e = EventBulletHit { unk: 0, hit_type: HIT_VEHICLE, pos: hit.pos, normal: hit.normal };
                 self.events.push(Event { tick_created: self.tick, kind: ServerEvent::BulletHit(e) });
                 self.vehicle_take_damage(vid, damage);
                 return;
@@ -242,11 +241,11 @@ impl Sim {
                 block_z: b.block.z,
                 cell: b.cell,
                 face: b.face,
-                pos: Vector(b.pos),
-                vel: Vector(b.vel),
+                pos: b.pos,
+                vel: b.vel,
             })
         } else {
-            ServerEvent::BulletHit(EventBulletHit { unk: 0, hit_type: HIT_WORLD, pos: Vector(level.hit.pos), normal: Vector(level.hit.normal) })
+            ServerEvent::BulletHit(EventBulletHit { unk: 0, hit_type: HIT_WORLD, pos: level.hit.pos, normal: level.hit.normal })
         };
         self.events.push(Event { tick_created: self.tick, kind });
     }
@@ -273,7 +272,7 @@ impl Sim {
         let mut damage = (bullet.mass * (bullet.vel.length() * DAMAGE_SCALE) * TICKS_PER_SECOND_F32 - DAMAGE_FLOOR) as i32;
 
         if damage > 0 {
-            let e = EventBulletHit { unk: 0, hit_type: HIT_BODY, pos: Vector(hit.pos), normal: Vector(hit.normal) };
+            let e = EventBulletHit { unk: 0, hit_type: HIT_BODY, pos: hit.pos, normal: hit.normal };
             self.events.push(Event { tick_created: self.tick, kind: ServerEvent::BulletHit(e) });
 
             if hit.bone == BoneId::Head {

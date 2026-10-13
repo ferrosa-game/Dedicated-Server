@@ -1,7 +1,9 @@
 use std::{io::Cursor, path::Path};
 
 use binrw::BinRead;
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
+
+use crate::br_vec3;
 
 use super::LoaderError;
 
@@ -32,8 +34,8 @@ pub struct It3Face {
 pub struct It3Mesh {
     pub sub_version: i32,
     pub vert_count: u32,
-    #[br(count = vert_count)]
-    pub verts: Vec<Vector>,
+    #[br(parse_with = binrw::helpers::count_with(vert_count as usize, br_vec3))]
+    pub verts: Vec<Vec3>,
     pub face_count: u32,
     #[br(count = face_count)]
     pub faces: Vec<It3Face>,
@@ -51,7 +53,8 @@ pub struct It3Indices {
 #[derive(BinRead, Debug, Clone)]
 #[brw(little)]
 pub struct It3Group {
-    pub center: Vector,
+    #[br(parse_with = br_vec3)]
+    pub center: Vec3,
     pub verts: It3Indices,
     pub face_count: u32,
     #[br(count = face_count)]
@@ -64,8 +67,8 @@ pub struct It3Group {
 pub struct It3Collision {
     pub sub_version: i32,
     pub vert_count: u32,
-    #[br(count = vert_count)]
-    pub verts: Vec<Vector>,
+    #[br(parse_with = binrw::helpers::count_with(vert_count as usize, br_vec3))]
+    pub verts: Vec<Vec3>,
     pub group_count: u32,
     #[br(count = group_count)]
     pub groups: Vec<It3Group>,

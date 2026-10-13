@@ -1,5 +1,4 @@
 use glam::Vec3;
-use ferrosa_math::vector::Vector;
 use ferrosa_protocol::clientbound::game::{
     TrafficEntry,
     events::{Event, ServerEvent, update_vehicle_type_color::EventUpdateVehicleTypeColor},
@@ -9,14 +8,8 @@ use super::Sim;
 use super::tps::timed;
 use crate::{
     traffic::{
-        DRIVEN, LOOP_STREET, LOOP_STREET_2, TAKEN, Traffic,
-        ai::ai_traffic_car,
-        grid::add_cars,
-        motion::{move_virtual_car, update_signals},
-        route::plan_route,
-        spawn::create_traffic,
-    },
-    vehicle::spawn_vehicle,
+        DRIVEN, LOOP_STREET, LOOP_STREET_2, TAKEN, Traffic, TrafficCar, ai::ai_traffic_car, grid::add_cars, motion::{move_virtual_car, update_signals}, route::plan_route, spawn::create_traffic,
+    }, vehicle::{spawn_vehicle, types::VehicleType},
 };
 
 /// The cars reset_game, a round and an eliminator hunt start with.
@@ -39,7 +32,7 @@ const STUCK_TICKS: i32 = 179;
 const STUCK_REVERSE: i32 = 279;
 
 /// Where a traffic car's vehicle goes: its type's chassis centred on the car, 1.5 back from its position.
-pub(crate) fn vehicle_pos(c: &crate::traffic::TrafficCar, types: &[crate::vehicle::types::VehicleType]) -> Vec3 {
+pub(crate) fn vehicle_pos(c: &TrafficCar, types: &[VehicleType]) -> Vec3 {
     let [r0, r1, r2] = c.rot;
     let k = types.get(c.kind as usize).map_or(Vec3::ZERO, |t| t.centroid);
     let n = -k;
@@ -338,7 +331,7 @@ pub(crate) fn traffic_section(
         .into_iter()
         .map(|i| {
             let c = &traffic.cars[i];
-            TrafficEntry { index: i as u16, vehicle: c.vehicle != -1, kind: c.kind, color: c.color, pos: Vector(c.pos), yaw: c.yaw }
+            TrafficEntry { index: i as u16, vehicle: c.vehicle != -1, kind: c.kind, color: c.color, pos: c.pos, yaw: c.yaw }
         })
         .collect();
     let count = map.intersections.len() as i32;

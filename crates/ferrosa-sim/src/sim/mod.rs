@@ -7,7 +7,6 @@ use std::{
 
 use glam::Vec3;
 use ferrosa_map::file_types::srk::SrkData;
-use ferrosa_math::vector::Vector;
 use ferrosa_protocol::{
     clientbound::{
         game::{
@@ -537,11 +536,11 @@ impl Sim {
         let player = ctx.players.get(player_id.idx()).unwrap();
         let (global_event_count, events) = Self::collect_events(client, ctx, player.team as i32, player_id.0 as i32);
         let earshots = Self::calculate_earshot(client, player_id, ctx);
-        let (object_packs, pack_offset, packed_items) = Self::object_packs(client, ctx, player.camera_pos.0);
-        let (line_links, link_offset) = Self::link_section(client, ctx, player.camera_pos.0);
-        let (traffic, signal) = traffic_section(client, ctx.traffic, &ctx.world.map.streets, player.camera_pos.0);
+        let (object_packs, pack_offset, packed_items) = Self::object_packs(client, ctx, player.camera_pos);
+        let (line_links, link_offset) = Self::link_section(client, ctx, player.camera_pos);
+        let (traffic, signal) = traffic_section(client, ctx.traffic, &ctx.world.map.streets, player.camera_pos);
         let backlog = ctx.events.count.wrapping_sub(client.event_cursor);
-        let vehicles = vehicles::vehicle_section(&mut client.vehicle_priority, &ctx.vehicles, player.camera_pos.0, backlog);
+        let vehicles = vehicles::vehicle_section(&mut client.vehicle_priority, &ctx.vehicles, player.camera_pos, backlog);
         let packet_sequence = client.packet_sequence;
         client.packet_sequence = packet_sequence.wrapping_add(1);
 
@@ -595,7 +594,7 @@ impl Sim {
             corp_round: ctx.corp_round,
             team_counts: ctx.team_counts,
             ready_states: ctx.ready_states,
-            follow_pos: Vector::new(0.0, 0.0, 0.0),
+            follow_pos: Vec3::new(0.0, 0.0, 0.0),
             own_human: ctx.own_humans.get(&player_id.idx()).cloned(),
             humans: ctx.humans.clone(),
             items: ctx.items.iter().filter(|i| packed_items.contains(&i.slot)).cloned().collect(),
@@ -636,7 +635,7 @@ impl Sim {
                         if ctx.pocketed.contains(&i.item_id) {
                             return false;
                         }
-                        let d = Vec3::new(i.pos.0.x - camera.x, i.pos.0.y - camera.y, i.pos.0.z - camera.z);
+                        let d = Vec3::new(i.pos.x - camera.x, i.pos.y - camera.y, i.pos.z - camera.z);
                         let dist = d.length();
                         let packed = client.packed.get(&i.slot).is_some_and(|p| p.kind == 1 && p.index == i.item_id);
                         if packed { dist <= UNPACK_RANGE } else { !(PACK_RANGE <= dist) }

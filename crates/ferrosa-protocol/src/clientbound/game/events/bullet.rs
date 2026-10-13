@@ -1,4 +1,4 @@
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
 
 use crate::codec::WireWrite;
 
@@ -7,8 +7,8 @@ use crate::codec::WireWrite;
 pub struct EventBullet {
     pub bullet_type: i32,
     pub item_id: i32,
-    pub pos: Vector,
-    pub vel: Vector,
+    pub pos: Vec3,
+    pub vel: Vec3,
 }
 
 impl WireWrite for EventBullet {

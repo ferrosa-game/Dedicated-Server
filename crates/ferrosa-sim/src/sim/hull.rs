@@ -1,3 +1,4 @@
+use ferrosa_map::file_types::it3::It3Collision;
 use glam::Vec3;
 use ferrosa_physics::RotMatrix;
 
@@ -45,9 +46,8 @@ impl ConvexHull {
 
     /// load_it3_file's hull: the file's vertices and groups, each face's normal taken from its second to fourth
     /// corners, and every group given the box edges.
-    pub(crate) fn from_it3(c: &ferrosa_map::file_types::it3::It3Collision) -> Self {
-        let verts: Vec<Vec3> = c.verts.iter().map(|v| v.0).collect();
-        let index = |i: i32| usize::try_from(i).unwrap_or(0).min(verts.len().saturating_sub(1));
+    pub(crate) fn from_it3(c: &It3Collision) -> Self {
+        let index = |i: i32| usize::try_from(i).unwrap_or(0).min(c.verts.len().saturating_sub(1));
         let groups = c
             .groups
             .iter()
@@ -57,14 +57,14 @@ impl ConvexHull {
                     .iter()
                     .map(|f| {
                         let corners: [usize; 4] = std::array::from_fn(|k| index(f.items.get(k).copied().unwrap_or(0)));
-                        let normal = calculate_face_normal(verts[corners[1]], verts[corners[2]], verts[corners[3]]);
+                        let normal = calculate_face_normal(c.verts[corners[1]], c.verts[corners[2]], c.verts[corners[3]]);
                         HullFace { verts: corners, normal }
                     })
                     .collect();
-                HullGroup { center: g.center.0, verts: g.verts.items.iter().map(|&i| index(i)).collect(), faces, edges: BOX_EDGES.to_vec() }
+                HullGroup { center: g.center, verts: g.verts.items.iter().map(|&i| index(i)).collect(), faces, edges: BOX_EDGES.to_vec() }
             })
             .collect();
-        Self { verts, groups }
+        Self { verts: c.verts.clone(), groups }
     }
 
     /// Every face of every group, in order.
@@ -80,6 +80,7 @@ impl ConvexHull {
                 Vec3::new(if q == 0 || q == 3 { -b.x } else { b.x }, if k > 3 { b.y } else { -b.y }, if q <= 1 { -b.z } else { b.z })
             })
             .collect();
+        
         Self::new(verts, CUBE_FACES.to_vec(), BOX_EDGES.to_vec())
     }
 

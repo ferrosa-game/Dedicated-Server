@@ -281,9 +281,9 @@ impl<'a> Buildings<'a> {
     ) {
         let Some(raw) = self.csx.get_building(name.to_string()) else { return };
 
-        let off_y = raw.offsets.map_or(0, |o| o.0.y) as i32;
+        let off_y = raw.offsets.y as i32;
         let b = raw.rotated(rot as u8, &|bf, v| self.csx.special_block(bf, v));
-        let off = b.offsets.map_or(IVec3::ZERO, |o| o.0.as_ivec3());
+        let off = b.offsets.as_ivec3();
 
         let (w, l, h) = (b.width as i32, b.length as i32, b.height as i32);
 
@@ -663,8 +663,9 @@ pub fn assign_streets(records: &mut [BuildingRecord], streets: &crate::world::st
 /// the building, from `o` (the building's lowest corner).
 /// The interior's x and z extent from the building's lowest corner: past its offset margin, turned with the building.
 fn interior_span(raw: &BuildingFile, rot: u32) -> ((i32, i32), (i32, i32)) {
-    let off = raw.offsets.map_or(IVec3::ZERO, |v| v.0.as_ivec3());
+    let off = raw.offsets.as_ivec3();
     let (w, l) = (raw.width as i32, raw.length as i32);
+
     match rot & 3 {
         0 => ((off.x, w), (off.z, l)),
         1 => ((0, l - off.z), (off.x, w)),
@@ -677,11 +678,13 @@ fn interior_span(raw: &BuildingFile, rot: u32) -> ((i32, i32), (i32, i32)) {
 /// origin back by the offsets, turns the axes about their up axis and moves it on by the new offsets (the x and z
 /// offsets swapping with each turn, as every lab's (4, 0, 4) agrees with).
 fn placement(raw: &BuildingFile, city: IVec3, rot: u32) -> (Vec3, RotMatrix) {
-    let off = raw.offsets.map_or(IVec3::ZERO, |v| v.0.as_ivec3());
+    let off = raw.offsets.as_ivec3();
     let cell = |v: i32| v as f32 * 4.0;
+
     let mut pos = Vec3::new(cell(city.x - off.x), cell(city.y - off.y), cell(city.z - off.z));
     let mut m = IDENTITY;
     let (mut ox, mut oz) = (off.x, off.z);
+
     for _ in 0..rot {
         let (a4, c4) = (cell(ox), cell(oz));
         let [r0, _, r2] = m;
@@ -693,6 +696,7 @@ fn placement(raw: &BuildingFile, city: IVec3, rot: u32) -> (Vec3, RotMatrix) {
         let [r0, _, r2] = m;
         pos = r0 * mx + pos + r2 * mz;
     }
+
     (pos, m)
 }
 
@@ -702,7 +706,7 @@ fn place_point(pos: Vec3, m: &RotMatrix, w: Vec3) -> Vec3 {
 }
 
 fn building_record(kind: i32, raw: &BuildingFile, o: IVec3, rot: u32, city: IVec3) -> BuildingRecord {
-    let off = raw.offsets.map_or(IVec3::ZERO, |v| v.0.as_ivec3());
+    let off = raw.offsets.as_ivec3();
     let h = raw.height as i32;
     let (x, z) = interior_span(raw, rot);
     let cell = |v: i32| v as f32 * 4.0;
@@ -712,6 +716,7 @@ fn building_record(kind: i32, raw: &BuildingFile, o: IVec3, rot: u32, city: IVec
         BURGER_SHOP => vec![ShopEntry { kind: 0, price: BURGER_PRICE, extra: 0 }],
         _ => Vec::new(),
     };
+
     BuildingRecord {
         kind,
         interior_min: Vec3::new(cell(o.x + x.0), cell(o.y + off.y), cell(o.z + z.0)),
@@ -741,8 +746,8 @@ fn building_record(kind: i32, raw: &BuildingFile, o: IVec3, rot: u32, city: IVec
             raw.bots
                 .iter()
                 .map(|b| {
-                    let pts: Vec<Vec3> = b.waypoints.iter().map(|w| place_point(pos, &m, w.waypoint.0)).collect();
-                    PatrolSpot { pos: place_point(pos, &m, b.waypoints.first().map_or(Vec3::ZERO, |w| w.waypoint.0)), facing: rot & 3, waypoints: pts }
+                    let pts: Vec<Vec3> = b.waypoints.iter().map(|w| place_point(pos, &m, w.waypoint)).collect();
+                    PatrolSpot { pos: place_point(pos, &m, b.waypoints.first().map_or(Vec3::ZERO, |w| w.waypoint)), facing: rot & 3, waypoints: pts }
                 })
                 .collect()
         } else {

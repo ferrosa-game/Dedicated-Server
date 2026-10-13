@@ -56,7 +56,7 @@ pub fn build_level(
     map_name: &str,
     game_type: u32,
 ) -> Level {
-    let custom: Vec<(&str, IVec3)> = csx.custom_blocks().map(|(n, b)| (n, b.size.0.as_ivec3())).collect();
+    let custom: Vec<(&str, IVec3)> = csx.custom_blocks().map(|(n, b)| (n, b.size.as_ivec3())).collect();
 
     let mut tables = BlockTable::new(&custom.iter().map(|c| c.0).collect::<Vec<&str>>());
     let mut meshes = BlockMeshes::new(&tables, &csx.custom_blocks().map(|(_, b)| b).collect::<Vec<&BlockFile>>());
@@ -94,7 +94,7 @@ pub fn build_level(
         let mut found = None;
 
         for s in &city.sectors {
-            let p = s.pos.0.as_ivec3();
+            let p = s.pos.as_ivec3();
 
             if s.area == area_id && p.x == x >> 3 && p.y == y >> 3 && p.z == z >> 3 {
                 found = Some(s);
@@ -105,7 +105,7 @@ pub fn build_level(
     };
 
     for sector in &city.sectors {
-        let base = sector.pos.0.as_ivec3() * 8;
+        let base = sector.pos.as_ivec3() * 8;
 
         for y in 0..8i32 {
             for z in 0..8i32 {
@@ -152,7 +152,7 @@ pub fn build_level(
     let mut buildings = Buildings::new(csx, build_blocks, item_sets.clone(), game_type);
 
     for b in &city.buildings {
-        buildings.place(&mut area, ground, &mut tables, &dims, b.name.as_str(), b.pos.0.as_ivec3(), b.rot, ground.roundcity());
+        buildings.place(&mut area, ground, &mut tables, &dims, b.name.as_str(), b.pos.as_ivec3(), b.rot, ground.roundcity());
     }
 
     for &(id, key) in &buildings.generated {

@@ -13,24 +13,19 @@ pub struct EventUpdatePlayer {
 
 impl WireWrite for EventUpdatePlayer {
     fn write(&self, w: &mut crate::codec::Writer) {
-        // Start packing for A
         let team_bits = (self.team as i32 + 1) << 10;
         let active_bits = (self.active as i32) << 9;
         let bot_bits = (self.is_bot as i32) << 8;
 
         let a = team_bits + active_bits + self.client_id as i32 + bot_bits;
-        // -----------
 
-        // Start packing for C
         let gender_bits = self.customization.gender as i32;
         let head_bits = (self.customization.head as i32) << 1;
         let skin_color_bits = (self.customization.skin as i32) << 6;
         let hair_bits = (self.customization.hair_style as i32) << 9;
 
         let c = gender_bits + head_bits + skin_color_bits + hair_bits;
-        // -----------
 
-        // Start packing for D
         let eye_color_bits = self.customization.eye_color as i32;
         let hair_color_bits = (self.customization.hair_color as i32) << 3;
         let model_bits = (self.customization.model as i32) << 7;
@@ -40,7 +35,6 @@ impl WireWrite for EventUpdatePlayer {
 
         let d1 = eye_color_bits + hair_color_bits + model_bits + suit_color_bits + tie_color_bits;
         let d = necklace_bits + d1;
-        // -----------
 
         w.bits(a, 16);
         w.bits(self.human_id, 10);

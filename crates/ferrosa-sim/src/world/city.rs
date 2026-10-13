@@ -43,7 +43,7 @@ pub fn place_sector_block(grid: &mut AreaGrid, types: &[BlockType], dims: &dyn B
 
 pub fn instantiate_sectors(city: &CityFileSBC, types: &[BlockType], grid: &mut AreaGrid, ground: &mut Ground, dims: &dyn BlockDims) {
     for sector in &city.sectors {
-        let base = sector.pos.0.as_ivec3() * 8;
+        let base = sector.pos.as_ivec3() * 8;
 
         for y in 0..8 {
             for z in 0..8 {

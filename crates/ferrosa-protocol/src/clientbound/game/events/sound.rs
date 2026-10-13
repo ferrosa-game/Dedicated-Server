@@ -1,4 +1,4 @@
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
 
 use crate::codec::WireWrite;
 
@@ -54,7 +54,7 @@ impl Sound {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EventSound {
     pub sound_type: Sound,
-    pub pos: Vector,
+    pub pos: Vec3,
     pub volume: f32,
     pub pitch: f32,
 }

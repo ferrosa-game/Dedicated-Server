@@ -1,6 +1,5 @@
 use glam::Vec3;
 use ferrosa_map::file_types::sbv::VehicleBodyFile;
-use ferrosa_math::vector::Vector;
 
 use crate::sim::hull::ConvexHull;
 
@@ -26,10 +25,11 @@ impl VehicleBody {
     /// load_sbv: reads `path`; None if it cannot be read.
     pub(crate) fn load(path: &std::path::Path) -> Option<Self> {
         let mut file = VehicleBodyFile::load(path).ok()?;
-        let positions: Vec<Vec3> = file.nodes.iter().map(|n| n.pos.0).collect();
+        let positions: Vec<Vec3> = file.nodes.iter().map(|n| n.pos).collect();
+
         let centred = match file.offset {
-            Some(Vector(offset)) => {
-                let shift = |p: &mut Vector| p.0 -= offset;
+            Some(offset) => {
+                let shift = |p: &mut Vec3| *p -= offset;
                 file.nodes.iter_mut().for_each(|n| shift(&mut n.pos));
                 file.vertices.iter_mut().for_each(shift);
                 file.parts.iter_mut().flat_map(|p| p.points.iter_mut()).for_each(shift);
@@ -51,6 +51,7 @@ impl VehicleBody {
                 register_unique_pair(&mut edges, f[k], f[(k + 1) % 4]);
             }
         }
+        
         let faces = file.faces.iter().map(|f| std::array::from_fn(|k| f.indices.get(k).map_or(0, |&i| i as usize))).collect();
         let mesh = ConvexHull::new(centred.clone(), faces, edges);
         Some(Self { file, mesh })

@@ -1,10 +1,13 @@
 use binrw::BinRead;
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
+
+use crate::br_vec3;
 
 #[derive(BinRead)]
 #[br(import(version: u32))]
 pub struct ItemModelVertex {
-    pub pos: Vector,
+    #[br(parse_with = br_vec3)]
+    pub pos: Vec3,
     #[br(if(version >= 3))]
     pub vertex1: f32,
     #[br(if(version >= 3))]

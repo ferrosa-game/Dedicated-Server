@@ -338,18 +338,20 @@ impl VehicleType {
         };
 
         for w in body.file.wheels.iter().take(mounts) {
-            let p = w.pos.0;
+            let p = w.pos;
             let near = |pick: &dyn Fn(usize, Vec3) -> Option<f32>| {
-                body.file.nodes.iter().enumerate().fold((0usize, NODE_SEARCH), |(best_i, best), (i, n)| match pick(i, n.pos.0) {
+                body.file.nodes.iter().enumerate().fold((0usize, NODE_SEARCH), |(best_i, best), (i, n)| match pick(i, n.pos) {
                     Some(d) => (if best > d { i } else { best_i }, if d < best { d } else { best }),
                     None => (best_i, best),
                 })
             };
+
             let (a, _) = near(&|_, n| {
                 let (dx, dy, dz) = (p.x - n.x, (p.y - n.y) * WHEEL_SEARCH_SCALE, p.z - n.z);
                 Some((dz * dz + (dx * dx + dy * dy)).sqrt())
             });
-            let na = body.file.nodes[a].pos.0;
+
+            let na = body.file.nodes[a].pos;
             let (b, _) = near(&|i, n| {
                 if i == a {
                     return None;
@@ -360,16 +362,18 @@ impl VehicleType {
                 let dot = (p.z - na.z) * an.z + ((p.y - na.y) * an.y + wa.x * an.x);
                 (dot >= 0.0).then_some(d)
             });
-            let nb = body.file.nodes[b].pos.0;
+
+            let nb = body.file.nodes[b].pos;
             let to_b = (nb - p).length();
             let to_a = (na - p).length();
             let sum = to_a + to_b;
+
             self.add_wheel(0, a as i32, b as i32, [to_b / sum, to_a / sum], radius, mass, vertical_offset, [0.25, 0.5, travel_damping]);
             if let Some(last) = self.wheels.last_mut() {
                 last.drive = drive;
             }
         }
-        let wp = |k: usize| body.file.wheels.get(k).map_or(Vec3::ZERO, |w| w.pos.0);
+        let wp = |k: usize| body.file.wheels.get(k).map_or(Vec3::ZERO, |w| w.pos);
         self.track = (wp(0).x - wp(1).x).abs();
         self.wheelbase = (wp(0).z - wp(2).z).abs();
     }
@@ -378,7 +382,7 @@ impl VehicleType {
     /// first eight nodes as the cage, a wheel at each mount hung between its nearest node and the nearest node beyond
     /// it, then the track, wheelbase, centre of mass (nodes below the floor at mass 4) and inertia.
     fn attach_wheels(&mut self, body: &VehicleBody, kind: VehicleKind, drive: i32, radius: f32, mass: f32, mounts: usize) {
-        self.nodes.extend(body.file.nodes.iter().map(|n| ChassisNode { pos: n.pos.0, mass: if n.pos.0.y < 0.0 { 2.0 } else { 1.0 } }));
+        self.nodes.extend(body.file.nodes.iter().map(|n| ChassisNode { pos: n.pos, mass: if n.pos.y < 0.0 { 2.0 } else { 1.0 } }));
         for e in &body.file.edges {
             self.add_node_edge(e.a, e.b);
         }
@@ -421,6 +425,7 @@ impl VehicleType {
         for n in self.nodes.iter_mut() {
             n.mass /= total;
         }
+
         let positions: Vec<Vec3> = self.nodes.iter().map(|n| n.pos).collect();
         let (sum, inv) = mean(positions.iter());
         let centroid = sum * inv;
@@ -428,6 +433,7 @@ impl VehicleType {
         for w in self.wheels.iter_mut() {
             w.local_pos -= centroid;
         }
+
         let c = self.cage.len();
         let (sum, inv) = mean(positions[..c].iter());
         let centre = sum * inv;
@@ -435,6 +441,7 @@ impl VehicleType {
             let d = (centre - p).length();
             if d > r { d } else { r }
         });
+
         self.radius = reach * RADIUS_MARGIN;
         let probe = self.radius * CAGE_PROBE;
         let (cage, centre) = if self.body_file != 0 {
@@ -444,9 +451,12 @@ impl VehicleType {
         } else {
             (positions[..c].to_vec(), centre)
         };
+
         self.cage_forward = mean_value_coordinates(&cage, Vec3::new(0.0 * probe + centre.x, 0.0 * probe + centre.y, probe * 1.0 + centre.z));
+
         let probe = CAGE_PROBE * self.radius;
         self.cage_right = mean_value_coordinates(&cage, Vec3::new(centre.x + 1.0 * probe, centre.y + 0.0 * probe, centre.z + probe * 0.0));
+
         let (sum, inv) = mean(positions[..c].iter());
         let mx = sum.x * inv;
         self.centred_nodes = positions.iter().map(|p| Vec3::new(p.x - mx, p.y - sum.y * inv, p.z - sum.z * inv)).collect();
@@ -454,11 +464,11 @@ impl VehicleType {
 
     /// The body slot's collision mesh, chassis and render faces and windows.
     fn body_meshes(&mut self, body: &VehicleBody) {
-        self.render_verts = body.file.vertices.iter().map(|v| v.0).collect();
+        self.render_verts = body.file.vertices.clone();
         self.mesh = Some(body.mesh.clone());
         self.chassis_faces = body.file.faces.iter().map(|f| f.indices.iter().map(|&i| i as usize).collect()).collect();
         self.render_faces = body.file.subshapes.iter().map(|s| s.nodes.iter().map(|n| n.id as usize).collect()).collect();
-        self.windows = body.file.parts.iter().map(|p| std::array::from_fn(|k| p.points.get(k).map_or(Vec3::ZERO, |v| v.0))).collect();
+        self.windows = body.file.parts.iter().map(|p| std::array::from_fn(|k| p.points.get(k).map_or(Vec3::ZERO, |v| *v))).collect();
     }
 
     /// load_tst: a test shape file's mesh replaces the render vertices and faces and its parts the windows (raised and
@@ -470,18 +480,20 @@ impl VehicleType {
         let tst = TstFile::load(path, kind == VehicleKind::Van2).unwrap_or_default();
         let shift = |p: Vec3| if kind != VehicleKind::Van2 { Vec3::new(p.x, p.y + TST_SHIFT, p.z + TST_SHIFT) } else { p };
         let mesh = tst.mesh.as_ref();
-        self.render_verts = mesh.map_or(Vec::new(), |m| m.vertices.iter().map(|v| shift(v.pos.0)).collect());
+
+        self.render_verts = mesh.map_or(Vec::new(), |m| m.vertices.iter().map(|v| shift(v.pos)).collect());
         self.render_faces = mesh.map_or(Vec::new(), |m| m.faces.iter().map(|f| f.corners.iter().map(|c| c.vertex as usize).collect()).collect());
         self.windows = tst.parts.as_ref().map_or(Vec::new(), |p| {
             p.parts
                 .iter()
                 .map(|part| {
-                    let point = |k: usize| part.points.get(k).map_or(Vec3::ZERO, |v| v.0);
+                    let point = |k: usize| part.points.get(k).map_or(Vec3::ZERO, |v| *v);
                     let last = if part.points.len() > 3 { point(3) } else { point(2) };
                     [point(0), point(1), point(2), last].map(shift)
                 })
                 .collect()
         });
+
         if kind == VehicleKind::Van2 {
             let chassis = tst.chassis.as_ref();
             self.chassis_faces = chassis.map_or(Vec::new(), |m| m.faces.iter().map(|f| f.corners.iter().map(|c| c.vertex as usize).collect()).collect());
@@ -717,24 +729,27 @@ impl VehicleType {
     /// the floor) without its springs, the first eight as the cage, a wheel at each mount as the sized setup hangs
     /// them but placed at the mount itself, the inertia about the origin and no centre of mass.
     fn attach_wheels_unsized(&mut self, body: &VehicleBody, kind: VehicleKind, drive: i32, radius: f32, mass: f32) {
-        self.nodes.extend(body.file.nodes.iter().map(|n| ChassisNode { pos: n.pos.0, mass: if n.pos.0.y < 0.0 { 2.0 } else { 1.0 } }));
+        self.nodes.extend(body.file.nodes.iter().map(|n| ChassisNode { pos: n.pos, mass: if n.pos.y < 0.0 { 2.0 } else { 1.0 } }));
         self.cage = SBV_CAGE.to_vec();
         self.hang_wheels(body, kind, drive, radius, mass, body.file.wheels.len());
+
         for n in self.nodes.iter_mut() {
             if 0.0 > n.pos.y {
                 n.mass = LOWER_NODE_MASS;
             }
         }
+
         let (inertia, total) = self.nodes.iter().fold((Vec3::ZERO, 0.0f32), |(acc, total), n| {
             let (dy, dx, dz) = (n.pos.y * n.pos.y, n.pos.x * n.pos.x, n.pos.z * n.pos.z);
             let m = n.mass;
             (Vec3::new((dy + dz) * m + acc.x, (dz + dx) * m + acc.y, (dy + dx) * m + acc.z), total + m)
         });
+
         let inv = 1.0 / total;
         self.inertia = inertia * inv;
+
         for (w, mount) in self.wheels.iter_mut().zip(&body.file.wheels) {
-            let p = mount.pos.0;
-            w.local_pos = Vec3::new(p.x, p.y - 0.125, p.z);
+            w.local_pos = Vec3::new(mount.pos.x, mount.pos.y - 0.125, mount.pos.z);
             w.mass_offset = w.local_pos;
         }
     }

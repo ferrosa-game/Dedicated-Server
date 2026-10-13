@@ -5,8 +5,6 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-ferrosa-math.workspace = true
-
 rand.workspace = true
 glam.workspace = true
 binrw.workspace = true

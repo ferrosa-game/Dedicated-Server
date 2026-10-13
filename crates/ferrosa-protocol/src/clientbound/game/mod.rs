@@ -1,5 +1,5 @@
+use glam::Vec3;
 use serde::{Deserialize, Serialize};
-use ferrosa_math::vector::Vector;
 
 use crate::{
     CharacterCustomization,
@@ -194,7 +194,7 @@ pub struct ServerItemObject {
     pub slot: u16,
     pub item_id: u16,
     pub item_type: ItemKind,
-    pub pos: Vector,
+    pub pos: Vec3,
     pub rot: [f32; 4],
     pub parent_item: i32,
     pub parent_human: i32,
@@ -204,7 +204,6 @@ pub struct ServerItemObject {
     pub tail: ItemTail,
 }
 
-/// The type-specific end of an item's state (write_iteminfo_to_object).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum ItemTail {
     #[default]
@@ -231,7 +230,7 @@ impl ServerItemObject {
         }
         w.bits(0, 8);
 
-        let p = self.pos.0;
+        let p = self.pos;
         for v in [(p.x + 4096.0) * 4096.0, p.y * 4096.0, (p.z + 4096.0) * 4096.0] {
             write_absolute(w, v as i32, 28);
         }
@@ -286,12 +285,11 @@ impl LineLinkEntry {
     }
 }
 
-/// A vehicle's state in the game packet (the vehicle part of append_object_packet), always written in full.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServerVehicleObject {
     pub vehicle_id: u16,
     pub traffic_car: i32,
-    pub pos: Vector,
+    pub pos: Vec3,
     pub rot: [f32; 4],
     /// The steering angle as a share of half a turn, in 255ths.
     pub steer: i32,
@@ -308,7 +306,7 @@ impl ServerVehicleObject {
         w.bits(self.tier, 2);
         w.bits(self.traffic_car, 10);
         w.bits(0, 8);
-        let p = self.pos.0;
+        let p = self.pos;
         for v in [(p.x + 4096.0) * 4096.0, (0.0 + p.y) * 4096.0, (p.z + 4096.0) * 4096.0] {
             write_absolute(w, v as i32, 28);
         }
@@ -323,7 +321,6 @@ impl ServerVehicleObject {
     }
 }
 
-/// A traffic car the client is told about this packet (the traffic part of the game packet).
 #[derive(Debug, Clone, PartialEq)]
 pub struct TrafficEntry {
     pub index: u16,
@@ -331,12 +328,9 @@ pub struct TrafficEntry {
     pub vehicle: bool,
     pub kind: VehicleKind,
     pub color: i32,
-    pub pos: Vector,
+    pub pos: Vec3,
     pub yaw: f32,
 }
-
-/// The double precision pi the yaw is scaled by.
-const TRAFFIC_PI: f64 = 3.14159265359;
 
 impl TrafficEntry {
     fn write_body(&self, w: &mut Writer) {
@@ -346,11 +340,11 @@ impl TrafficEntry {
         w.bits(1, 1);
         w.bits(self.kind as i32, 6);
         w.bits(self.color, 4);
-        let p = self.pos.0;
+        let p = self.pos;
         for v in [(p.x + 4096.0) * 4096.0, (p.y + 0.0) * 4096.0, (p.z + 4096.0) * 4096.0] {
             write_absolute(w, v as i32, 28);
         }
-        let yaw = ((self.yaw as f64 / TRAFFIC_PI * 255.0) as i32).clamp(-255, 255);
+        let yaw = ((self.yaw as f64 / std::f64::consts::PI * 255.0) as i32).clamp(-255, 255);
         write_absolute(w, yaw, 9);
     }
 }
@@ -367,7 +361,7 @@ pub struct ServerHumanObject {
     pub vehicle_seat: i32,
     pub alive: bool,
     pub bleeding: bool,
-    pub pos: Vector,
+    pub pos: Vec3,
     pub rot: [f32; 4],
     pub bones: [[f32; 4]; 15],
 }
@@ -396,7 +390,7 @@ impl ServerHumanObject {
         w.bits(self.alive as i32, 1);
         w.bits(self.bleeding as i32, 1);
 
-        let p = self.pos.0;
+        let p = self.pos;
         for v in [(4096.0 + p.x) * 4096.0, (0.0 + p.y) * 4096.0, (4096.0 + p.z) * 4096.0] {
             write_absolute(w, v as i32, 28);
         }
@@ -445,7 +439,6 @@ fn pack_quaternion(q: [f32; 4], bits: u32) -> (i32, [i32; 3]) {
     (largest as i32, out)
 }
 
-/// The state of the client's own human, sent in every game packet while the player has a human.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OwnHumanData {
     pub human_id: i32,
@@ -464,12 +457,11 @@ pub struct OwnHumanData {
     pub health: [i32; 7],
     pub stamina: i32,
     pub max_stamina: i32,
-    pub head_vel: Vector,
+    pub head_vel: Vec3,
     /// The inventory display: per slot (hands, then pockets) the item types, with ammo and attachment flags.
     pub inventory: [Vec<i32>; 7],
 }
 
-/// A menu button: what pressing it sends back, its label and a value shown with it.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MenuButton {
     pub id: i32,
@@ -516,7 +508,7 @@ pub struct ServerGamePacket {
     pub ready_states: Option<[bool; 32]>,
     pub voice: [Option<ServerVoiceData>; 8],
 
-    pub follow_pos: Vector,
+    pub follow_pos: Vec3,
 
     pub own_human: Option<OwnHumanData>,
     pub humans: Vec<ServerHumanObject>,
@@ -592,11 +584,11 @@ impl WireWrite for ServerGamePacket {
                 w.bits(h.max_stamina, 8);
                 h.head_vel
             }
-            None => Vector::new(0.0, 0.0, 0.0),
+            None => Vec3::new(0.0, 0.0, 0.0),
         };
-        w.f32(head_vel.0.x);
-        w.f32(head_vel.0.y);
-        w.f32(head_vel.0.z);
+        w.f32(head_vel.x);
+        w.f32(head_vel.y);
+        w.f32(head_vel.z);
 
         w.bits(self.manager_tab as i32, 1);
         w.bits(self.menu_type as i32, 8);

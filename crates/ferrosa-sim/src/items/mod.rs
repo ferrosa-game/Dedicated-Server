@@ -1,6 +1,5 @@
 use glam::{IVec3, Vec3};
 use rand::RngExt;
-use ferrosa_math::vector::Vector;
 use ferrosa_physics::{
     RotMatrix, Table,
     body::RigidBodyType,
@@ -261,7 +260,7 @@ impl Sim {
         let right = -view[2];
         rotate_orientation(&mut view, right, player.view_pitch);
 
-        let mut pos = player.camera_pos.0 - view[0] * SPAWN_DISTANCE;
+        let mut pos = player.camera_pos - view[0] * SPAWN_DISTANCE;
         pos += pos_offset;
 
         let Some(id) = self.create_item(kind, pos, None, IDENTITY) else {
@@ -283,14 +282,17 @@ impl Sim {
             (ItemKind::Magnum, Some(ItemKind::MagnumMag)),
             (ItemKind::Auto5, None),
         ];
+
         const GUN_SPACING: f32 = 0.75;
         const MAG_SPACING: f32 = 0.25;
         let Some(player) = self.players.get(player_id.idx()) else { return };
         let mut view = IDENTITY;
         rotate_orientation(&mut view, Vec3::Y, player.view_yaw);
+
         let (forward, right) = (-view[0], -view[2]);
-        let centre = player.camera_pos.0 + forward * SPAWN_DISTANCE;
+        let centre = player.camera_pos + forward * SPAWN_DISTANCE;
         let first = -(GUNS.len() as f32 - 1.0) * 0.5;
+
         for (k, (gun, mag)) in GUNS.into_iter().enumerate() {
             let at = centre + right * ((first + k as f32) * GUN_SPACING);
             self.create_item(gun, at, None, view);
@@ -404,7 +406,7 @@ impl Sim {
                 item.despawn_time = 0;
             }
             if item.health <= 0 {
-                let e = EventBulletHit { unk: 0, hit_type: 0, pos: Vector(item.pos2), normal: Vector(item.vel) };
+                let e = EventBulletHit { unk: 0, hit_type: 0, pos: item.pos2, normal: item.vel };
                 self.events.push(Event { tick_created: self.tick, kind: ServerEvent::BulletHit(e) });
                 item.despawn_time = 0;
             }
@@ -736,7 +738,7 @@ impl Sim {
                     slot: (HUMAN_SLOTS + id) as u16,
                     item_id: id as u16,
                     item_type: item.item_type,
-                    pos: Vector(body.pos),
+                    pos: body.pos,
                     rot,
                     parent_item: item.parent_item,
                     parent_human: item.parent_human,

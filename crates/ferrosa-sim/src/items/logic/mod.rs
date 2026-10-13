@@ -1,4 +1,3 @@
-use ferrosa_math::vector::Vector;
 use ferrosa_protocol::clientbound::game::{
     GameState, ItemKind,
     events::{Event, ServerEvent, bullet::EventBullet, sound::Sound},
@@ -133,7 +132,7 @@ impl Sim {
             self.stats.bullets += 1;
         }
         let shown = p - bv;
-        let e = EventBullet { bullet_type, item_id: id as i32, pos: Vector(shown), vel: Vector(vel) };
+        let e = EventBullet { bullet_type, item_id: id as i32, pos: shown, vel };
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Bullet(e) });
         let s = calculate_spread_vector(&mut self.noise_seed, spread + spread, 0.0);
         let r = vel + s;

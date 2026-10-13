@@ -177,7 +177,7 @@ pub fn item_types() -> Vec<ItemType> {
     match ferrosa_map::file_types::itm::ItmFile::load(&uzi) {
         Ok(itm) => {
             for kind in [Auto5, Uzi] {
-                types[kind as usize].inv_inertia = Vec3::ONE / itm.inertia.0;
+                types[kind as usize].inv_inertia = Vec3::ONE / itm.inertia;
             }
         }
         Err(e) => eprintln!("[Items] could not load {}: {e}", uzi.display()),

@@ -1,5 +1,4 @@
 use glam::Vec3;
-use ferrosa_math::vector::Vector;
 use ferrosa_physics::{
     RotMatrix,
     rotation::{IDENTITY, rot_matrix_to_quaternion},
@@ -33,10 +32,11 @@ impl Sim {
     pub(crate) fn spawn_human_for(&mut self, player_id: PlayerId) {
         let Some(player) = self.players.get(player_id.idx()) else { return };
 
-        let pos = player.camera_pos.0;
+        let pos = player.camera_pos;
         let Some(id) = self.spawn_human(pos, &IDENTITY, Some(player_id)) else {
             return println!("[Sim] Human table full");
         };
+
         if let Some(player) = self.players.get_mut(player_id.idx()) {
             player.human = Some(id);
             player.ghost_human = false;
@@ -45,6 +45,7 @@ impl Sim {
 
             self.update_player_event(player_id);
         }
+        
         println!("[Sim] Spawned human #{id} at {:?}", pos);
     }
 
@@ -158,15 +159,15 @@ impl Sim {
                     block_z: b.block.z,
                     cell: b.cell,
                     face: b.face,
-                    pos: Vector(b.pos),
-                    vel: Vector(b.vel),
+                    pos: b.pos,
+                    vel: b.vel,
                 }),
-                HumanOutput::Blood(p) => ServerEvent::BulletHit(EventBulletHit { unk: 0, hit_type: 3, pos: Vector(p), normal: Vector(p) }),
+                HumanOutput::Blood(p) => ServerEvent::BulletHit(EventBulletHit { unk: 0, hit_type: 3, pos: p, normal: p }),
                 HumanOutput::ReleasePlayer(pid) => {
                     self.settle_death(pid);
                     continue;
                 }
-                HumanOutput::Sound { sound, pos, volume, pitch } => ServerEvent::Sound(EventSound { sound_type: sound, pos: Vector(pos), volume, pitch }),
+                HumanOutput::Sound { sound, pos, volume, pitch } => ServerEvent::Sound(EventSound { sound_type: sound, pos, volume, pitch }),
                 HumanOutput::RunOver { driver, victim } => {
                     self.score_run_over(driver, victim);
                     continue;
@@ -224,17 +225,20 @@ impl Sim {
 
     pub(crate) fn kill_human_for(&mut self, player_id: PlayerId) {
         let Some(player) = self.players.get(player_id.idx()) else { return };
-        let eye = player.camera_pos.0;
+        let eye = player.camera_pos;
+
         let target = self
             .humans
             .iter()
             .filter(|(_, h)| h.health.vitality > 0)
             .min_by(|(_, a), (_, b)| (a.pos - eye).length().total_cmp(&(b.pos - eye).length()))
             .map(|(id, _)| id);
+
         let Some(id) = target else { return println!("[Sim] No living human to kill") };
         if let Some(h) = self.humans.get_mut(id) {
             h.health.vitality = 0;
         }
+
         println!("[Sim] Killed human #{id}");
     }
 
@@ -253,7 +257,7 @@ impl Sim {
                     vehicle_seat: h.seat as i32,
                     alive: h.health.vitality > 0,
                     bleeding: h.bleeding,
-                    pos: Vector(root.pos),
+                    pos: root.pos,
                     rot: rot_matrix_to_quaternion(&root.rot),
                     bones: std::array::from_fn(|i| rot_matrix_to_quaternion(&h.bones[i + 1].networked_rot)),
                 }
@@ -287,7 +291,7 @@ impl Sim {
                         health: [h.health.health, h.health.chest, h.health.head, h.health.left_arm, h.health.right_arm, h.health.left_leg, h.health.right_leg],
                         stamina: h.stamina,
                         max_stamina: h.max_stamina,
-                        head_vel: Vector(h.bones[3].vel),
+                        head_vel:h.bones[3].vel,
                         inventory: std::array::from_fn(|k| {
                             let slot = &h.inventory[k];
                             slot.items[..slot.count as usize]

@@ -57,12 +57,12 @@ impl BlockMeshes {
         let b = &mut self.b;
         b.reset();
         for bx in &f.boxes {
-            let p: [Vec3; 8] = std::array::from_fn(|i| bx.pos[i].0);
+            let p: [Vec3; 8] = std::array::from_fn(|i| bx.pos[i]);
             b.add_box(&p, bx.texture[0], bx.side_flag);
         }
         for sf in &f.block_surface {
             for (i, v) in sf.vertex_data.iter().flatten().enumerate() {
-                b.ctrl[i] = v.pos.0;
+                b.ctrl[i] = v.pos;
             }
             let mut flags = sf.texture;
             if sf.project_texture != 0 {
@@ -70,7 +70,7 @@ impl BlockMeshes {
             }
             b.append_bezier(sf.order_y as i32, Degree::from_i32(sf.order_x as i32), sf.tess_y as i32, Degree::from_i32(sf.tess_x as i32), flags);
         }
-        let (w, h, d) = (f.size.0.x as i32, f.size.0.y as i32, f.size.0.z as i32);
+        let (w, h, d) = (f.size.x as i32, f.size.y as i32, f.size.z as i32);
         let mut faces = |on: u32, dir: i32, outer: i32, inner: i32, at: &dyn Fn(f32, f32) -> Vec3| {
             if on != 0 {
                 for o in 0..outer {

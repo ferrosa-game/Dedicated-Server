@@ -1,4 +1,4 @@
-use ferrosa_math::vector::Vector;
+use glam::Vec3;
 
 use crate::codec::WireWrite;
 
@@ -6,14 +6,14 @@ use crate::codec::WireWrite;
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventExplosion {
     pub size: i32,
-    pub pos: Vector,
+    pub pos: Vec3,
 }
 
 impl WireWrite for EventExplosion {
     fn write(&self, w: &mut crate::codec::Writer) {
         w.bits(self.size, 8);
-        w.f32(self.pos.0.x);
-        w.f32(self.pos.0.y);
-        w.f32(self.pos.0.z);
+        w.f32(self.pos.x);
+        w.f32(self.pos.y);
+        w.f32(self.pos.z);
     }
 }

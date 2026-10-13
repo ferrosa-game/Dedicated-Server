@@ -51,12 +51,13 @@ pub struct RoadNetwork {
 
 impl RoadNetwork {
     pub(crate) fn from_city(city: &CityFileSBC) -> Self {
-        let inters: Vec<IVec3> = city.intersections.iter().map(|i| i.0.as_ivec3()).collect();
+        let inters: Vec<IVec3> = city.intersections.iter().map(|i| i.as_ivec3()).collect();
         let streets: Vec<(usize, usize, i32, i32)> = city
             .streets
             .iter()
             .map(|s| (s.intersection_indices[0] as usize, s.intersection_indices[1] as usize, s.left_lane as i32, s.right_lane as i32))
             .collect();
+
         Self::build(&inters, &streets)
     }
 
