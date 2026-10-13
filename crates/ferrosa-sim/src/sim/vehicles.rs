@@ -1,8 +1,7 @@
 use glam::Vec3;
 use ferrosa_physics::rotation::{IDENTITY, rot_matrix_to_quaternion, rotate_orientation};
 use ferrosa_protocol::clientbound::game::{
-    ServerVehicleObject, VehicleKind,
-    events::{Event, ServerEvent, update_vehicle::EventUpdateVehicle, update_vehicle_type_color::EventUpdateVehicleTypeColor},
+    ServerVehicleObject, VehicleKind, events::{Event, ServerEvent, chat::ChatType, update_vehicle::EventUpdateVehicle, update_vehicle_type_color::EventUpdateVehicleTypeColor},
 };
 
 use super::Sim;
@@ -13,9 +12,6 @@ use crate::{
     world::trace::line_intersect_level,
 };
 
-const SPAWN_DISTANCE: f32 = 6.0;
-const GROUND_SEARCH: f32 = 8.0;
-const RIDE_HEIGHT: f32 = 1.0;
 const HIDDEN_STATE: i32 = 3;
 /// The update_vehicle kinds: a window broken, a tyre burst, the vehicle wrecked.
 pub(crate) const WINDOW_BROKEN: i32 = 0;
@@ -126,31 +122,38 @@ impl Sim {
         Some(id)
     }
 
-    /// Test command (/car [type] [color]): a vehicle in front of the player, facing the way they look.
+    /// Test command (/car [type] [color]): a vehicle in front of the player, facing away from them.
     pub(crate) fn car_command(&mut self, player_id: PlayerId, message: &str) {
         let mut args = message.split_whitespace().skip(1).map(|a| a.parse::<i32>().ok());
         let kind = args.next().flatten().unwrap_or(0);
         let color = args.next().flatten().unwrap_or(0);
         let kind = u8::try_from(kind)
             .ok()
-            .and_then(|k| ferrosa_protocol::clientbound::game::VehicleKind::try_from(k).ok())
+            .and_then(|k| VehicleKind::try_from(k).ok())
             .filter(|&k| self.vehicle_types.get(k as usize).is_some_and(|t| !t.nodes.is_empty()));
 
         let Some(kind) = kind else {
             let ready: Vec<String> =
                 self.vehicle_types.iter().enumerate().filter(|(_, t)| !t.nodes.is_empty()).map(|(k, t)| format!("{k} {}", t.name)).collect();
-            self.send_chat(&format!("Vehicle types: {}", ready.join(", ")), ferrosa_protocol::clientbound::game::events::chat::ChatType::Announce, -1, 0);
+            self.send_chat(&format!("Vehicle types: {}", ready.join(", ")), ChatType::Announce, -1, 0);
             return;
         };
 
         let Some(player) = self.players.get(player_id.idx()) else { return };
+        let human = player.human.and_then(|h| self.humans.get(h));
         let mut rot = IDENTITY;
-        rotate_orientation(&mut rot, Vec3::Y, player.view_yaw);
+        rotate_orientation(&mut rot, Vec3::Y, human.map_or(player.view_yaw, |h| h.view_yaw));
 
-        let ahead = player.camera_pos - rot[0] * SPAWN_DISTANCE;
+        let forward = -rot[2];
+        let origin = human.map_or(player.camera_pos, |h| h.bones[0].pos);
+        let ahead = origin + forward * 6.0;
+        let rot = [-rot[0], rot[1], -rot[2]];
         let map = &self.world.map;
-        let ground = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, ahead + Vec3::Y * GROUND_SEARCH, ahead - Vec3::Y * GROUND_SEARCH);
-        let pos = ground.map_or(ahead, |g| Vec3::new(ahead.x, g.hit.pos.y + RIDE_HEIGHT, ahead.z));
+
+        let ground = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, ahead + Vec3::Y * 8.0, ahead - Vec3::Y * 256.0);
+        let pos = ground.map_or(ahead, |g| Vec3::new(ahead.x, g.hit.pos.y + 1.0, ahead.z));
+        let com = self.vehicle_types[kind as usize].center_of_mass;
+        let pos = pos - (rot[0] * com.x + rot[1] * com.y + rot[2] * com.z);
 
         match self.spawn_vehicle(kind, color, pos, rot) {
             Some(id) => println!("[Sim] Spawned vehicle {kind:?} #{id} at {pos:?}"),

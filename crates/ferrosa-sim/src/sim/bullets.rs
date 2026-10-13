@@ -1,7 +1,6 @@
 use glam::{IVec3, Vec3};
 use ferrosa_protocol::clientbound::game::{
-    ItemKind,
-    events::{Event, ServerEvent, bullet_hit::EventBulletHit, bullet_hole::EventBulletHole, update_vehicle::EventUpdateVehicle},
+    ItemKind, VehicleKind, events::{Event, ServerEvent, bullet_hit::EventBulletHit, bullet_hole::EventBulletHole, update_vehicle::EventUpdateVehicle},
 };
 
 use super::{
@@ -96,6 +95,7 @@ impl Sim {
         let damage = if damage >= 0 { damage } else { 0 };
         let Some(vehicle) = self.vehicles.get_mut(vid) else { return };
         let update = |kind: i32, part: usize| EventUpdateVehicle { vehicle_id: vid as i32, kind, part: part as i32, pos: hit.pos, velocity: v };
+
         let event = match hit.part {
             VehiclePart::Wheel(k) => {
                 let Some(w) = vehicle.wheels.get_mut(k) else { return };
@@ -111,7 +111,7 @@ impl Sim {
                 w.popped = 1;
                 ServerEvent::UpdateVehicle(update(TYRE_BURST, k))
             }
-            _ if vehicle.kind == ferrosa_protocol::clientbound::game::VehicleKind::Train => return,
+            _ if vehicle.kind == VehicleKind::Train => return,
             VehiclePart::Window(k) => {
                 if let Some(w) = vehicle.broken_windows.get_mut(k) {
                     *w = true;

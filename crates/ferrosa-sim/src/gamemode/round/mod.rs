@@ -205,7 +205,7 @@ impl Sim {
 
         for pid in self.players.iter().filter(|(_, p)| !p.is_bot).map(|(_, p)| p.player_id).collect::<Vec<_>>() {
             let Some(p) = self.players.get(pid.idx()) else { continue };
-            
+
             on_teams += round_corp(p.team).is_some() as i32;
             all_ready &= p.is_ready;
 
