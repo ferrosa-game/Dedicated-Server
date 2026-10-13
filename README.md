@@ -95,7 +95,7 @@ We intend to add WASM into the server, so that way plugins can create custom gam
 
 ## AI Disclosure
 
-Im gonna be frank, I did *not* want to port all of that weirdly decompiled physics code by hand, AI has gotten to a point where it can right competent code, so I entrusted it with the work, making sure it verified the output of the physics functions via GDB with the real binary.
+Im gonna be frank, I did *not* want to port all of that weirdly decompiled physics code by hand, AI has gotten to a point where it can write competent code, so I entrusted it with the work, making sure it verified the output of the physics functions via GDB with the real binary.
 
 If you dont like this, dont use it. I dont really know what to tell you.
 
