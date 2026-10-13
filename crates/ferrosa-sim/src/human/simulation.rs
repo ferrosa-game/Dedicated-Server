@@ -1,8 +1,8 @@
-use glam::Vec3;
 use ferrosa_physics::{
     RigidBodies,
     rotation::{IDENTITY, rotate_orientation},
 };
+use glam::Vec3;
 
 use super::{
     Human,
@@ -20,11 +20,8 @@ use super::{
     seated::{fall_out, simulate_seated, walk_simulation},
 };
 
+use crate::{input::Input, items::Touchables};
 use crate::{time::game_minutes, world::map::Map};
-use crate::{
-    input::Input,
-    items::Touchables,
-};
 
 const TURN_STEP: f32 = 3.0 / 64.0;
 const DEAD_PLAYER_TICKS: i32 = 3480;

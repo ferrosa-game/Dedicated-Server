@@ -1,5 +1,5 @@
-use glam::{IVec3, Vec3};
 use ferrosa_physics::RotMatrix;
+use glam::{IVec3, Vec3};
 
 use crate::{
     area::{AreaGrid, CUBE, FOOTPRINT, MESH, TYPE_MASK, cell_index},

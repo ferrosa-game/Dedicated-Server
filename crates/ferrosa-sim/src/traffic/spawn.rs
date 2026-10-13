@@ -1,6 +1,6 @@
-use glam::Vec3;
 use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::clientbound::game::VehicleKind;
+use glam::Vec3;
 
 use super::{DRIVEN, HIDDEN_STREET, LOOP_STREET, MAX_ROUTE, PARKED, RouteStep, Traffic, TrafficCar, maxss, route::plan_route};
 use crate::{vehicle::types::VehicleType, world::map::Map};

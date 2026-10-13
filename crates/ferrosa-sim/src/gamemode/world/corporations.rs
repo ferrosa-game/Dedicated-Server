@@ -1,8 +1,8 @@
-use glam::Vec3;
 use ferrosa_protocol::{
     Team,
     clientbound::game::{ItemKind, MenuButton, MenuType},
 };
+use glam::Vec3;
 
 use crate::sim::{
     Sim,

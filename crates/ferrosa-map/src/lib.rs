@@ -1,5 +1,5 @@
 use binrw::{BinRead, BinResult};
-use glam::{Vec3, UVec3};
+use glam::{UVec3, Vec3};
 use std::fmt::Debug;
 
 pub mod file_types;

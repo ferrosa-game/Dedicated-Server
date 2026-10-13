@@ -1,5 +1,5 @@
-use glam::Vec3;
 use ferrosa_protocol::{Team, clientbound::game::events::chat::ChatType};
+use glam::Vec3;
 
 use super::Sim;
 use crate::{PlayerId, human::damage::damage_human};

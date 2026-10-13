@@ -1,5 +1,5 @@
-use glam::Vec3;
 use ferrosa_protocol::clientbound::game::ItemKind;
+use glam::Vec3;
 
 use crate::sim::Sim;
 

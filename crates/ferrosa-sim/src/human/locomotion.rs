@@ -1,4 +1,3 @@
-use glam::Vec3;
 use ferrosa_physics::{
     Bond, RigidBodies, RotMatrix, Table,
     body::GroundContact,
@@ -7,6 +6,7 @@ use ferrosa_physics::{
         rot_matrix_to_quaternion, rotate_orientation,
     },
 };
+use glam::Vec3;
 
 use super::{
     Human,

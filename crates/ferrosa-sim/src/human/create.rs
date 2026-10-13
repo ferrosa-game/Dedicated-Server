@@ -1,13 +1,13 @@
-use glam::Vec3;
 use ferrosa_physics::{Bond, Joint as BondJoint, RigidBodies, RotMatrix, Table, body::RigidBodyType};
 use ferrosa_protocol::CharacterCustomization;
+use glam::Vec3;
 
 use super::{
     AttachmentGroup, Attachments, BONE_COUNT, Bone, Human, INVENTORY_SLOTS, InventorySlot, Joint, Locomotion, QueuedAction,
     bones::{BONES, BoneTemplate},
 };
-use crate::{human::BoneId, player::Player, time::game_minutes};
 use crate::human::HumanHealth;
+use crate::{human::BoneId, player::Player, time::game_minutes};
 
 const JOINT_ORDER: [usize; 15] = [1, 2, 3, 10, 11, 12, 13, 14, 15, 4, 5, 6, 7, 8, 9];
 

@@ -4,13 +4,13 @@ use ferrosa_protocol::clientbound::game::{
 };
 
 use super::Sim;
-use crate::{input::ItemInput, time::game_minutes};
 use crate::{
     PlayerId,
     items::{Item, state::ItemState},
     sim::bullets::{BULLET_DATA, create_bullet},
 };
 use crate::{human::arms::calculate_spread_vector, items::logic::phone::PhoneStatus};
+use crate::{input::ItemInput, time::game_minutes};
 
 pub mod bandage;
 pub mod burger;

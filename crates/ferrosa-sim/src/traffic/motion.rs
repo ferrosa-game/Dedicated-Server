@@ -1,5 +1,5 @@
-use glam::Vec3;
 use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
+use glam::Vec3;
 
 use super::{DRIVEN, Traffic};
 use crate::{

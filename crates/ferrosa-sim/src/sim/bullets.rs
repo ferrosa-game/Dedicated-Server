@@ -1,18 +1,23 @@
-use glam::{IVec3, Vec3};
 use ferrosa_protocol::clientbound::game::{
-    ItemKind, VehicleKind, events::{Event, ServerEvent, bullet_hit::EventBulletHit, bullet_hole::EventBulletHole, update_vehicle::EventUpdateVehicle},
+    ItemKind, VehicleKind,
+    events::{Event, ServerEvent, bullet_hit::EventBulletHit, bullet_hole::EventBulletHole, update_vehicle::EventUpdateVehicle},
 };
+use glam::{IVec3, Vec3};
 
 use super::{
     Sim,
     vehicles::{TYRE_BURST, WINDOW_BROKEN},
 };
 use crate::{
-    PlayerId, human::{
+    PlayerId,
+    human::{
         BoneId,
         damage::{BoneHit, damage_human, trace_ray_human},
         physics::{HumanOutput, add_bullet_hole},
-    }, time::TICKS_PER_SECOND_F32, vehicle::physics::{VehicleHit, VehiclePart, trace_vehicle_parts}, world::{
+    },
+    time::TICKS_PER_SECOND_F32,
+    vehicle::physics::{VehicleHit, VehiclePart, trace_vehicle_parts},
+    world::{
         capsule::CapsuleHit,
         trace::{LevelHit, line_intersect_level},
     },

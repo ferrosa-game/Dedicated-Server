@@ -1,8 +1,8 @@
 use glam::Vec3;
 
-use rayon::prelude::*;
 use ferrosa_map::file_types::tst::TstFile;
 use ferrosa_protocol::clientbound::game::VehicleKind;
+use rayon::prelude::*;
 
 use crate::vehicle_body::VehicleBody;
 

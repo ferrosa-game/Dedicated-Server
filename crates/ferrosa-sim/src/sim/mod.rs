@@ -5,7 +5,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use glam::Vec3;
 use ferrosa_map::file_types::srk::SrkData;
 use ferrosa_protocol::{
     clientbound::{
@@ -22,12 +21,18 @@ use ferrosa_protocol::{
     frame_packet,
     serverbound::game::actions::GameAction,
 };
+use glam::Vec3;
 use tokio::sync::mpsc;
 
 use self::tps::timed;
 use self::traffic::traffic_section;
 use crate::{
-    Client, ConnId, Inbound, Outbound, PlayerId, SimJoinMsg, SimMsg, human::inventory, items, player::Player, time::game_minutes, world::{World, map::Map},
+    Client, ConnId, Dropped, Inbound, Outbound, PlayerId, SimJoinMsg, SimMsg,
+    human::inventory,
+    items,
+    player::Player,
+    time::game_minutes,
+    world::{World, map::Map},
 };
 use rayon::prelude::*;
 
@@ -136,6 +141,7 @@ pub struct Sim {
     pub(crate) gamestate: GameState,
     in_rx: mpsc::UnboundedReceiver<Inbound>,
     out_tx: Outbound,
+    drop_tx: Dropped,
     pub(crate) world: World,
     pub(crate) saved_accounts: SrkData,
     pub(crate) players: crate::player::PlayerTable,
@@ -192,7 +198,14 @@ pub struct ServerStats {
 }
 
 impl Sim {
-    pub fn new(in_rx: mpsc::UnboundedReceiver<Inbound>, out_tx: Outbound, map_name: String, mode: crate::gamemode::Mode, max_players: u8) -> Self {
+    pub fn new(
+        in_rx: mpsc::UnboundedReceiver<Inbound>,
+        out_tx: Outbound,
+        drop_tx: Dropped,
+        map_name: String,
+        mode: crate::gamemode::Mode,
+        max_players: u8,
+    ) -> Self {
         let srk_data = SrkData::load(Path::new("server.srk")).unwrap();
         let corporations = [economy::Corporation::default(); economy::CORPORATIONS];
         let mut events = EventRing::default();
@@ -203,6 +216,7 @@ impl Sim {
             ticks_since_reset: 0,
             in_rx,
             out_tx,
+            drop_tx,
             world: World::new(mode.map().map_or(map_name, str::to_string)),
             mode,
             gamestate: GameState::Intermission,
@@ -301,8 +315,14 @@ impl Sim {
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Chat(EventChat { chat_type, speaker_id, volume, message: message.to_string() }) });
     }
 
-    fn kick(&mut self, src: SocketAddr, reason: &str) {
+    fn kick(&mut self, conn: ConnId, src: SocketAddr, reason: &str) {
         let _ = self.out_tx.send((frame_packet(KickClient { reason: reason.to_string() }), src));
+        self.drop_conn(conn);
+    }
+
+    /// Tells the edge `conn` is gone, so its address can join again.
+    pub(crate) fn drop_conn(&self, conn: ConnId) {
+        let _ = self.drop_tx.send(conn);
     }
 
     fn alloc_player(&mut self, account_id: u32, j: SimJoinMsg) -> Option<PlayerId> {
@@ -391,7 +411,7 @@ impl Sim {
         if matches!(self.gamestate, GameState::InGame | GameState::Idle | GameState::Intermission) {
             timed!(self, "physics", self.physics_tick());
         }
-        
+
         timed!(self, "broadcast", self.broadcast_tick());
         self.send_admin_lists();
 

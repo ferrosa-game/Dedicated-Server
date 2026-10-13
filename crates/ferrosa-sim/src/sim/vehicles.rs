@@ -1,8 +1,9 @@
-use glam::Vec3;
 use ferrosa_physics::rotation::{IDENTITY, rot_matrix_to_quaternion, rotate_orientation};
 use ferrosa_protocol::clientbound::game::{
-    ServerVehicleObject, VehicleKind, events::{Event, ServerEvent, chat::ChatType, update_vehicle::EventUpdateVehicle, update_vehicle_type_color::EventUpdateVehicleTypeColor},
+    ServerVehicleObject, VehicleKind,
+    events::{Event, ServerEvent, chat::ChatType, update_vehicle::EventUpdateVehicle, update_vehicle_type_color::EventUpdateVehicleTypeColor},
 };
+use glam::Vec3;
 
 use super::Sim;
 use crate::{

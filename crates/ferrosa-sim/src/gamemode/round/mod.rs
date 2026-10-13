@@ -1,15 +1,15 @@
-use glam::Vec3;
 use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::{
     GameMode, Team,
     clientbound::game::{GameState, ItemKind, MenuType, events::chat::ChatType},
 };
+use glam::Vec3;
 
 use crate::{PlayerId, items::state::ItemState};
 use crate::{
     items,
     sim::{Sim, missions},
-    time::game_minutes
+    time::game_minutes,
 };
 
 pub mod menus;

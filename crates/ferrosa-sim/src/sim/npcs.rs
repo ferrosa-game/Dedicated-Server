@@ -1,4 +1,3 @@
-use glam::Vec3;
 use ferrosa_protocol::{
     Team,
     clientbound::game::{
@@ -6,6 +5,7 @@ use ferrosa_protocol::{
         events::{Event, ServerEvent, update_player::EventUpdatePlayer},
     },
 };
+use glam::Vec3;
 
 use super::Sim;
 use crate::{PlayerId, time::TICKS_PER_SECOND};

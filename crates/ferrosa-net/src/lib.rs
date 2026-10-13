@@ -1,7 +1,16 @@
-use std::{collections::HashMap, net::{IpAddr, SocketAddr}, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
 
 use ferrosa_protocol::{
-    GameMode, ServerboundPacket, clientbound::{kick::KickClient, server_info::ServerInfo}, masterserver::AuthPacket, parse_frame, serverbound::info_request::InfoRequest,
+    GameMode, ServerboundPacket,
+    clientbound::{kick::KickClient, server_info::ServerInfo},
+    masterserver::AuthPacket,
+    parse_frame,
+    serverbound::info_request::InfoRequest,
 };
 use ferrosa_sim::{ConnId, Inbound, Outbound, SimJoinMsg, SimMsg};
 use tokio::{net::UdpSocket, sync::mpsc};
@@ -26,6 +35,7 @@ pub struct Edge {
     socket: Arc<UdpSocket>,
     in_tx: mpsc::UnboundedSender<Inbound>,
     out_tx: Outbound,
+    drop_rx: mpsc::UnboundedReceiver<ConnId>,
     masterserver: MasterServer,
     sessions: HashMap<SocketAddr, ConnId>,
     next_conn: u32,
@@ -34,8 +44,15 @@ pub struct Edge {
 }
 
 impl Edge {
-    pub fn new(socket: Arc<UdpSocket>, in_tx: mpsc::UnboundedSender<Inbound>, out_tx: Outbound, masterserver: MasterServer, listing: ServerListing) -> Self {
-        Self { socket, in_tx, out_tx, masterserver, sessions: Default::default(), next_conn: 0, listing, server_ip: None }
+    pub fn new(
+        socket: Arc<UdpSocket>,
+        in_tx: mpsc::UnboundedSender<Inbound>,
+        out_tx: Outbound,
+        drop_rx: mpsc::UnboundedReceiver<ConnId>,
+        masterserver: MasterServer,
+        listing: ServerListing,
+    ) -> Self {
+        Self { socket, in_tx, out_tx, drop_rx, masterserver, sessions: Default::default(), next_conn: 0, listing, server_ip: None }
     }
 
     pub async fn run(mut self) {
@@ -48,6 +65,7 @@ impl Edge {
                 r = self.socket.recv_from(&mut buf) => {
                     if let Ok((n, src)) = r { self.on_datagram(&buf[..n], src); }
                 }
+                Some(conn) = self.drop_rx.recv() => self.sessions.retain(|_, c| *c != conn),
                 _ = keepalive.tick() => self.masterserver.keepalive(),
                 _ = evict.tick() => self.masterserver.evict_stale(Duration::from_secs(10)),
             }
@@ -74,7 +92,9 @@ impl Edge {
             ServerboundPacket::JoinRequest(j) => {
                 // The game only supports v4
                 // TODO: Make the game support v6
-                let IpAddr::V4(ip) = src.ip() else { return; };
+                let IpAddr::V4(ip) = src.ip() else {
+                    return;
+                };
 
                 let auth_packet = if ip.is_loopback() || ip.is_link_local() || ip.is_private() {
                     AuthPacket {
@@ -82,7 +102,7 @@ impl Edge {
                         auth_ticket: j.auth_ticket,
                         phone_number: j.phone_number,
                         player_name: j.player_name.clone(),
-                        steam_id: 0
+                        steam_id: 0,
                     }
                 } else if let Some(auth) = self.masterserver.verify_join(j.account_id, j.auth_ticket) {
                     auth.clone()
@@ -106,14 +126,7 @@ impl Edge {
                         self.next_conn += 1;
                         self.sessions.insert(src, conn);
 
-                        let _ = self.in_tx.send(Inbound {
-                            conn,
-                            src,
-                            msg: SimMsg::Join(SimJoinMsg {
-                                join_packet: j.clone(),
-                                auth_packet,
-                            }),
-                        });
+                        let _ = self.in_tx.send(Inbound { conn, src, msg: SimMsg::Join(SimJoinMsg { join_packet: j.clone(), auth_packet }) });
                     }
                 }
             }

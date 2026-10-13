@@ -1,8 +1,8 @@
-use glam::Vec3;
 use ferrosa_physics::{
     Bond, RigidBodies, RotMatrix,
     rotation::{IDENTITY, multiply_matrixes, quaternion_multiply, quaternion_to_axis_angle, rot_matrix_to_quaternion, rotate_orientation},
 };
+use glam::Vec3;
 
 use super::Human;
 

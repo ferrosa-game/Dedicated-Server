@@ -1,8 +1,8 @@
 //! A human in a vehicle seat: finding a seat, the seated pose, the driver's controls and getting out.
 
-use glam::Vec3;
 use ferrosa_physics::{RigidBodies, RotMatrix, rotation::rotate_orientation};
 use ferrosa_protocol::clientbound::game::ItemKind;
+use glam::Vec3;
 
 use super::{
     BONE_COUNT, Human,

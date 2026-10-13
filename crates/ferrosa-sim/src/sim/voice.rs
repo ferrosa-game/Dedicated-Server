@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
-use glam::Vec3;
 use ferrosa_protocol::clientbound::game::{GameState, ItemKind};
+use glam::Vec3;
 
 use super::{Earshot, Sim, TickCtx};
 use crate::{

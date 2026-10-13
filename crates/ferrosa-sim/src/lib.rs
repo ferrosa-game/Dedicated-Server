@@ -38,6 +38,8 @@ pub struct Inbound {
     pub msg: SimMsg,
 }
 pub type Outbound = UnboundedSender<(Vec<u8>, SocketAddr)>;
+/// Connections the sim has dropped (timed out, banned, rejected at join), for the edge to forget.
+pub type Dropped = UnboundedSender<ConnId>;
 
 pub struct SimJoinMsg {
     pub join_packet: JoinRequest,

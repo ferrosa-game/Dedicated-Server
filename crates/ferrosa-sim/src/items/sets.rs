@@ -1,8 +1,8 @@
-use glam::IVec3;
 use ferrosa_protocol::clientbound::game::{
     ItemKind,
     events::{Event, ServerEvent, item_set_cell::EventItemSetCell},
 };
+use glam::IVec3;
 
 use super::Sim;
 use crate::world::item_sets::{SetHit, entry_pose};

@@ -1,5 +1,5 @@
-use glam::IVec3;
 use ferrosa_map::file_types::sbc::CityFileSBC;
+use glam::IVec3;
 
 use crate::{
     area::{AreaGrid, BlockDims, CUBE, MESH, TYPE_MASK},

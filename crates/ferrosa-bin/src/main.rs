@@ -2,7 +2,7 @@ use std::{net::SocketAddr, path::Path, sync::Arc};
 
 use ferrosa_map::file_types::srk::SrkData;
 use ferrosa_net::{Edge, ServerListing, masterserver::MasterServer};
-use ferrosa_sim::{Inbound, Sim};
+use ferrosa_sim::{ConnId, Inbound, Sim};
 use tokio::{net::UdpSocket, sync::mpsc};
 
 use crate::config::ConfigMain;
@@ -21,6 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (in_tx, in_rx) = mpsc::unbounded_channel::<Inbound>();
     let (out_tx, mut out_rx) = mpsc::unbounded_channel::<(Vec<u8>, SocketAddr)>();
+    let (drop_tx, drop_rx) = mpsc::unbounded_channel::<ConnId>();
 
     let socket = Arc::new(UdpSocket::bind(("0.0.0.0", config.port)).await?);
     println!("[Net] listening on {}", socket.local_addr()?);
@@ -43,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::thread::Builder::new()
             .name("sim".into())
             .spawn(move || {
-                let mut sim = Sim::new(in_rx, out_tx, map_name, mode, config.max_players);
+                let mut sim = Sim::new(in_rx, out_tx, drop_tx, map_name, mode, config.max_players);
                 sim.set_admin_password(config.admin_password.clone());
                 sim.set_world_max_time(config.round_time as i32 * 60);
                 sim.run()
@@ -64,6 +65,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         server_name: config.server_name.clone(),
     };
 
-    Edge::new(socket, in_tx, out_tx, masterserver, server_listing).run().await;
+    Edge::new(socket, in_tx, out_tx, drop_rx, masterserver, server_listing).run().await;
     Ok(())
 }

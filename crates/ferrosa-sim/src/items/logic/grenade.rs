@@ -1,5 +1,5 @@
-use glam::Vec3;
 use ferrosa_protocol::clientbound::game::events::{Event, ServerEvent, explosion::EventExplosion};
+use glam::Vec3;
 
 use crate::{PlayerId, input::ItemInput, items::state::ItemState, sim::Sim};
 

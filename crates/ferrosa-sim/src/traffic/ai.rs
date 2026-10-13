@@ -1,7 +1,10 @@
 use glam::Vec3;
 
 use super::{LOOP_STREET, LOOP_STREET_2, Traffic, grid::lane_clearance, lane_count, left_lanes, maxss, minss, random_street, route::plan_route};
-use crate::{time::TICKS_PER_SECOND_F32, world::streets::{Lane, MapStreet, StreetMap}};
+use crate::{
+    time::TICKS_PER_SECOND_F32,
+    world::streets::{Lane, MapStreet, StreetMap},
+};
 
 /// Ticks a car may sit still before it backs out (until 319, when the count starts over).
 const STUCK_TICKS: i32 = 179;

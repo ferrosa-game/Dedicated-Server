@@ -1,4 +1,3 @@
-use glam::Vec3;
 use ferrosa_physics::{
     RotMatrix,
     rotation::{IDENTITY, rot_matrix_to_quaternion},
@@ -7,6 +6,7 @@ use ferrosa_protocol::clientbound::game::{
     HumanAppearance, ItemKind, OwnHumanData, ServerHumanObject,
     events::{Event, ServerEvent, bullet_hit::EventBulletHit, bullet_hole::EventBulletHole, sound::EventSound},
 };
+use glam::Vec3;
 
 use super::{Sim, economy, items::touchables};
 use crate::{
@@ -45,7 +45,7 @@ impl Sim {
 
             self.update_player_event(player_id);
         }
-        
+
         println!("[Sim] Spawned human #{id} at {:?}", pos);
     }
 
@@ -277,25 +277,34 @@ impl Sim {
                 let h = self.humans.get(id)?;
                 Some((
                     idx,
-                    (OwnHumanData {
-                        human_id: id as i32,
-                        view_yaw: h.view_yaw,
-                        view_pitch: h.view_pitch,
-                        yaw_offset: h.yaw_offset,
-                        pitch_offset: h.pitch_offset,
-                        body_yaw: h.body_yaw,
-                        is_standing: h.is_standing,
-                        pain: h.pain,
-                        action_type: h.action_type,
-                        action_duration: h.action_duration,
-                        action_hand: h.action_hand,
-                        action_slot: h.action_slot,
-                        progress_bar: h.progress_bar,
-                        health: [h.health.health, h.health.chest, h.health.head, h.health.left_arm, h.health.right_arm, h.health.left_leg, h.health.right_leg],
-                        stamina: h.stamina,
-                        max_stamina: h.max_stamina,
-                        head_vel:h.bones[3].vel,
-                    },
+                    (
+                        OwnHumanData {
+                            human_id: id as i32,
+                            view_yaw: h.view_yaw,
+                            view_pitch: h.view_pitch,
+                            yaw_offset: h.yaw_offset,
+                            pitch_offset: h.pitch_offset,
+                            body_yaw: h.body_yaw,
+                            is_standing: h.is_standing,
+                            pain: h.pain,
+                            action_type: h.action_type,
+                            action_duration: h.action_duration,
+                            action_hand: h.action_hand,
+                            action_slot: h.action_slot,
+                            progress_bar: h.progress_bar,
+                            health: [
+                                h.health.health,
+                                h.health.chest,
+                                h.health.head,
+                                h.health.left_arm,
+                                h.health.right_arm,
+                                h.health.left_leg,
+                                h.health.right_leg,
+                            ],
+                            stamina: h.stamina,
+                            max_stamina: h.max_stamina,
+                            head_vel: h.bones[3].vel,
+                        },
                         std::array::from_fn(|k| {
                             let slot = &h.inventory[k];
                             slot.items[..slot.count as usize]

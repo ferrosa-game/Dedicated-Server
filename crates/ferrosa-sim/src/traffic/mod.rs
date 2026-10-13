@@ -1,5 +1,5 @@
-use glam::Vec3;
 use ferrosa_physics::RotMatrix;
+use glam::Vec3;
 
 use crate::world::streets::StreetMap;
 

@@ -1,9 +1,9 @@
-use glam::Vec3;
 use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::{
     GameMode, Team,
     clientbound::game::{GameState, ItemKind, MenuType, VehicleKind},
 };
+use glam::Vec3;
 
 use crate::time::WORLD_HOUR;
 use crate::{

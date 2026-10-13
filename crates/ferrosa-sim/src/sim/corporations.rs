@@ -1,4 +1,3 @@
-use glam::Vec3;
 use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::{
     Team,
@@ -7,6 +6,7 @@ use ferrosa_protocol::{
         events::{Event, ServerEvent, chat::ChatType, team_door::EventTeamDoor},
     },
 };
+use glam::Vec3;
 
 use super::Sim;
 use crate::{

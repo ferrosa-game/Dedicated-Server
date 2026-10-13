@@ -1,8 +1,8 @@
 use std::{io::Cursor, path::Path};
 
+use crate::br_vec3;
 use binrw::BinRead;
 use glam::Vec3;
-use crate::br_vec3;
 
 use super::LoaderError;
 

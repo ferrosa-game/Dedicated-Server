@@ -1,5 +1,5 @@
-use glam::Vec3;
 use ferrosa_physics::rotation::rotate_vector_about_axis;
+use glam::Vec3;
 
 use crate::{collide::calculate_face_normal, trace::cvtt};
 

@@ -27,7 +27,15 @@ pub struct BlockRecord {
 
 impl BlockRecord {
     fn new() -> Box<Self> {
-        Box::new(Self { layer0: [0; CELLS], layer1: [0; CELLS], object: [0; CELLS], item_set: [0; CELLS], taken: [0; CELLS], textures: [[0; 8]; CELLS], cell_textures: [[0; 8]; CELLS] })
+        Box::new(Self {
+            layer0: [0; CELLS],
+            layer1: [0; CELLS],
+            object: [0; CELLS],
+            item_set: [0; CELLS],
+            taken: [0; CELLS],
+            textures: [[0; 8]; CELLS],
+            cell_textures: [[0; 8]; CELLS],
+        })
     }
 }
 

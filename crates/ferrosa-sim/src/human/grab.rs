@@ -4,8 +4,8 @@
 //! but nothing in it ever fills the record in, so no hand ever takes hold. Here an empty hand takes hold of the
 //! nearest other human's bone it touches while the key is held.
 
-use glam::Vec3;
 use ferrosa_physics::{Bond, ItemPoint, RigidBodies, RotMatrix, Table};
+use glam::Vec3;
 
 use super::{BoneId, Human, inventory::point_segment_distance};
 use crate::input::Input;
@@ -39,7 +39,7 @@ struct HeldBone {
 
 fn to_world(b: &HeldBone, l: Vec3) -> Vec3 {
     let [r0, r1, r2] = b.rot;
-    
+
     b.pos + r0 * l.x + r1 * l.y + r2 * l.z
 }
 

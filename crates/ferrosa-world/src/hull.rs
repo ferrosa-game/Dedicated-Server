@@ -1,6 +1,6 @@
 use ferrosa_map::file_types::it3::It3Collision;
-use glam::Vec3;
 use ferrosa_physics::RotMatrix;
+use glam::Vec3;
 
 use crate::{
     capsule::capsule_intersect_triangle,
@@ -80,7 +80,7 @@ impl ConvexHull {
                 Vec3::new(if q == 0 || q == 3 { -b.x } else { b.x }, if k > 3 { b.y } else { -b.y }, if q <= 1 { -b.z } else { b.z })
             })
             .collect();
-        
+
         Self::new(verts, CUBE_FACES.to_vec(), BOX_EDGES.to_vec())
     }
 

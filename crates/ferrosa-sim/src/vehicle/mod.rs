@@ -3,12 +3,12 @@
 pub mod physics;
 pub use ferrosa_world::vehicle_types as types;
 
-use glam::Vec3;
 use ferrosa_physics::{
     RigidBodies, RotMatrix, Table,
     body::RigidBodyType,
     bond::{Bond, ItemAngular, ItemPoint},
 };
+use glam::Vec3;
 
 use ferrosa_protocol::clientbound::game::VehicleKind;
 use types::VehicleType;

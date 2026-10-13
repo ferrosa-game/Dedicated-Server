@@ -1,10 +1,10 @@
 use std::f64;
 
-use glam::Vec3;
 use ferrosa_protocol::{
     clientbound::game::GameState,
     serverbound::game::actions::{GameAction, InventoryAction},
 };
+use glam::Vec3;
 
 use super::Sim;
 use crate::input::Input;

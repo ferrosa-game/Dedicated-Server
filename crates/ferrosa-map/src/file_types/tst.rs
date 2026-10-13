@@ -3,10 +3,10 @@ use std::{
     path::Path,
 };
 
+use super::{LoaderError, sbv::SbvPart};
 use crate::br_vec3;
 use binrw::BinRead;
 use glam::Vec3;
-use super::{LoaderError, sbv::SbvPart};
 
 const MESH_VERSION: i32 = 2;
 const PARTS_VERSION: i32 = 1;

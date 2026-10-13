@@ -1,6 +1,6 @@
-use glam::Vec3;
 use ferrosa_physics::RotMatrix;
 use ferrosa_protocol::{CharacterCustomization, Team};
+use glam::Vec3;
 
 use crate::PlayerId;
 

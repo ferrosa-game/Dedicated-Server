@@ -1,5 +1,5 @@
-use glam::{IVec3, Vec3};
 use ferrosa_map::file_types::sbl::BlockFile;
+use glam::{IVec3, Vec3};
 
 use crate::{
     blocks::{BlockTable, CURB_RAMP, DOOR_FRAME, LAMP, WINDOW_FRAME, slope_id},

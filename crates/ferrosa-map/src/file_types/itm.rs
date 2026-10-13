@@ -1,9 +1,9 @@
 use std::{io::Cursor, path::Path};
 
+use super::LoaderError;
 use crate::br_vec3;
 use binrw::BinRead;
 use glam::Vec3;
-use super::LoaderError;
 
 /// A marked point of the item (0 the muzzle, 1 the right hand, 2 the left hand, 4 the second hand's grip).
 #[derive(BinRead, Debug, Clone)]

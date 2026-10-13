@@ -1,4 +1,3 @@
-use glam::Vec3;
 use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::{
     GameMode, Team,
@@ -7,6 +6,7 @@ use ferrosa_protocol::{
         events::{Event, ServerEvent, chat::ChatType, mission::EventMission},
     },
 };
+use glam::Vec3;
 
 use crate::time::{TICKS_PER_SECOND, game_minutes};
 use crate::{

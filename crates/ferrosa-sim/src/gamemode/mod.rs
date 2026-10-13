@@ -1,5 +1,5 @@
-use glam::Vec3;
 use ferrosa_protocol::GameMode;
+use glam::Vec3;
 
 use self::rules::ModeRules;
 use crate::{PlayerId, sim::Sim};

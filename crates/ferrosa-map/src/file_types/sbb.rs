@@ -1,8 +1,8 @@
 use binrw::BinRead;
 use glam::{UVec3, Vec3};
 
-use crate::{br_uvec3, br_vec3};
 use crate::Char64;
+use crate::{br_uvec3, br_vec3};
 
 #[derive(BinRead, Debug, Default, Clone)]
 pub struct BuildingFileTile {

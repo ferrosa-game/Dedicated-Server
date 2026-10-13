@@ -1,15 +1,21 @@
-use glam::Vec3;
 use ferrosa_protocol::clientbound::game::{
     TrafficEntry,
     events::{Event, ServerEvent, update_vehicle_type_color::EventUpdateVehicleTypeColor},
 };
+use glam::Vec3;
 
 use super::Sim;
 use super::tps::timed;
 use crate::{
     traffic::{
-        DRIVEN, LOOP_STREET, LOOP_STREET_2, TAKEN, Traffic, TrafficCar, ai::ai_traffic_car, grid::add_cars, motion::{move_virtual_car, update_signals}, route::plan_route, spawn::create_traffic,
-    }, vehicle::{spawn_vehicle, types::VehicleType},
+        DRIVEN, LOOP_STREET, LOOP_STREET_2, TAKEN, Traffic, TrafficCar,
+        ai::ai_traffic_car,
+        grid::add_cars,
+        motion::{move_virtual_car, update_signals},
+        route::plan_route,
+        spawn::create_traffic,
+    },
+    vehicle::{spawn_vehicle, types::VehicleType},
 };
 
 /// The cars reset_game, a round and an eliminator hunt start with.

@@ -1,6 +1,5 @@
 use std::net::SocketAddr;
 
-use glam::Vec3;
 use ferrosa_protocol::{
     Team,
     clientbound::game::{
@@ -9,6 +8,7 @@ use ferrosa_protocol::{
     },
     serverbound::game::actions::{ChatAction, Menu, MenuAction},
 };
+use glam::Vec3;
 
 use super::Sim;
 use crate::{Client, ConnId, PlayerId, SimJoinMsg};
@@ -23,7 +23,7 @@ impl Sim {
         let accout_data = self.join_account(&j.auth_packet);
 
         if accout_data.ban_time > 0 {
-            return self.kick(src, "You are banned from this server");
+            return self.kick(conn, src, "You are banned from this server");
         }
 
         let admin = self.is_admin_phone(accout_data.phone_number);
@@ -33,11 +33,11 @@ impl Sim {
         }
 
         if self.players.len() >= self.max_players as usize && !admin {
-            return self.kick(src, "Server is full");
+            return self.kick(conn, src, "Server is full");
         }
 
         let Some(player_id) = self.alloc_player(accout_data.account_id, j) else {
-            return self.kick(src, "Server is full");
+            return self.kick(conn, src, "Server is full");
         };
         if let Some(p) = self.players.get_mut(player_id.idx()) {
             p.username = super::admin::account_name(&accout_data);
@@ -92,6 +92,7 @@ impl Sim {
 
     pub(crate) fn on_leave(&mut self, conn: ConnId) {
         let client = self.clients.remove(&conn).unwrap();
+        self.drop_conn(conn);
         let mode = self.mode;
         mode.on_leave(self, client.player_id);
         self.settle_leave(client.player_id);
@@ -242,7 +243,9 @@ impl Sim {
                     return;
                 }
                 "/heal" => {
-                    if let Some(p) = self.players.get(player_id.idx()) && let Some(human) = p.human {
+                    if let Some(p) = self.players.get(player_id.idx())
+                        && let Some(human) = p.human
+                    {
                         let human = self.humans.get_mut(human).unwrap();
 
                         human.health.chest = 100;

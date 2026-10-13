@@ -1,10 +1,10 @@
 use std::sync::LazyLock;
 
-use glam::{IVec3, Vec3};
 use ferrosa_physics::{
     RotMatrix,
     rotation::{IDENTITY, rotate_orientation, rotate_vector_about_axis},
 };
+use glam::{IVec3, Vec3};
 
 use crate::{
     capsule::capsule_intersect_triangle,

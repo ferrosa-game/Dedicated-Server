@@ -2,7 +2,6 @@ use crate::{
     items::{Touchables, logic::phone::PhoneStatus, state::ItemState, types::ItemType},
     world::{capsule::segment_closest_points, map::Map, trace::line_intersect_level},
 };
-use glam::Vec3;
 use ferrosa_physics::{
     Bond, ItemAngular, ItemPoint, RigidBodies, RotMatrix,
     rotation::{
@@ -10,6 +9,7 @@ use ferrosa_physics::{
         rotate_vector_about_axis,
     },
 };
+use glam::Vec3;
 
 use super::{
     Human,
@@ -542,7 +542,8 @@ fn hold_frame(
     }
 
     rotate_orientation(&mut m, Vec3::Y, yaw);
-    if ty.is_gun && let Some(q) = aim
+    if ty.is_gun
+        && let Some(q) = aim
     {
         m = quaternion_to_rot_matrix([-q[0], -q[1], -q[2], q[3]]);
         let axis = m[0];

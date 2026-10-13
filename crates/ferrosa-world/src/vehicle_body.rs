@@ -1,5 +1,5 @@
-use glam::Vec3;
 use ferrosa_map::file_types::sbv::VehicleBodyFile;
+use glam::Vec3;
 
 use crate::hull::ConvexHull;
 
@@ -51,7 +51,7 @@ impl VehicleBody {
                 register_unique_pair(&mut edges, f[k], f[(k + 1) % 4]);
             }
         }
-        
+
         let faces = file.faces.iter().map(|f| std::array::from_fn(|k| f.indices.get(k).map_or(0, |&i| i as usize))).collect();
         let mesh = ConvexHull::new(centred.clone(), faces, edges);
         Some(Self { file, mesh })

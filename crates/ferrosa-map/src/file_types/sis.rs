@@ -1,5 +1,5 @@
-use std::{io::Cursor, path::Path};
 use crate::br_vec3;
+use std::{io::Cursor, path::Path};
 
 use binrw::BinRead;
 use glam::Vec3;

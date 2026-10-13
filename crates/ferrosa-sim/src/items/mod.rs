@@ -1,5 +1,3 @@
-use glam::{IVec3, Vec3};
-use rand::RngExt;
 use ferrosa_physics::{
     RotMatrix, Table,
     body::RigidBodyType,
@@ -9,6 +7,8 @@ use ferrosa_protocol::clientbound::game::{
     ItemKind, ItemTail, ServerItemObject,
     events::{Event, ServerEvent, bullet_hit::EventBulletHit},
 };
+use glam::{IVec3, Vec3};
+use rand::RngExt;
 
 pub mod grid;
 pub mod logic;

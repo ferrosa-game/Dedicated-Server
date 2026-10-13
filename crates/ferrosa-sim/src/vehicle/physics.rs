@@ -1,4 +1,3 @@
-use glam::Vec3;
 use ferrosa_physics::{
     RigidBodies, RigidBody, RotMatrix, Table,
     bond::Bond,
@@ -6,15 +5,19 @@ use ferrosa_physics::{
 };
 use ferrosa_protocol::clientbound::game::VehicleKind;
 use ferrosa_protocol::clientbound::game::events::sound::Sound;
+use glam::Vec3;
 
 use super::{Vehicle, types::VehicleType};
-use crate::{time::TICKS_PER_SECOND_F32, world::{
-    capsule::{capsule_intersect_triangle, capsule_intersect_triangle_facing},
-    collide::{calculate_face_normal, point_in_triangle_oriented, segment_intersect_face},
-    map::Map,
-    sphere::{segment_intersect_plane_two_sided, segment_intersect_sphere, sphere_intersect_level},
-    trace::line_intersect_level,
-}};
+use crate::{
+    time::TICKS_PER_SECOND_F32,
+    world::{
+        capsule::{capsule_intersect_triangle, capsule_intersect_triangle_facing},
+        collide::{calculate_face_normal, point_in_triangle_oriented, segment_intersect_face},
+        map::Map,
+        sphere::{segment_intersect_plane_two_sided, segment_intersect_sphere, sphere_intersect_level},
+        trace::line_intersect_level,
+    },
+};
 
 const WATER_LEVEL: f32 = 23.0;
 const FALLEN: f32 = -32.0;

@@ -1,6 +1,6 @@
-use glam::{IVec3, Vec3};
 use ferrosa_physics::{Bond, RigidBodies};
 use ferrosa_protocol::clientbound::game::events::sound::Sound;
+use glam::{IVec3, Vec3};
 
 use super::{
     BONE_COUNT, Human,

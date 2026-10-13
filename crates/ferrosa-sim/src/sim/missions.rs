@@ -1,4 +1,3 @@
-use glam::Vec3;
 use ferrosa_physics::rotation::RotMatrix;
 use ferrosa_protocol::{
     CharacterCustomization, Team,
@@ -10,6 +9,7 @@ use ferrosa_protocol::{
         },
     },
 };
+use glam::Vec3;
 
 use super::Sim;
 use crate::{PlayerId, items::state::ItemState};
