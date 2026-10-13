@@ -6,7 +6,7 @@ use ferrosa_physics::{
     rotation::{IDENTITY, rotate_orientation, rotate_vector_about_axis},
 };
 
-use crate::world::{
+use crate::{
     capsule::capsule_intersect_triangle,
     collide::{calculate_face_normal, segment_intersect_face},
     mesh::{CUBE_CORNERS, CUBE_FACES},

@@ -2,7 +2,7 @@ use std::{path::Path, time::Instant};
 
 use ferrosa_map::file_types::{LoaderError, csx::CityFileCSX, sbc::CityFileSBC};
 
-use crate::world::{
+use crate::{
     ground::{Ground, generate_grass},
     level::{Level, build_level},
     roads::RoadNetwork,
@@ -18,7 +18,7 @@ pub struct Map {
 }
 
 impl Map {
-    pub(crate) fn load_map(map_name: String) -> Result<Self, LoaderError> {
+    pub fn load_map(map_name: String) -> Result<Self, LoaderError> {
         let start_time = Instant::now();
 
         let name = format!("data/{}", map_name);
@@ -48,7 +48,7 @@ impl Map {
         ground.build_city_blocks(&roads);
         let streets = StreetMap::build(&roads);
         let mut level = level;
-        crate::world::building::assign_streets(&mut level.buildings, &streets);
+        crate::building::assign_streets(&mut level.buildings, &streets);
 
         println!("[Map] Loading complete in {}ms!", start_time.elapsed().as_millis());
 

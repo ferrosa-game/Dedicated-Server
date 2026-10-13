@@ -281,7 +281,7 @@ pub fn segment_intersect_sphere(start: Vec3, end: Vec3, center: Vec3, radius: f3
 }
 
 /// sphere_intersect_mesh: the wheel disc against each of the triangles under its own normal, the nearest hit.
-pub fn sphere_intersect_triangles(tris: &[crate::world::track::TrackTriangle], centre: Vec3, axis: Vec3, radius: f32) -> Option<DiscHit> {
+pub fn sphere_intersect_triangles(tris: &[crate::track::TrackTriangle], centre: Vec3, axis: Vec3, radius: f32) -> Option<DiscHit> {
     let (mut best, mut best_dist) = (None, NO_HIT);
     for &[a, b, c] in tris {
         take(&mut best, &mut best_dist, face_hit(centre, axis, radius, calculate_face_normal(a, b, c), a, b, c));

@@ -14,7 +14,7 @@ pub mod grid;
 pub mod logic;
 pub mod sets;
 pub mod state;
-pub mod types;
+pub use ferrosa_world::item_types as types;
 
 use crate::sim::tps::timed;
 use crate::{

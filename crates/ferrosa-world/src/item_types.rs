@@ -1,7 +1,7 @@
 use glam::Vec3;
 use ferrosa_protocol::clientbound::game::ItemKind;
 
-use crate::sim::hull::ConvexHull;
+use crate::hull::ConvexHull;
 
 pub struct ItemType {
     pub name: String,

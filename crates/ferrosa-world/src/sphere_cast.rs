@@ -1,7 +1,7 @@
 use glam::{IVec3, Vec3};
 use ferrosa_physics::RotMatrix;
 
-use crate::world::{
+use crate::{
     area::{AreaGrid, CUBE, FOOTPRINT, MESH, TYPE_MASK, cell_index},
     city_objects::{object_pose, sphere_intersect_object},
     collide::{calculate_face_normal, segment_intersect_face},
@@ -140,7 +140,7 @@ fn custom_shape(meshes: &BlockMeshes, center: Vec3, cell: IVec3, s: f32, v: u32,
 
 /// sphere_intersect_item_type_mesh: a sphere at rest against each face of an item's mesh placed at `pos` turned by `rot`
 /// (both triangles of a face under the first one's normal).
-fn sphere_intersect_item(hull: &crate::sim::hull::ConvexHull, pos: Vec3, rot: &RotMatrix, center: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
+fn sphere_intersect_item(hull: &crate::hull::ConvexHull, pos: Vec3, rot: &RotMatrix, center: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
     let world = hull.world_verts(pos, rot);
     let mut best = Best::new();
     for f in hull.faces() {

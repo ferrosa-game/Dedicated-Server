@@ -16,7 +16,7 @@ pub(crate) mod sim;
 pub(crate) mod time;
 pub(crate) mod traffic;
 pub(crate) mod vehicle;
-pub(crate) mod world;
+pub(crate) use ferrosa_world as world;
 
 pub use gamemode::{Mode, ModeHooks, ModeSync, by_name, rules::ModeRules};
 pub use sim::Sim;

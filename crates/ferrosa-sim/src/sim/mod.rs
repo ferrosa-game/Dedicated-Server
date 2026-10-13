@@ -38,7 +38,7 @@ pub mod corporations;
 pub mod crime;
 pub mod economy;
 pub mod events;
-pub mod hull;
+pub use ferrosa_world::hull;
 pub mod humans;
 pub mod memos;
 pub mod missions;

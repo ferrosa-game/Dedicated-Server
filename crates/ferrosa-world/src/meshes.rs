@@ -1,7 +1,7 @@
 use glam::{IVec3, Vec3};
 use ferrosa_map::file_types::sbl::BlockFile;
 
-use crate::world::{
+use crate::{
     blocks::{BlockTable, CURB_RAMP, DOOR_FRAME, LAMP, WINDOW_FRAME, slope_id},
     collide::calculate_face_normal,
     mesh::{BlockMesh, CUBE_CORNERS, Degree, FACE_DOWN, FACE_POS_X, FACE_POS_Z, MeshBuilder, Q, dir_flag},
@@ -15,7 +15,7 @@ pub struct BlockMeshes {
 }
 
 impl BlockMeshes {
-    pub(crate) fn new(tables: &BlockTable, customs: &[&BlockFile]) -> Self {
+    pub fn new(tables: &BlockTable, customs: &[&BlockFile]) -> Self {
         let mut new_mesh = Self { meshes: Vec::new(), b: MeshBuilder::default() };
 
         for (k, f) in customs.iter().enumerate() {
@@ -27,7 +27,7 @@ impl BlockMeshes {
         new_mesh
     }
 
-    pub(crate) fn get(&self, id: u32) -> Option<&BlockMesh> {
+    pub fn get(&self, id: u32) -> Option<&BlockMesh> {
         self.meshes.get(id as usize)
     }
 
@@ -63,6 +63,7 @@ impl BlockMeshes {
         for sf in &f.block_surface {
             for (i, v) in sf.vertex_data.iter().flatten().enumerate() {
                 b.ctrl[i] = v.pos;
+                b.uv_ctrl[i] = glam::Vec2::new(v.tex_coord.first().copied().unwrap_or(0.0), v.tex_coord.get(1).copied().unwrap_or(0.0));
             }
             let mut flags = sf.texture;
             if sf.project_texture != 0 {
@@ -107,6 +108,7 @@ impl BlockMeshes {
         ] {
             b.ctrl[i] = Vec3::from(p);
         }
+        b.set_uv_corners([0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]);
         b.append_bezier(1, LINEAR, 8, Some(Degree::Cubic), FACE_DOWN);
         self.store_turns(CURB_RAMP, one);
 
@@ -115,6 +117,11 @@ impl BlockMeshes {
             b.reset();
             let mut quad = |p0, p3, p15, p12, flags| {
                 b.set_corners(p0, p3, p15, p12);
+                if flags == 5 {
+                    b.set_uv_corners([0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]);
+                } else {
+                    b.set_uv_corners([0.0, Q], [1.0, Q], [1.0, 0.0], [0.0, 0.0]);
+                }
                 b.append_bezier(1, LINEAR, 1, LINEAR, flags);
             };
             quad([0.0, Q, 0.0], [1.0, Q, 0.0], [1.0, Q, 1.0], [0.0, Q, 1.0], 5);
@@ -207,7 +214,7 @@ impl BlockMeshes {
         self.store_turns(LAMP, one);
     }
 
-    pub(crate) fn build_generated(&mut self, id: u32, key: u32, portals: &PortalGroups) {
+    pub fn build_generated(&mut self, id: u32, key: u32, portals: &PortalGroups) {
         let modes: [i32; 4] = std::array::from_fn(|i| ((key >> (4 * i)) & 15) as i32);
         let group = ((key >> 18) & 15) as usize;
         let floor = key & (1 << 16) != 0;
@@ -266,7 +273,7 @@ pub struct PortalGroups {
 }
 
 impl PortalGroups {
-    pub(crate) fn load(dir: &std::path::Path, names: &[String]) -> Self {
+    pub fn load(dir: &std::path::Path, names: &[String]) -> Self {
         let groups = names.iter().take(64).map(|name| std::fs::read(dir.join(format!("{name}.sbl"))).map(|b| Self::parse(&b)).unwrap_or_default()).collect();
         Self { groups, empty: Portal::default() }
     }
@@ -299,13 +306,13 @@ impl PortalGroups {
             .collect()
     }
 
-    pub(crate) fn get(&self, group: usize, idx: usize) -> &Portal {
+    pub fn get(&self, group: usize, idx: usize) -> &Portal {
         self.groups.get(group).and_then(|g| g.get(idx)).unwrap_or(&self.empty)
     }
 }
 
 impl MeshBuilder {
-    pub(crate) fn edge_face_pair(&mut self, turns: i32, e: f32, d: f32) {
+    pub fn edge_face_pair(&mut self, turns: i32, e: f32, d: f32) {
         self.set_corners([0.0, 1.0, d], [e, 1.0, d], [e, 0.0, d], [0.0, 0.0, d]);
 
         let f = self.rotate_grid(turns, FACE_POS_Z);
@@ -316,7 +323,7 @@ impl MeshBuilder {
         self.append_bezier(1, LINEAR, 1, LINEAR, f | (((turns + 3) & 3) + 1) as u32);
     }
 
-    pub(crate) fn portal_windows(&mut self, turns: i32, p: &Portal) {
+    pub fn portal_windows(&mut self, turns: i32, p: &Portal) {
         let depth = if p.ty == 1 { 1.0 / 256.0 } else { 1.0 / 64.0 };
 
         for &[x, w, y, h] in &p.windows {
@@ -328,7 +335,7 @@ impl MeshBuilder {
         }
     }
 
-    pub(crate) fn portal_frame(&mut self, turns: i32, p: &Portal) {
+    pub fn portal_frame(&mut self, turns: i32, p: &Portal) {
         let [px, pw, py, ph] = p.rect;
         let mirror = !(p.ty == 1 && turns > 1);
         let back = if p.ty != 1 { 8 } else { 0 };

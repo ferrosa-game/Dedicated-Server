@@ -11,7 +11,7 @@ use ferrosa_physics::{
 };
 use ferrosa_protocol::{Team, clientbound::game::ItemKind};
 
-use crate::world::{
+use crate::{
     area::{AreaGrid, BlockDims, CUBE, FOOTPRINT, MESH, TYPE_MASK},
     blocks::BlockTable,
     ground::Ground,
@@ -30,6 +30,10 @@ struct Tile {
     top: u32,
     faces: u8,
     item_set: u32,
+    /// The interior block's materials (building_setup_build's remapped interior texture indices).
+    textures: [u8; 8],
+    /// The exterior block's texture slots: the material remapped in the low byte, the flags above it kept.
+    block_textures: [u16; 8],
 }
 
 pub fn building_type(name: &str, roundcity: bool) -> i32 {
@@ -125,7 +129,7 @@ pub struct PatrolSpot {
 
 impl BuildingRecord {
     /// is_in_building: whether `pos` is inside the box, grown by `margin`.
-    pub(crate) fn contains(&self, pos: Vec3, margin: f32) -> bool {
+    pub fn contains(&self, pos: Vec3, margin: f32) -> bool {
         let (a, b) = (self.interior_min, self.interior_max);
         !(pos.x < a.x - margin)
             && !(b.x + margin <= pos.x)
@@ -204,12 +208,12 @@ impl Default for CorporationBase {
 
 impl CorporationBase {
     /// Whether `pos` is inside the base (x and z only).
-    pub(crate) fn contains(&self, pos: Vec3) -> bool {
+    pub fn contains(&self, pos: Vec3) -> bool {
         !(pos.x < self.interior_min.x) && !(self.interior_max.x + 0.0 <= pos.x) && !(pos.z < self.interior_min.z) && self.interior_max.z + 0.0 > pos.z
     }
 
     /// is_position_in_vault: whether `pos` is inside the vault grown by `tolerance` on every side.
-    pub(crate) fn in_vault(&self, pos: Vec3, tolerance: f32) -> bool {
+    pub fn in_vault(&self, pos: Vec3, tolerance: f32) -> bool {
         let (a, b) = (self.vault_min, self.vault_max);
         !(pos.x < a.x - tolerance)
             && !(b.x + tolerance <= pos.x)
@@ -220,7 +224,7 @@ impl CorporationBase {
     }
 
     /// The table's frame: turned to the table's way, then half around.
-    pub(crate) fn frame(&self) -> RotMatrix {
+    pub fn frame(&self) -> RotMatrix {
         let mut m = IDENTITY;
         let axis = m[1];
         rotate_orientation(&mut m, axis, self.table_orientation);
@@ -248,10 +252,12 @@ pub struct Buildings<'a> {
     /// The computers found while instantiating the building being placed.
     computers: Vec<IVec3>,
     game_type: u32,
+    /// The level's material names (load_level's texture list), which a building's texture names resolve against.
+    materials: Vec<String>,
 }
 
 impl<'a> Buildings<'a> {
-    pub(crate) fn new(csx: &'a CityFileCSX, build_blocks: Vec<String>, item_sets: Vec<String>, game_type: u32) -> Self {
+    pub fn new(csx: &'a CityFileCSX, build_blocks: Vec<String>, item_sets: Vec<String>, game_type: u32, materials: Vec<String>) -> Self {
         Self {
             csx,
             custom_names: csx.custom_blocks().map(|(n, _)| n).collect(),
@@ -264,11 +270,12 @@ impl<'a> Buildings<'a> {
             computers: Vec::new(),
             bases: vec![CorporationBase::default(); CORPORATIONS],
             game_type,
+            materials,
         }
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn place(
+    pub fn place(
         &mut self,
         area: &mut AreaGrid,
         ground: &mut Ground,
@@ -377,6 +384,14 @@ impl<'a> Buildings<'a> {
                 }
             }
         }
+        let mut remap = [0u32; 256];
+        for (i, n) in b.texture_names.iter().enumerate().take(256) {
+            for (k, m) in self.materials.iter().enumerate() {
+                if m == n.as_str() {
+                    remap[i] = k as u32;
+                }
+            }
+        }
         let resolve = |v: u32| {
             if v & TYPE_MASK == MESH { ((v >> 24) & 3).wrapping_add(special[(v & 1023) as usize] | MESH) } else { v }
         };
@@ -392,6 +407,8 @@ impl<'a> Buildings<'a> {
                 top: 0,
                 faces: t.texture_indices.iter().enumerate().fold(0, |m, (i, &w)| if w & 32768 == 0 { m | 1 << i } else { m }),
                 item_set: if t.item_set == 0 { 0 } else { (t.item_set & (3 << 24)) | isets[(t.item_set & 1023) as usize] | (1 << 30) },
+                textures: t.interior_texture_indices.map(|w| remap[(w & 255) as usize] as u8),
+                block_textures: t.texture_indices.map(|w| (w & 0xff00) | remap[(w & 255) as usize] as u16),
             })
             .collect()
     }
@@ -494,7 +511,7 @@ impl<'a> Buildings<'a> {
                         continue;
                     }
                     let p = o + IVec3::new(x, y, z);
-                    area.create_block(p.x, p.y, p.z, t.block | flags, t.faces, dims);
+                    area.create_block(p.x, p.y, p.z, t.block | flags, t.block_textures, dims);
                     if y == off_y {
                         ground.stamp_roadmap(p.x, p.z, p.y as f32 * 4.0);
                     }
@@ -542,10 +559,10 @@ impl<'a> Buildings<'a> {
 
                         let id = self.mesh_id(tables, key);
                         if area.layer1(p.x, p.y, p.z) == 0 {
-                            area.place_with_footprint(p.x, p.y, p.z, id | flags | MESH, dims);
+                            area.place_with_footprint(p.x, p.y, p.z, id | flags | MESH, dims, t.textures);
                         }
                     } else if (v as i32) < 0 {
-                        area.place_with_footprint(p.x, p.y, p.z, flags | v, dims);
+                        area.place_with_footprint(p.x, p.y, p.z, flags | v, dims, t.textures);
                         if let Some(k) = base {
                             let id = v & 65535;
                             let c = |n: i32| n as f32 * 4.0;
@@ -639,7 +656,7 @@ pub fn clear_collision_cell(area: &mut AreaGrid, x: i32, y: i32, z: i32) {
 
 /// The area_instantiate_building_blocks part naming each building's streets: of the intersection nearest its origin
 /// moved 32 along its third axis, the first two streets, the opposite ones standing in for missing ones.
-pub fn assign_streets(records: &mut [BuildingRecord], streets: &crate::world::streets::StreetMap) {
+pub fn assign_streets(records: &mut [BuildingRecord], streets: &crate::streets::StreetMap) {
     const REACH: f32 = 32.0;
     for b in records {
         let [_, _, r2] = b.rot;

@@ -1,7 +1,7 @@
 use glam::Vec3;
 use ferrosa_physics::rotation::rotate_vector_about_axis;
 
-use crate::world::{collide::calculate_face_normal, trace::cvtt};
+use crate::{collide::calculate_face_normal, trace::cvtt};
 
 /// The track grid: 64 by 64 cells of 64 units, each listing up to 8 meshes.
 pub const GRID_CELLS: usize = 64;
@@ -107,7 +107,7 @@ fn horizontal(dx: f32, dz: f32) -> f32 {
 impl Track {
     /// level_generate_race_track: the tube track with its train spawns, the pieces linked in a loop and their
     /// weights eased, then the ramps (build_roundcity_curved_meshes).
-    pub(crate) fn race_track() -> Self {
+    pub fn race_track() -> Self {
         let mut t = Track { meshes: Vec::new(), grid: vec![Vec::new(); GRID_CELLS * GRID_CELLS], spawns: Vec::new() };
         let v = Vec3::new(-1.0, -0.0, -0.0);
         let s = TRACK_START;
@@ -458,7 +458,7 @@ fn boxes_overlap(lo: Vec3, hi: Vec3, min: Vec3, max: Vec3) -> bool {
 impl Track {
     /// track_collect_triangles_in_bounds: the triangles of the chosen parts of every mesh listed in the grid cells
     /// the bounds cover (a mesh in several cells is taken once per cell) whose bounds meet them.
-    pub(crate) fn collect(&self, min: Vec3, max: Vec3, parts: u32) -> Vec<TrackTriangle> {
+    pub fn collect(&self, min: Vec3, max: Vec3, parts: u32) -> Vec<TrackTriangle> {
         let mut out = Vec::new();
         if self.meshes.is_empty() {
             return out;
@@ -498,7 +498,7 @@ impl Track {
 
 impl TrackMesh {
     /// train_collect_rail_points for the rails then the bed: every triangle of both (at most 1024).
-    pub(crate) fn rail_triangles(&self) -> Vec<TrackTriangle> {
+    pub fn rail_triangles(&self) -> Vec<TrackTriangle> {
         (0..2).flat_map(|p| self.pieces[p]..self.pieces[p + 4]).take(MAX_TRIANGLES).map(|i| self.tris[i as usize].map(|v| self.verts[v as usize])).collect()
     }
 
@@ -518,7 +518,7 @@ pub fn segment_intersect_triangles(tris: &[TrackTriangle], start: Vec3, end: Vec
     let mut best = (1.0f32, Vec3::ZERO, Vec3::ZERO);
     for &[a, b, c] in tris {
         let n = calculate_face_normal(a, b, c);
-        if let Some((t, p)) = crate::world::collide::segment_intersect_face(n, start, end, a, b, c)
+        if let Some((t, p)) = crate::collide::segment_intersect_face(n, start, end, a, b, c)
             && !(best.0 <= t)
         {
             best = (t, p, n);

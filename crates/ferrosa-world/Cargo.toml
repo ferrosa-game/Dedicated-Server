@@ -1,0 +1,16 @@
+[package]
+name = "ferrosa-world"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+ferrosa-protocol.workspace = true
+ferrosa-map.workspace = true
+ferrosa-physics.workspace = true
+
+rayon.workspace = true
+glam.workspace = true
+
+[lints]
+workspace = true

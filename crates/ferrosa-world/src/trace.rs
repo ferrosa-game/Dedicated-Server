@@ -1,6 +1,6 @@
 use glam::{IVec3, Vec3};
 
-use crate::world::{
+use crate::{
     area::{AreaGrid, CUBE, FOOTPRINT, MESH, TYPE_MASK, cell_index},
     city_objects::{object_pose, segment_intersect_object},
     collide::{TraceHit, calculate_face_normal, segment_intersect_face},
@@ -26,21 +26,21 @@ pub struct LevelHit {
 }
 
 #[inline]
-pub(crate) fn cvtt(v: f32) -> i32 {
+pub fn cvtt(v: f32) -> i32 {
     if (-2147483648.0..2147483648.0).contains(&v) { v as i32 } else { i32::MIN }
 }
 
-pub(crate) struct AreaFrame {
-    pub(crate) origin: Vec3,
+pub struct AreaFrame {
+    pub origin: Vec3,
     m: [f32; 9],
-    pub(crate) size: f32,
-    pub(crate) inv: f32,
-    pub(crate) min: Vec3,
-    pub(crate) max: Vec3,
+    pub size: f32,
+    pub inv: f32,
+    pub min: Vec3,
+    pub max: Vec3,
 }
 
 impl AreaFrame {
-    pub(crate) fn new(a: &AreaGrid) -> Self {
+    pub fn new(a: &AreaGrid) -> Self {
         let o = a.origin;
         let s = a.block_size;
         let c = a.chunks;
@@ -54,13 +54,13 @@ impl AreaFrame {
         }
     }
 
-    pub(crate) fn to_local(&self, p: Vec3) -> Vec3 {
+    pub fn to_local(&self, p: Vec3) -> Vec3 {
         let m = &self.m;
         let d = p - self.origin;
         Vec3::new(m[0] * d.x + m[1] * d.y + m[2] * d.z, m[3] * d.x + m[4] * d.y + m[5] * d.z, d.x * m[6] + d.y * m[7] + d.z * m[8])
     }
 
-    pub(crate) fn rotate_back(&self, v: Vec3) -> Vec3 {
+    pub fn rotate_back(&self, v: Vec3) -> Vec3 {
         let m = &self.m;
         Vec3::new(m[0] * v.x + m[3] * v.y + m[6] * v.z, m[1] * v.x + m[4] * v.y + m[7] * v.z, m[2] * v.x + m[5] * v.y + m[8] * v.z)
     }
@@ -310,8 +310,8 @@ pub fn line_intersect_level(ground: &Ground, area: &AreaGrid, meshes: &BlockMesh
         for k in 0..3 {
             (lo[k], hi[k]) = if e3[k] <= s3[k] { (e3[k], s3[k]) } else { (s3[k], e3[k]) };
         }
-        let tris = area.track.collect(Vec3::from_array(lo), Vec3::from_array(hi), crate::world::track::WALLS);
-        if let Some((t, pos, normal)) = crate::world::track::segment_intersect_triangles(&tris, start, end)
+        let tris = area.track.collect(Vec3::from_array(lo), Vec3::from_array(hi), crate::track::WALLS);
+        if let Some((t, pos, normal)) = crate::track::segment_intersect_triangles(&tris, start, end)
             && frac > t
         {
             frac = t;

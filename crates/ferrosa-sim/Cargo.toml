@@ -8,6 +8,7 @@ authors.workspace = true
 ferrosa-protocol.workspace = true
 ferrosa-map.workspace = true
 ferrosa-physics.workspace = true
+ferrosa-world.workspace = true
 
 rayon.workspace = true
 glam.workspace = true

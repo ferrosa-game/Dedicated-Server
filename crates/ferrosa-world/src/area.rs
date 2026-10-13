@@ -18,11 +18,16 @@ pub struct BlockRecord {
     pub object: [u32; CELLS],
     pub item_set: [u32; CELLS],
     pub taken: [u32; CELLS],
+    /// The material of each of a mesh cell's 8 texture slots (the record's bytes at 0x3808).
+    pub textures: [[u8; 8]; CELLS],
+    /// The 8 texture slots of each layer-0 cell (the record's words at 0x1008): a material in the low byte, an atlas
+    /// layer in bits 8-12 when bit 14 is set, or an atlas layer alone in the low 10 bits when bit 15 is set.
+    pub cell_textures: [[u16; 8]; CELLS],
 }
 
 impl BlockRecord {
     fn new() -> Box<Self> {
-        Box::new(Self { layer0: [0; CELLS], layer1: [0; CELLS], object: [0; CELLS], item_set: [0; CELLS], taken: [0; CELLS] })
+        Box::new(Self { layer0: [0; CELLS], layer1: [0; CELLS], object: [0; CELLS], item_set: [0; CELLS], taken: [0; CELLS], textures: [[0; 8]; CELLS], cell_textures: [[0; 8]; CELLS] })
     }
 }
 
@@ -48,13 +53,13 @@ pub struct AreaGrid {
     /// a breakable wall). The binary keeps it in a global that only custom shape hits overwrite.
     pub face_attr: u32,
     /// The item sets the level's item-set cells place, and the item hulls traces test them against.
-    pub item_sets: crate::world::item_sets::ItemSets,
+    pub item_sets: crate::item_sets::ItemSets,
     /// The dynamic meshes reset_game builds on test2 (the race track and ramps).
-    pub track: crate::world::track::Track,
+    pub track: crate::track::Track,
 }
 
 impl AreaGrid {
-    pub(crate) fn new(chunks: IVec3, origin: Vec3, block_size: f32) -> Self {
+    pub fn new(chunks: IVec3, origin: Vec3, block_size: f32) -> Self {
         Self {
             origin,
             block_size,
@@ -97,8 +102,21 @@ impl AreaGrid {
         x >= 0 && y >= 0 && z >= 0 && (x >> 6) < self.chunks.x && (y >> 6) < self.chunks.y && (z >> 6) < self.chunks.z
     }
 
-    pub(crate) fn record(&self, x: i32, y: i32, z: i32) -> Option<&BlockRecord> {
+    pub fn record(&self, x: i32, y: i32, z: i32) -> Option<&BlockRecord> {
         self.record_id(x, y, z).map(|i| &*self.records[i])
+    }
+
+    /// Every block with a record: the cell its 8 x 8 x 8 cells start at, and the record.
+    pub fn blocks(&self) -> impl Iterator<Item = (IVec3, &BlockRecord)> + '_ {
+        let c = self.chunks;
+        (0..c.x).flat_map(move |cx| (0..c.y).flat_map(move |cy| (0..c.z).map(move |cz| IVec3::new(cx, cy, cz)))).flat_map(move |chunk| {
+            let page = self.chunk_pages[((chunk.x * c.y + chunk.y) * c.z + chunk.z) as usize];
+            (0..PAGE).filter(move |_| page != NONE).filter_map(move |slot| {
+                let id = self.block_records[page as usize * PAGE + slot];
+                let block = IVec3::new((slot >> 6) as i32, ((slot >> 3) & 7) as i32, (slot & 7) as i32);
+                (id != NONE).then(|| ((chunk * 8 + block) * 8, &*self.records[id as usize]))
+            })
+        })
     }
 
     fn record_mut(&mut self, x: i32, y: i32, z: i32) -> Option<&mut BlockRecord> {
@@ -118,16 +136,16 @@ impl AreaGrid {
         Some(&mut self.records[self.block_records[slot] as usize])
     }
 
-    pub(crate) fn layer0(&self, x: i32, y: i32, z: i32) -> u32 {
+    pub fn layer0(&self, x: i32, y: i32, z: i32) -> u32 {
         self.record(x, y, z).map_or(0, |r| r.layer0[cell_index(x, y, z)])
     }
 
-    pub(crate) fn layer1(&self, x: i32, y: i32, z: i32) -> u32 {
+    pub fn layer1(&self, x: i32, y: i32, z: i32) -> u32 {
         self.record(x, y, z).map_or(0, |r| r.layer1[cell_index(x, y, z)])
     }
 
     /// area_get_collision_cell_resolved: the layer 1 word of a cell, a footprint's resolved to its origin cell.
-    pub(crate) fn collision_cell_resolved(&self, x: i32, y: i32, z: i32) -> u32 {
+    pub fn collision_cell_resolved(&self, x: i32, y: i32, z: i32) -> u32 {
         let v = self.layer1(x, y, z);
         if v & TYPE_MASK != FOOTPRINT {
             return v;
@@ -135,19 +153,19 @@ impl AreaGrid {
         self.layer1(x - (v & 255) as i32, y - ((v >> 16) & 255) as i32, z - ((v >> 8) & 255) as i32)
     }
 
-    pub(crate) fn set_layer0(&mut self, x: i32, y: i32, z: i32, v: u32) {
+    pub fn set_layer0(&mut self, x: i32, y: i32, z: i32, v: u32) {
         if let Some(r) = self.record_mut(x, y, z) {
             r.layer0[cell_index(x, y, z)] = v;
         }
     }
 
-    pub(crate) fn set_layer1(&mut self, x: i32, y: i32, z: i32, v: u32) {
+    pub fn set_layer1(&mut self, x: i32, y: i32, z: i32, v: u32) {
         if let Some(r) = self.record_mut(x, y, z) {
             r.layer1[cell_index(x, y, z)] = v;
         }
     }
 
-    pub(crate) fn set_object(&mut self, x: i32, y: i32, z: i32, v: u32) {
+    pub fn set_object(&mut self, x: i32, y: i32, z: i32, v: u32) {
         if !self.in_range(x, y, z) {
             return;
         }
@@ -156,7 +174,7 @@ impl AreaGrid {
         }
     }
 
-    pub(crate) fn set_item_set(&mut self, x: i32, y: i32, z: i32, v: u32) {
+    pub fn set_item_set(&mut self, x: i32, y: i32, z: i32, v: u32) {
         if let Some(r) = self.record_mut(x, y, z) {
             let c = cell_index(x, y, z);
             r.item_set[c] = v;
@@ -165,17 +183,17 @@ impl AreaGrid {
     }
 
     /// grid_lookup_cell_value: the item-set word of a cell (the set, and its quarter turns in bits 24 and 25).
-    pub(crate) fn item_set(&self, x: i32, y: i32, z: i32) -> u32 {
+    pub fn item_set(&self, x: i32, y: i32, z: i32) -> u32 {
         self.record(x, y, z).map_or(0, |r| r.item_set[cell_index(x, y, z)])
     }
 
     /// grid_lookup_cell_mask: which items of a cell's set have been taken out as real items.
-    pub(crate) fn taken(&self, x: i32, y: i32, z: i32) -> u32 {
+    pub fn taken(&self, x: i32, y: i32, z: i32) -> u32 {
         self.record(x, y, z).map_or(0, |r| r.taken[cell_index(x, y, z)])
     }
 
     /// grid_set_cell_mask.
-    pub(crate) fn set_taken(&mut self, x: i32, y: i32, z: i32, mask: u32) {
+    pub fn set_taken(&mut self, x: i32, y: i32, z: i32, mask: u32) {
         if !self.in_range(x, y, z) {
             return;
         }
@@ -185,7 +203,7 @@ impl AreaGrid {
     }
 
     /// reset_city_grid_dynamic_flags: every broken wall mended and every item set whole again.
-    pub(crate) fn reset_dynamic(&mut self) {
+    pub fn reset_dynamic(&mut self) {
         for r in &mut self.records {
             for c in 0..CELLS {
                 if r.layer1[c] & TYPE_MASK == MESH {
@@ -196,7 +214,10 @@ impl AreaGrid {
         }
     }
 
-    pub(crate) fn create_block(&mut self, x: i32, y: i32, z: i32, v: u32, faces: u8, dims: &dyn BlockDims) {
+    /// area_create_block: a cube or mesh cell with its 8 texture slots; a cube draws the faces whose slot hasn't
+    /// bit 15 set, less those against neighbouring cubes.
+    pub fn create_block(&mut self, x: i32, y: i32, z: i32, v: u32, textures: [u16; 8], dims: &dyn BlockDims) {
+        let faces = textures.iter().enumerate().fold(0u8, |m, (i, &w)| if (w as i16) >= 0 { m | 1 << i } else { m });
         if x < 0 || y < 0 || z < 0 || v == 0 {
             return;
         }
@@ -210,6 +231,7 @@ impl AreaGrid {
                 let stored = (v & (3 << 24)) | CUBE | 63 | (faces as u32) << 6;
 
                 r.layer0[c] = stored;
+                r.cell_textures[c] = textures;
 
                 let below = self.layer0(x, y - 1, z);
                 if below & TYPE_MASK == CUBE || y == 0 {
@@ -238,6 +260,7 @@ impl AreaGrid {
                 let Some(r) = self.record_mut(x, y, z) else { return };
                 let c = cell_index(x, y, z);
                 r.layer0[c] = v;
+                r.cell_textures[c] = textures;
                 self.footprint(x, y, z, v, dims, Self::set_layer0);
             }
 
@@ -245,7 +268,8 @@ impl AreaGrid {
         }
     }
 
-    pub(crate) fn place_with_footprint(&mut self, x: i32, y: i32, z: i32, v: u32, dims: &dyn BlockDims) {
+    /// area_place_block_with_footprint: a mesh block and its materials, and footprint cells over the rest of it.
+    pub fn place_with_footprint(&mut self, x: i32, y: i32, z: i32, v: u32, dims: &dyn BlockDims, textures: [u8; 8]) {
         if x < 0 || y < 0 || z < 0 {
             return;
         }
@@ -259,6 +283,7 @@ impl AreaGrid {
         let c = cell_index(x, y, z);
 
         r.layer1[c] = v;
+        r.textures[c] = textures;
 
         self.footprint(x, y, z, v, dims, Self::set_layer1);
     }
@@ -278,7 +303,7 @@ impl AreaGrid {
         }
     }
 
-    pub(crate) fn clear_cell(&mut self, x: i32, y: i32, z: i32) {
+    pub fn clear_cell(&mut self, x: i32, y: i32, z: i32) {
         if !self.in_range(x, y, z) {
             return;
         }

@@ -2,7 +2,7 @@ use ferrosa_map::file_types::it3::It3Collision;
 use glam::Vec3;
 use ferrosa_physics::RotMatrix;
 
-use crate::world::{
+use crate::{
     capsule::capsule_intersect_triangle,
     collide::{calculate_face_normal, segment_intersect_face},
     mesh::CUBE_FACES,
@@ -38,7 +38,7 @@ pub struct ConvexHull {
 
 impl ConvexHull {
     /// A hull of one group around the origin, cast from every vertex.
-    pub(crate) fn new(verts: Vec<Vec3>, faces: Vec<[usize; 4]>, edges: Vec<[usize; 2]>) -> Self {
+    pub fn new(verts: Vec<Vec3>, faces: Vec<[usize; 4]>, edges: Vec<[usize; 2]>) -> Self {
         let faces = faces.into_iter().map(|f| HullFace { verts: f, normal: calculate_face_normal(verts[f[0]], verts[f[1]], verts[f[2]]) }).collect();
         let group = HullGroup { center: Vec3::ZERO, verts: (0..verts.len()).collect(), faces, edges };
         Self { verts, groups: vec![group] }
@@ -46,7 +46,7 @@ impl ConvexHull {
 
     /// load_it3_file's hull: the file's vertices and groups, each face's normal taken from its second to fourth
     /// corners, and every group given the box edges.
-    pub(crate) fn from_it3(c: &It3Collision) -> Self {
+    pub fn from_it3(c: &It3Collision) -> Self {
         let index = |i: i32| usize::try_from(i).unwrap_or(0).min(c.verts.len().saturating_sub(1));
         let groups = c
             .groups
@@ -68,12 +68,12 @@ impl ConvexHull {
     }
 
     /// Every face of every group, in order.
-    pub(crate) fn faces(&self) -> impl Iterator<Item = &HullFace> {
+    pub fn faces(&self) -> impl Iterator<Item = &HullFace> {
         self.groups.iter().flat_map(|g| &g.faces)
     }
 
     /// The default hull of a collidable item: its bounding box.
-    pub(crate) fn bounding_box(b: Vec3) -> Self {
+    pub fn bounding_box(b: Vec3) -> Self {
         let verts = (0..8)
             .map(|k| {
                 let q = k & 3;
@@ -85,7 +85,7 @@ impl ConvexHull {
     }
 
     /// item_type_build_prism_collision_mesh: four rings of six points (`melon` selects the watermelon's ring radii and heights).
-    pub(crate) fn prism(wide: f32, narrow: f32, height: f32, melon: bool) -> Self {
+    pub fn prism(wide: f32, narrow: f32, height: f32, melon: bool) -> Self {
         let mut verts = Vec::with_capacity(PRISM_RINGS * PRISM_SIDES);
         let neg_height = -height;
         for ring in 0..PRISM_RINGS {
@@ -136,13 +136,13 @@ impl ConvexHull {
     }
 
     /// transform_collision_mesh_vertices: the hull's vertices placed at `pos` with orientation `rot`.
-    pub(crate) fn world_verts(&self, pos: Vec3, rot: &RotMatrix) -> Vec<Vec3> {
+    pub fn world_verts(&self, pos: Vec3, rot: &RotMatrix) -> Vec<Vec3> {
         let [r0, r1, r2] = *rot;
         self.verts.iter().map(|v| v.x * r0 + v.y * r1 + v.z * r2 + pos).collect()
     }
 
     /// capsule_intersect_hull_face_groups_max_distance: the face hit with the greatest axis distance (zero-distance hits never count).
-    pub(crate) fn intersect_capsule(&self, world: &[Vec3], start: Vec3, end: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
+    pub fn intersect_capsule(&self, world: &[Vec3], start: Vec3, end: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
         let mut best = (Vec3::ZERO, Vec3::ZERO, 0.0f32);
         for f in self.faces() {
             let [a, b, c, d] = f.verts.map(|i| world[i]);
@@ -241,7 +241,7 @@ impl ConvexHull {
 
     /// trace_segment_item_mesh: the segment against each face of the hull placed as `world`, both triangles of a face
     /// under the first one's normal; the nearest hit as (fraction, point, normal).
-    pub(crate) fn trace_mesh(&self, world: &[Vec3], start: Vec3, end: Vec3) -> Option<(f32, Vec3, Vec3)> {
+    pub fn trace_mesh(&self, world: &[Vec3], start: Vec3, end: Vec3) -> Option<(f32, Vec3, Vec3)> {
         let mut best = (1.0f32, Vec3::ZERO, Vec3::ZERO);
         for f in self.faces() {
             let [a, b, c, d] = f.verts.map(|i| world[i]);
@@ -258,7 +258,7 @@ impl ConvexHull {
     }
 
     /// segment_cast_hull_face_groups: the first face the segment enters, as the hit point and the face's world normal.
-    pub(crate) fn segment_cast(&self, world: &[Vec3], rot: &RotMatrix, start: Vec3, end: Vec3) -> Option<(Vec3, Vec3)> {
+    pub fn segment_cast(&self, world: &[Vec3], rot: &RotMatrix, start: Vec3, end: Vec3) -> Option<(Vec3, Vec3)> {
         let [r0, r1, r2] = *rot;
         let mut best = (1.0f32, Vec3::ZERO, Vec3::ZERO);
         for f in self.faces() {

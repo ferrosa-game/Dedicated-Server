@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use glam::Vec3;
 
-use crate::world::{
+use crate::{
     collide::{TraceHit, calculate_face_normal, segment_intersect_face},
     roads::{CityBlock, RoadNetwork},
 };
 
 const TDIM: usize = 2049;
-pub(crate) const ORIGIN: f32 = -4096.0;
+pub const ORIGIN: f32 = -4096.0;
 const NAV: i32 = 16384;
 const MASK: usize = 4096;
 
@@ -47,20 +47,20 @@ pub struct Ground {
 }
 
 impl Ground {
-    pub(crate) fn new(base: Vec<f32>, roundcity: bool) -> Self {
+    pub fn new(base: Vec<f32>, roundcity: bool) -> Self {
         assert_eq!(base.len(), TDIM * TDIM, "generate_grass must be {TDIM}x{TDIM}");
         Self { base, roadmap: HashMap::new(), mask: vec![u64::MAX; MASK * MASK / 64], bounds: None, roundcity, blocks: Vec::new() }
     }
 
-    pub(crate) fn roundcity(&self) -> bool {
+    pub fn roundcity(&self) -> bool {
         self.roundcity
     }
 
-    pub(crate) fn set_street_bounds(&mut self, bounds: (i32, i32, i32, i32)) {
+    pub fn set_street_bounds(&mut self, bounds: (i32, i32, i32, i32)) {
         self.bounds = Some(bounds);
     }
 
-    pub(crate) fn stamp_roadmap(&mut self, x: i32, z: i32, height: f32) {
+    pub fn stamp_roadmap(&mut self, x: i32, z: i32, height: f32) {
         if self.roundcity || !(0..=4094).contains(&x) || !(0..=4094).contains(&z) {
             return;
         }
@@ -99,7 +99,7 @@ impl Ground {
         (self.mask[i >> 6] >> (i & 63)) & 1 != 0
     }
 
-    pub(crate) fn build_city_blocks(&mut self, roads: &RoadNetwork) {
+    pub fn build_city_blocks(&mut self, roads: &RoadNetwork) {
         if self.roundcity {
             return;
         }
@@ -289,7 +289,7 @@ impl Ground {
         self.blocks.push(Block { nx0: x0 + 4096, nz0: z0 + 4096, w, d, h });
     }
 
-    pub(crate) fn vertex(&self, nx: i32, nz: i32) -> f32 {
+    pub fn vertex(&self, nx: i32, nz: i32) -> f32 {
         for b in self.blocks.iter().rev() {
             let (lx, lz) = (nx - b.nx0, nz - b.nz0);
             if lx >= 0 && lz >= 0 && lx <= b.w && lz <= b.d {
@@ -307,11 +307,20 @@ impl Ground {
         (1.0 - u) * (t00 * ov + t10 * v) + u * (v * t11 + ov * t01)
     }
 
-    pub(crate) fn cell_ok(&self, ix: i32, iz: i32) -> bool {
+    /// The land mask as the client's terrain shader reads it: 1024 x 1024 texels, each 4 x 4 cells, the bit for
+    /// cell (x, z) of a texel at (z * 4 + x); a set bit is ground.
+    pub fn landmask(&self) -> Vec<u16> {
+        (0..1024)
+            .flat_map(|tz: i32| (0..1024).map(move |tx: i32| (tx, tz)))
+            .map(|(tx, tz)| (0..16).filter(|&b| self.covered(tx * 4 + (b & 3), tz * 4 + (b >> 2))).fold(0u16, |m, b| m | 1 << b))
+            .collect()
+    }
+
+    pub fn cell_ok(&self, ix: i32, iz: i32) -> bool {
         (0..NAV).contains(&ix) && (0..NAV).contains(&iz) && self.covered(ix >> 2, iz >> 2)
     }
 
-    pub(crate) fn line_intersect_landscape(&self, start: Vec3, end: Vec3) -> Option<TraceHit> {
+    pub fn line_intersect_landscape(&self, start: Vec3, end: Vec3) -> Option<TraceHit> {
         let (s, e) = ([start.x, start.y, start.z], [end.x, end.y, end.z]);
         let origin = [ORIGIN, 0.0, ORIGIN];
         let mut cur = [0i32; 3];

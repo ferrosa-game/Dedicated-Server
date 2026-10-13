@@ -4,17 +4,15 @@ use glam::{IVec3, Vec3};
 use ferrosa_map::file_types::{csx::CityFileCSX, sbc::CityFileSBC, sbl::BlockFile};
 
 use crate::{
-    items::types::item_types,
-    world::{
-        area::{ALL_FACES, AreaGrid, MESH},
-        blocks::{BlockTable, StaticDims},
-        building::Buildings,
-        city::{instantiate_sectors, resolve_block_types},
-        ground::Ground,
-        item_sets::ItemSets,
-        meshes::{BlockMeshes, PortalGroups},
-        roads::RoadNetwork,
-    },
+    area::{AreaGrid, MESH},
+    blocks::{BlockTable, StaticDims},
+    building::Buildings,
+    city::{instantiate_sectors, resolve_block_types},
+    ground::Ground,
+    item_sets::ItemSets,
+    item_types::item_types,
+    meshes::{BlockMeshes, PortalGroups},
+    roads::RoadNetwork,
 };
 
 pub struct Level {
@@ -22,9 +20,15 @@ pub struct Level {
     pub tables: BlockTable,
     pub meshes: BlockMeshes,
     /// The building records (bases, shops, banks, labs) in placement order.
-    pub buildings: Vec<crate::world::building::BuildingRecord>,
+    pub buildings: Vec<crate::building::BuildingRecord>,
     /// Each corporation's base.
-    pub bases: Vec<crate::world::building::CorporationBase>,
+    pub bases: Vec<crate::building::CorporationBase>,
+    /// The material names a mesh cell's texture slots index (load_level's list: four built in, then test.csx's
+    /// textures in order).
+    pub materials: Vec<String>,
+    /// Where in test.csx each of its textures' image starts, and the image's and material image's sizes (the
+    /// materials after the four built in).
+    pub texture_data: Vec<(u64, u32, u32)>,
 }
 
 fn list_names(dir: &Path, ext: &str) -> Vec<String> {
@@ -56,6 +60,7 @@ pub fn build_level(
     map_name: &str,
     game_type: u32,
 ) -> Level {
+    let materials: Vec<String> = ["concrete", "", "", ""].iter().map(|s| s.to_string()).chain(csx.textures().map(|(name, _, _)| name.to_string())).collect();
     let custom: Vec<(&str, IVec3)> = csx.custom_blocks().map(|(n, b)| (n, b.size.as_ivec3())).collect();
 
     let mut tables = BlockTable::new(&custom.iter().map(|c| c.0).collect::<Vec<&str>>());
@@ -125,7 +130,8 @@ pub fn build_level(
                             v
                         };
 
-                        area.create_block(p.x, p.y, p.z, v, ALL_FACES, &dims);
+                        let textures = std::array::from_fn(|k| sector.texture_indices.get(i * 8 + k).is_some_and(|&t| t != 0) as u16);
+                        area.create_block(p.x, p.y, p.z, v, textures, &dims);
                     }
 
                     let iv = sector.itemset_indices.get(i).copied().unwrap_or(0);
@@ -144,12 +150,12 @@ pub fn build_level(
         block_names[BlockTable::custom(k) as usize] = n.to_string();
     }
 
-    let types = resolve_block_types(city, &block_names);
+    let types = resolve_block_types(city, &block_names, &materials);
 
     let build_blocks = list_names(&map_dir.join("buildblock"), ".sbl");
 
     let portals = PortalGroups::load(&map_dir.join("buildblock"), &build_blocks);
-    let mut buildings = Buildings::new(csx, build_blocks, item_sets.clone(), game_type);
+    let mut buildings = Buildings::new(csx, build_blocks, item_sets.clone(), game_type, materials.clone());
 
     for b in &city.buildings {
         buildings.place(&mut area, ground, &mut tables, &dims, b.name.as_str(), b.pos.as_ivec3(), b.rot, ground.roundcity());
@@ -169,5 +175,6 @@ pub fn build_level(
 
     let bases = std::mem::take(&mut buildings.bases);
     let buildings = buildings.records;
-    Level { area, tables, meshes, buildings, bases }
+    let texture_data = csx.textures().map(|(_, t, offset)| (offset, t.texture_size, t.material_size)).collect();
+    Level { area, tables, meshes, buildings, bases, materials, texture_data }
 }

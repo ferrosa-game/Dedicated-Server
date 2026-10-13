@@ -1,6 +1,6 @@
 use glam::{IVec3, Vec3};
 
-use crate::world::{
+use crate::{
     area::{AreaGrid, CUBE, FOOTPRINT, MESH, TYPE_MASK, cell_index},
     city_objects::{capsule_intersect_object, object_pose},
     collide::{calculate_face_normal, segment_intersect_face},
@@ -135,9 +135,9 @@ pub fn capsule_intersect_triangle_facing(start: Vec3, end: Vec3, a: Vec3, b: Vec
 }
 
 #[derive(Default)]
-pub(crate) struct TerrainMesh {
-    pub(crate) verts: Vec<Vec3>,
-    pub(crate) faces: Vec<[usize; 3]>,
+pub struct TerrainMesh {
+    pub verts: Vec<Vec3>,
+    pub faces: Vec<[usize; 3]>,
 }
 
 impl TerrainMesh {
@@ -153,7 +153,7 @@ impl TerrainMesh {
         self.verts.len() - 1
     }
 
-    pub(crate) fn build(ground: &Ground, min: Vec3, max: Vec3) -> Self {
+    pub fn build(ground: &Ground, min: Vec3, max: Vec3) -> Self {
         let mut mesh = Self::default();
         let (x0, x1) = (cvtt(min.x - ORIGIN), cvtt(max.x - ORIGIN));
         let (z0, z1) = (cvtt(min.z - ORIGIN), cvtt(max.z - ORIGIN));

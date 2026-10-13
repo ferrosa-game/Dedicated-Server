@@ -5,7 +5,7 @@ use ferrosa_map::file_types::sis::ItemSetFile;
 use ferrosa_physics::rotation::{IDENTITY, RotMatrix, rotate_orientation};
 use ferrosa_protocol::clientbound::game::ItemKind;
 
-use crate::sim::hull::ConvexHull;
+use crate::hull::ConvexHull;
 
 /// The π the binary turns a cell's quarter turns by.
 const HALF_TURN: f64 = 180.0_f64.to_radians();
@@ -35,7 +35,7 @@ pub struct SetHit {
 
 impl SetHit {
     /// The cell word spawn_item_from_grid_cell takes: the set and its quarter turns.
-    pub(crate) fn cell_word(&self) -> u32 {
+    pub fn cell_word(&self) -> u32 {
         (self.turn << 24) + self.set
     }
 }
@@ -94,7 +94,7 @@ fn box_stack_set() -> ItemSet {
 impl ItemSets {
     /// setup_item_sets: the built-in sets, then data/itemset/*.sis (`names`, in load order) from index 4, each item's
     /// type the last of `type_names` its name matches.
-    pub(crate) fn load(data_dir: &Path, names: &[String], type_names: &[String], hulls: Vec<Option<ConvexHull>>) -> Self {
+    pub fn load(data_dir: &Path, names: &[String], type_names: &[String], hulls: Vec<Option<ConvexHull>>) -> Self {
         let mut sets = vec![ItemSet::default(), table_set(), melon_set(), box_stack_set()];
 
         for name in names {
@@ -118,11 +118,11 @@ impl ItemSets {
         Self { sets, hulls }
     }
 
-    pub(crate) fn set(&self, word: u32) -> Option<&ItemSet> {
+    pub fn set(&self, word: u32) -> Option<&ItemSet> {
         self.sets.get((word & 1023) as usize)
     }
 
-    pub(crate) fn hull(&self, kind: i32) -> Option<&ConvexHull> {
+    pub fn hull(&self, kind: i32) -> Option<&ConvexHull> {
         self.hulls.get(kind as usize)?.as_ref()
     }
 }

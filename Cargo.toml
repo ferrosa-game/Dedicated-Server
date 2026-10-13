@@ -1,6 +1,6 @@
 [workspace]
 resolver="3"
-members = ["crates/ferrosa-bin", "crates/ferrosa-map", "crates/ferrosa-net", "crates/ferrosa-physics", "crates/ferrosa-protocol", "crates/ferrosa-sim"]
+members = ["crates/ferrosa-bin", "crates/ferrosa-map", "crates/ferrosa-net", "crates/ferrosa-physics", "crates/ferrosa-protocol", "crates/ferrosa-sim", "crates/ferrosa-world"]
 
 [workspace.package]
 version = "0.1.3"
@@ -28,3 +28,4 @@ ferrosa-sim = { path = "crates/ferrosa-sim", default-features = false }
 ferrosa-net = { path = "crates/ferrosa-net", default-features = false }
 ferrosa-protocol = { path = "crates/ferrosa-protocol", default-features = false }
 ferrosa-physics = { path = "crates/ferrosa-physics", default-features = false }
+ferrosa-world = { path = "crates/ferrosa-world", default-features = false }

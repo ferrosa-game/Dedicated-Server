@@ -158,7 +158,7 @@ fn street_name(north_south: bool, i0: IVec3) -> (&'static str, i32) {
 impl StreetMap {
     /// create_intersection_internal, create_road, intersection_compute_world_bounds, street_compute_lane_geometry
     /// and build_street_route_graph over the city's road network (after its lane widths are final).
-    pub(crate) fn build(roads: &RoadNetwork) -> Self {
+    pub fn build(roads: &RoadNetwork) -> Self {
         let mut map = StreetMap { min: IVec3::new(i32::MAX, 0, i32::MAX), max: IVec3::new(i32::MIN, 0, i32::MIN), ..Default::default() };
         for (pos, lanes, streets) in roads.intersection_fields() {
             map.min = IVec3::new(map.min.x.min(pos.x), 0, map.min.z.min(pos.z));

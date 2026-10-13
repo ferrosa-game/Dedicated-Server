@@ -32,7 +32,11 @@ pub struct CSXFile {
     pub building: Option<BuildingFile>,
 
     #[br(if(file_type == CSXFileType::Block))]
-    pub block: Option<BlockFile>, // We dont care about textures, what are we gonna do? Render them?
+    pub block: Option<BlockFile>,
+
+    /// A texture's header; its image and material bytes follow it in the file (see `CityFileCSX::texture_data`).
+    #[br(if(file_type == CSXFileType::Texture))]
+    pub texture: Option<CSXTextureHeader>,
 }
 
 #[derive(BinRead, Clone, Default, Debug)]
@@ -82,6 +86,12 @@ impl CityFileCSX {
         let mut cursor = Cursor::new(bytes);
 
         Ok(CityFileCSX::read(&mut cursor)?)
+    }
+
+    /// The texture entries in file order: the entry's name (what buildings name the material by), its header, and
+    /// where its image starts (just past the header).
+    pub fn textures(&self) -> impl Iterator<Item = (&str, &CSXTextureHeader, u64)> {
+        self.lookup_table.iter().filter_map(|e| Some((e.name(), e.file.texture.as_ref()?, e.offset as u64 + 76)))
     }
 
     pub fn custom_blocks(&self) -> impl Iterator<Item = (&str, &BlockFile)> {
