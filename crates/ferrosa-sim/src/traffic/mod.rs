@@ -144,12 +144,15 @@ pub fn random_street(map: &StreetMap) -> i32 {
     let n = map.streets.len() as i32;
     let wide = |s: i32| map.streets.get(s as usize).is_some_and(|st| st.left_lanes > 3 || st.right_lanes > 3);
     let mut r = rand::random_range(0..n);
+
     for _ in 0..1024 {
         if !wide(r) {
             break;
         }
+
         r = rand::random_range(0..n);
     }
+
     r
 }
 

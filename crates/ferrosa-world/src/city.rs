@@ -47,6 +47,7 @@ pub fn place_sector_block(grid: &mut AreaGrid, types: &[BlockType], dims: &dyn B
     if bt.value & TYPE_MASK == CUBE {
         let turn = (r.wrapping_neg() & 3) as usize;
         let sides: [u16; 4] = std::array::from_fn(|k| set[1 + ((turn + k) & 3)]);
+
         grid.create_block(x, y, z, CUBE, [set[0], sides[0], sides[1], sides[2], sides[3], set[5], set[6], set[7]], dims);
     } else {
         grid.create_block(x, y, z, bt.value + r, set, dims);

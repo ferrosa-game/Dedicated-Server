@@ -37,6 +37,66 @@ struct Rec {
     s: [Src; 2],
 }
 
+impl Rec {
+    fn sources(&self) -> &[Src] {
+        &self.s[..self.n as usize]
+    }
+
+    fn push(&mut self, s: Src) {
+        self.s[self.n as usize] = s;
+        self.n += 1;
+    }
+
+    /// Whether the cell has a source at full weight (a road cell), so takes no others.
+    fn settled(&self) -> bool {
+        self.n != 0 && !(1.0 > self.s[0].w)
+    }
+
+    /// `src`, seen from cell (lx, lz) in direction `dir`, as one of the cell's sources: in place of the last source
+    /// lying the same way if it outweighs it, kept out if that one is heavier, else added while there is room.
+    fn offer(&mut self, src: Src, dir: (f32, f32), lx: i32, lz: i32) {
+        if self.n == 0 {
+            return self.push(src);
+        }
+        let same_way = self.sources().iter().enumerate().fold(None, |found, (k, e)| {
+            let (_, (ex, ez)) = toward(e.x - lx, e.z - lz);
+            if ez * dir.1 + ex * dir.0 > 0.0 { Some((src.w > e.w).then_some(k)) } else { found }
+        });
+        match same_way {
+            None if self.n != 2 => self.push(src),
+            Some(Some(k)) => self.s[k] = src,
+            _ => {}
+        }
+    }
+}
+
+/// `a` to `b` by `t`, as the block builders weigh them.
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a * (1.0 - t) + b * t
+}
+
+/// Smoothstep with `t` clamped to 0..1 (NaN counting as 1).
+fn smooth(t: f32) -> f32 {
+    if 0.0 > t {
+        0.0
+    } else if t <= 1.0 {
+        t * t * (3.0 - (t + t))
+    } else {
+        1.0
+    }
+}
+
+/// The length of (dx, dz) and the unit vector along it, (0, 0) for none.
+fn toward(dx: i32, dz: i32) -> (f32, (f32, f32)) {
+    let (x, z) = (dx as f32, dz as f32);
+    let len = (x * x + z * z).sqrt();
+    if len == 0.0 {
+        return (len, (0.0, 0.0));
+    }
+    let inv = 1.0 / len;
+    (len, (x * inv, z * inv))
+}
+
 pub struct Ground {
     base: Vec<f32>,
     roadmap: HashMap<u32, f32>,
@@ -113,9 +173,8 @@ impl Ground {
 
     fn build_block(&mut self, b: &CityBlock) {
         let (x0, z0) = (b.x0 * 4, b.z0 * 4);
+        let (w, d) = (b.x1 * 4 - x0, b.z1 * 4 - z0);
 
-        let w = b.x1 * 4 - x0;
-        let d = b.z1 * 4 - z0;
         if w < 0 || d < 0 {
             return;
         }
@@ -132,157 +191,91 @@ impl Ground {
         let mut v = 0f32;
 
         for lz in 0..=d {
-            let om = 1.0 - v;
-            let west = ha * om + hc * v;
-            let east = hd * v + om * hb;
+            let (west, east) = (lerp(ha, hc, v), lerp(hb, hd, v));
             let mut u = 0f32;
+
             for lx in 0..=w {
-                h[at(lx, lz)] = east * u + (1.0 - u) * west;
+                h[at(lx, lz)] = lerp(west, east, u);
                 u += inv_w;
             }
 
             v += inv_d;
         }
 
-        let (wc, dc) = (w >> 2, d >> 2);
-        if dc > 0 && wc > 0 {
-            for cz in 0..dc {
-                for cx in 0..wc {
-                    let (gx, gz) = (b.x0 + cx, b.z0 + cz);
-                    let r00 = self.roadmap_at(gx, gz);
-                    let r10 = self.roadmap_at(gx + 1, gz);
-                    let r01 = self.roadmap_at(gx, gz + 1);
-                    let r11 = self.roadmap_at(gx + 1, gz + 1);
+        for cz in 0..(d >> 2) {
+            for cx in 0..(w >> 2) {
+                let (gx, gz) = (b.x0 + cx, b.z0 + cz);
+                let road = [self.roadmap_at(gx, gz), self.roadmap_at(gx + 1, gz), self.roadmap_at(gx, gz + 1), self.roadmap_at(gx + 1, gz + 1)];
 
-                    if !(r00 > 0.0 && r10 > 0.0 && r01 > 0.0 && r11 > 0.0) {
+                if !road.iter().all(|&r| r > 0.0) {
+                    continue;
+                }
+
+                let [r00, r10, r01, r11] = road;
+
+                let mut v = 0f32;
+                for j in 0..5 {
+                    let (left, right) = (lerp(r00, r01, v), lerp(r10, r11, v));
+                    let mut u = 0f32;
+
+                    for k in 0..5 {
+                        let (lx, lz) = (cx * 4 + k, cz * 4 + j);
+                        let i = at(lx, lz);
+
+                        if rec[i].n == 0 {
+                            rec[i].push(Src { x: lx, z: lz, w: 1.0 });
+                            h[i] = lerp(left, right, u);
+                        }
+
+                        u += 0.25;
+                    }
+
+                    v += 0.25;
+                }
+            }
+        }
+
+        for _ in 0..16 {
+            for lz in 1..d {
+                for lx in 1..w {
+                    let i = at(lx, lz);
+
+                    if rec[i].settled() {
                         continue;
                     }
 
-                    let mut v = 0f32;
-                    for j in 0..5 {
-                        let om = 1.0 - v;
-                        let left = r00 * om + r01 * v;
-                        let right = r11 * v + om * r10;
-                        let mut u = 0f32;
+                    for (dz, dx) in NEIGH {
+                        let nb = rec[at(lx + dx, lz + dz)];
 
-                        for k in 0..5 {
-                            let (lx, lz) = (cx * 4 + k, cz * 4 + j);
-                            let i = at(lx, lz);
+                        for s in nb.sources() {
+                            let (dist, dir) = toward(s.x - lx, s.z - lz);
+                            let nw = 1.0 - dist * 0.0625;
 
-                            if rec[i].n == 0 {
-                                rec[i].n = 1;
-                                rec[i].s[0] = Src { x: lx, z: lz, w: 1.0 };
-                                h[i] = right * u + (1.0 - u) * left;
+                            if nw > 0.0 {
+                                rec[i].offer(Src { x: s.x, z: s.z, w: nw }, dir, lx, lz);
                             }
-
-                            u += 0.25;
                         }
-
-                        v += 0.25;
                     }
                 }
             }
         }
 
-        if d > 1 && w > 1 {
-            for _ in 0..16 {
-                for lz in 1..d {
-                    for lx in 1..w {
-                        let i = at(lx, lz);
-                        if rec[i].n != 0 && !(1.0 > rec[i].s[0].w) {
-                            continue;
-                        }
-                        for (dz, dx) in NEIGH {
-                            let nb = rec[at(lx + dx, lz + dz)];
-                            for s in &nb.s[..nb.n as usize] {
-                                let ddx = (s.x - lx) as f32;
-                                let ddz = (s.z - lz) as f32;
-                                let dist = (ddx * ddx + ddz * ddz).sqrt();
-                                let nw = 1.0 - dist * 0.0625;
-                                if !(nw > 0.0) {
-                                    continue;
-                                }
-                                let (ndx, ndz) = if dist == 0.0 {
-                                    (0.0, 0.0)
-                                } else {
-                                    let inv = 1.0 / dist;
-                                    (ddx * inv, ddz * inv)
-                                };
-                                let src = Src { x: s.x, z: s.z, w: nw };
-                                let r = &mut rec[i];
-                                let n = r.n as usize;
-                                if n == 0 {
-                                    r.s[0] = src;
-                                    r.n = 1;
-                                    continue;
-                                }
-                                let mut mark: i32 = -1;
-                                for (ei, e) in r.s[..n].iter().enumerate() {
-                                    let edx = (e.x - lx) as f32;
-                                    let edz = (e.z - lz) as f32;
-                                    let ed = (edx * edx + edz * edz).sqrt();
-                                    let (ex, ez) = if ed == 0.0 {
-                                        (0.0, 0.0)
-                                    } else {
-                                        let inv = 1.0 / ed;
-                                        (edx * inv, edz * inv)
-                                    };
-                                    if ez * ndz + ex * ndx > 0.0 {
-                                        mark = if nw > e.w { ei as i32 } else { -2 };
-                                    }
-                                }
-                                match mark {
-                                    -2 => {}
-                                    -1 => {
-                                        if n != 2 {
-                                            r.s[n] = src;
-                                            r.n += 1;
-                                        }
-                                    }
-                                    m => r.s[m as usize] = src,
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        for lz in 1..d {
+            for lx in 1..w {
+                let i = at(lx, lz);
 
-            let smooth = |t: f32| t * t * (3.0 - (t + t));
-            for lz in 1..d {
-                for lx in 1..w {
-                    let r = rec[at(lx, lz)];
-                    if r.n == 0 {
-                        continue;
-                    }
-                    let own = h[at(lx, lz)];
-                    let s0 = r.s[0];
-                    let h0 = h[at(s0.x, s0.z)];
-                    let (blend, wmax) = if r.n == 1 {
-                        (h0, s0.w.max(0.0))
-                    } else {
-                        let s1 = r.s[1];
-                        let h1 = h[at(s1.x, s1.z)];
-                        let sum = s0.w + 0.0 + s1.w;
+                let (blend, weight) = match *rec[i].sources() {
+                    [] => continue,
+                    [s0] => (h[at(s0.x, s0.z)], s0.w.max(0.0)),
+                    [s0, s1, ..] => {
+                        let sum = s0.w + s1.w;
                         let t = if sum > 1.0 { s0.w } else { s0.w / sum };
-                        let (p0, p1) = if 0.0 > t {
-                            (h0 * 0.0, h1)
-                        } else if t <= 1.0 {
-                            let s = smooth(t);
-                            (h0 * s, h1 * (1.0 - s))
-                        } else {
-                            (h0, h1 * 0.0)
-                        };
-                        (p1 + p0, s1.w.max(s0.w.max(0.0)))
-                    };
-                    h[at(lx, lz)] = if 0.0 > wmax {
-                        own + blend * 0.0
-                    } else if wmax <= 1.0 {
-                        let s = smooth(wmax);
-                        own * (1.0 - s) + blend * s
-                    } else {
-                        own * 0.0 + blend
-                    };
-                }
+
+                        (lerp(h[at(s1.x, s1.z)], h[at(s0.x, s0.z)], smooth(t)), s1.w.max(s0.w.max(0.0)))
+                    }
+                };
+
+                h[i] = lerp(h[i], blend, smooth(weight));
             }
         }
 
@@ -292,18 +285,22 @@ impl Ground {
     pub fn vertex(&self, nx: i32, nz: i32) -> f32 {
         for b in self.blocks.iter().rev() {
             let (lx, lz) = (nx - b.nx0, nz - b.nz0);
+
             if lx >= 0 && lz >= 0 && lx <= b.w && lz <= b.d {
                 return b.h[lz as usize * (b.w + 1) as usize + lx as usize];
             }
         }
+
         if nx >= NAV || nz >= NAV {
             return 0.0;
         }
+
         let (c, u) = ((nx >> 3) as usize, (nx & 7) as f32 * 0.125);
         let (r, v) = ((nz >> 3) as usize, (nz & 7) as f32 * 0.125);
         let t = |rr: usize, cc: usize| self.base[rr * TDIM + cc];
         let (t00, t01, t10, t11) = (t(r, c), t(r, c + 1), t(r + 1, c), t(r + 1, c + 1));
         let ov = 1.0 - v;
+
         (1.0 - u) * (t00 * ov + t10 * v) + u * (v * t11 + ov * t01)
     }
 
@@ -327,9 +324,11 @@ impl Ground {
         let mut last = [0i32; 3];
         let mut step = [0i32; 3];
         let mut ad = [0f32; 3];
+
         for i in 0..3 {
             cur[i] = (s[i] - origin[i]) as i32;
             last[i] = (e[i] - origin[i]) as i32;
+
             let d = if i == 1 { 0.0 } else { e[i] - s[i] };
             step[i] = if i != 1 && d > 0.0 { 1 } else { -1 };
             ad[i] = d.abs();
@@ -338,9 +337,11 @@ impl Ground {
         let mut f = [0f32; 3];
         for i in 0..3 {
             let mut v = (s[i] as f64 - (s[i].floor() as f64 + 0.5)) as f32;
+
             if step[i] > 0 {
                 v = -v;
             }
+
             f[i] = v + v;
         }
 
@@ -425,6 +426,7 @@ pub fn generate_grass(do_hack: bool) -> Vec<f32> {
             let dx640 = (x as i32 - 640) as f32;
             let dist1 = (dx640 * dx640 + dz640_sq).sqrt();
             let nrm = (dist1 * (1.0 / 128.0) - 1.5) * 0.5;
+
             let (a, b, c): (f32, f64, f64) = if nrm <= 0.0 {
                 (0.0, 0.0, 0.0)
             } else if nrm <= 3.0 {
@@ -454,6 +456,7 @@ pub fn generate_grass(do_hack: bool) -> Vec<f32> {
 
             if do_hack {
                 let (xi, zi) = (x as i32, z as i32);
+
                 let edge = |boundary: i32, coord: i32| -> f32 {
                     let raw = (boundary - coord) as f32 * 0.25;
                     if raw <= 1.0 { 1.0 - raw } else { 0.0 }
@@ -464,8 +467,10 @@ pub fn generate_grass(do_hack: bool) -> Vec<f32> {
                 if zi <= 637 && xi <= 767 {
                     height = ramp(edge(638, zi).max(edge(768, xi)));
                 }
+
                 if zi <= 767 && xi <= 637 {
                     let t = if zi <= 637 { edge(768, zi) } else { edge(768, zi).max(edge(638, xi)) };
+
                     height = ramp(t);
                 }
             }
@@ -473,6 +478,7 @@ pub fn generate_grass(do_hack: bool) -> Vec<f32> {
             h[z * 2049 + x] = height;
         }
     }
+
     h
 }
 
@@ -505,5 +511,6 @@ pub fn value_noise_2d(wrap_mask: u32, x: f32, y: f32) -> f32 {
 
     let bottom = corner(c00) * (1.0 - sx) + corner(c10) * sx;
     let top = corner(c11) * sx + (1.0 - sx) * corner(c01);
+
     bottom * (1.0 - sy) + sy * top
 }

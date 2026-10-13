@@ -44,11 +44,14 @@ impl ActionQueue {
         std::iter::from_fn(|| {
             while self.applied != self.write {
                 let a = self.ring[self.applied as usize].take();
+
                 self.applied = (self.applied + 1) % 64;
+
                 if a.is_some() {
                     return a;
                 }
             }
+            
             None
         })
     }

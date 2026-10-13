@@ -89,16 +89,22 @@ impl PhaseTimes {
         if !self.enabled {
             return;
         }
+
         self.ticks += 1;
+
         if self.ticks < REPORT_TICKS {
             return;
         }
+
         let ms = |d: Duration| d.as_secs_f64() * 1000.0;
         self.phases.sort_by_key(|p| std::cmp::Reverse(p.1));
+
         println!("[Timings] {} ticks, per tick:", self.ticks);
+
         for (name, total, max) in &self.phases {
             println!("[Timings]   {name:<28} {:>8.3} ms avg {:>8.3} ms max", ms(*total) / self.ticks as f64, ms(*max));
         }
+        
         self.phases.clear();
         self.ticks = 0;
     }

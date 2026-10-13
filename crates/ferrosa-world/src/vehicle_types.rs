@@ -244,15 +244,18 @@ fn mean<'a>(points: impl Iterator<Item = &'a Vec3>) -> (Vec3, f32) {
 pub fn mean_value_coordinates(verts: &[Vec3], q: Vec3) -> Vec<f32> {
     let n = verts.len();
     let mut count = 0;
+
     for i in 0..n.saturating_sub(1) {
         for j in i + 1..n {
             let a = verts[j];
+
             for k in j + 1..n {
                 for l in k + 1..n {
                     let nrm = ((verts[l] - a).cross(verts[k] - a)).normalize_or_zero();
                     let d = verts[i] - a;
                     let dot = nrm.dot(d);
                     let dist = if 0.0 > dot { ((-nrm.y) * d.y - d.x * nrm.x) - nrm.z * d.z } else { dot };
+
                     if dist.abs() >= COPLANAR {
                         count += 1;
                     }
@@ -260,40 +263,50 @@ pub fn mean_value_coordinates(verts: &[Vec3], q: Vec3) -> Vec<f32> {
             }
         }
     }
+
     let weights: Vec<f32> = (0..n)
         .map(|p| {
             let mut w = 0.0f32;
+
             for a in 0..n.saturating_sub(1) {
                 let o = verts[a];
+
                 for b in a + 1..n.saturating_sub(1) {
                     if b == p || a == p {
                         continue;
                     }
+
                     for c in b + 1..n {
                         if c == p {
                             continue;
                         }
+
                         let e1 = verts[b] - o;
                         let e2 = verts[c] - o;
                         let c3 = e2.cross(e1);
                         let mut nrm = c3.normalize_or_zero();
                         let d = verts[p] - o;
                         let mut dot = nrm.dot(d);
+
                         if 0.0 > dot {
                             nrm = -nrm;
                             dot = d.dot(nrm);
                         }
+
                         if dot.abs() < COPLANAR {
                             continue;
                         }
+
                         let num = nrm.z * (q.z - o.z) + (nrm.y * (q.y - o.y) + nrm.x * (q.x - o.x));
                         w += num / dot;
                     }
                 }
             }
+
             w
         })
         .collect();
+
     weights.into_iter().map(|w| w / count as f32).collect()
 }
 
@@ -303,6 +316,7 @@ impl VehicleType {
         if self.edges.iter().any(|e| (e.a == a && e.b == b) || (e.a == b && e.b == a)) {
             return;
         }
+
         self.edges.push(NodeEdge { a, b });
     }
 
@@ -311,7 +325,9 @@ impl VehicleType {
     fn add_wheel(&mut self, state: i32, a: i32, b: i32, weights: [f32; 2], radius: f32, mass: f32, vertical_offset: f32, tuning: [f32; 3]) {
         let (pa, pb) = (self.nodes[a as usize].pos, self.nodes[b as usize].pos);
         let mut local_pos = pa.lerp(pb, weights[1]);
+
         local_pos.y += vertical_offset;
+
         self.wheels.push(WheelDef {
             state,
             node_a: a,
@@ -339,6 +355,7 @@ impl VehicleType {
 
         for w in body.file.wheels.iter().take(mounts) {
             let p = w.pos;
+
             let near = |pick: &dyn Fn(usize, Vec3) -> Option<f32>| {
                 body.file.nodes.iter().enumerate().fold((0usize, NODE_SEARCH), |(best_i, best), (i, n)| match pick(i, n.pos) {
                     Some(d) => (if best > d { i } else { best_i }, if d < best { d } else { best }),
@@ -356,10 +373,12 @@ impl VehicleType {
                 if i == a {
                     return None;
                 }
+
                 let (dx, dy, dz) = ((p.x - n.x) * WHEEL_SEARCH_SCALE, (p.y - n.y) * WHEEL_SEARCH_SCALE, p.z - n.z);
                 let d = (dz * dz + (dx * dx + dy * dy)).sqrt();
                 let (wa, an) = ((p - na), (n - na));
                 let dot = (p.z - na.z) * an.z + ((p.y - na.y) * an.y + wa.x * an.x);
+
                 (dot >= 0.0).then_some(d)
             });
 
@@ -369,11 +388,14 @@ impl VehicleType {
             let sum = to_a + to_b;
 
             self.add_wheel(0, a as i32, b as i32, [to_b / sum, to_a / sum], radius, mass, vertical_offset, [0.25, 0.5, travel_damping]);
+
             if let Some(last) = self.wheels.last_mut() {
                 last.drive = drive;
             }
         }
+
         let wp = |k: usize| body.file.wheels.get(k).map_or(Vec3::ZERO, |w| w.pos);
+
         self.track = (wp(0).x - wp(1).x).abs();
         self.wheelbase = (wp(0).z - wp(2).z).abs();
     }
@@ -383,35 +405,43 @@ impl VehicleType {
     /// it, then the track, wheelbase, centre of mass (nodes below the floor at mass 4) and inertia.
     fn attach_wheels(&mut self, body: &VehicleBody, kind: VehicleKind, drive: i32, radius: f32, mass: f32, mounts: usize) {
         self.nodes.extend(body.file.nodes.iter().map(|n| ChassisNode { pos: n.pos, mass: if n.pos.y < 0.0 { 2.0 } else { 1.0 } }));
+
         for e in &body.file.edges {
             self.add_node_edge(e.a, e.b);
         }
+
         self.cage = SBV_CAGE.to_vec();
         self.hang_wheels(body, kind, drive, radius, mass, mounts);
 
         let mut com = Vec3::ZERO;
         let mut total = 0.0f32;
+
         for n in self.nodes.iter_mut() {
             if 0.0 > n.pos.y {
                 n.mass = LOWER_NODE_MASS;
             }
+
             let m = n.mass;
             com = n.pos * m + com;
             total += m;
         }
+
         let inv = 1.0 / total;
         com *= inv;
         self.center_of_mass = com;
+
         let (inertia, total) = self.nodes.iter().fold((Vec3::ZERO, 0.0f32), |(acc, total), n| {
             let (dy, dx, dz) = ((n.pos.y - com.y) * (n.pos.y - com.y), (n.pos.x - com.x) * (n.pos.x - com.x), (n.pos.z - com.z) * (n.pos.z - com.z));
             let m = n.mass;
             (Vec3::new((dy + dz) * m + acc.x, (dz + dx) * m + acc.y, (dy + dx) * m + acc.z), total + m)
         });
+
         let inv = 1.0 / total;
         self.inertia = inertia * inv;
         let positions: Vec<Vec3> = self.nodes.iter().map(|n| n.pos).collect();
         let (sum, inv) = mean(positions.iter());
         self.centroid_offset = sum * inv - com;
+
         for w in self.wheels.iter_mut() {
             let p = positions[w.node_a as usize].lerp(positions[w.node_b as usize], w.weight_b);
             w.mass_offset = p - com;

@@ -58,15 +58,19 @@ pub fn object_pose(word: u32, cell: IVec3, size: f32) -> (usize, Vec3, RotMatrix
     let kind = (word & 127) as usize;
     let turn = ((word as i32 >> 10) & 3) as usize;
     let mut offset = CITY_OBJECT_TYPES[kind].offset;
+
     if turn != 0 {
         offset = rotate_vector_about_axis(offset, Vec3::Y, TURNS[turn - 1]);
     }
+
     let half = 0.5 * size;
     let pos = Vec3::new((cell.x as f32 * size + half) + offset.x, cell.y as f32 * size + offset.y, (cell.z as f32 * size + half) + offset.z);
     let mut rot = IDENTITY;
+
     if turn != 0 {
         rotate_orientation(&mut rot, Vec3::Y, TURNS[turn - 1]);
     }
+
     (kind, pos, rot)
 }
 
@@ -85,15 +89,19 @@ fn culled(t: &CityObjectType, pos: Vec3, start: Vec3, end: Vec3, r: f32) -> bool
 /// object is moved into place. Returns the fraction, point and normal of the nearest hit.
 pub fn segment_intersect_object(kind: usize, pos: Vec3, rot: &RotMatrix, start: Vec3, end: Vec3) -> Option<(f32, Vec3, Vec3)> {
     let t = &CITY_OBJECT_TYPES[kind];
+
     if culled(t, pos, start, end, 0.0) {
         return None;
     }
+
     let mut best = 1.0f32;
     let mut out = (Vec3::ZERO, Vec3::ZERO);
+
     for q in &t.quads {
         let [a, b, c, d] = q.map(|i| turn(rot, t.verts[i]));
         let n = calculate_face_normal(a, b, c);
         let [a, b, c, d] = [a, b, c, d].map(|v| v + pos);
+
         for (p, q) in [(b, c), (c, d)] {
             if let Some((f, hit)) = segment_intersect_face(n, start, end, a, p, q)
                 && !(best <= f)
@@ -110,16 +118,20 @@ pub fn segment_intersect_object(kind: usize, pos: Vec3, rot: &RotMatrix, start: 
 /// distance of the nearest contact.
 pub fn capsule_intersect_object(kind: usize, pos: Vec3, rot: &RotMatrix, start: Vec3, end: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
     let t = &CITY_OBJECT_TYPES[kind];
+
     if culled(t, pos, start, end, radius) {
         return None;
     }
+
     let mut best = 65536.0f32;
     let mut out = (Vec3::ZERO, Vec3::ZERO);
+
     for q in &t.quads {
         let [a, b, c, d] = q.map(|i| {
             let v = turn(rot, t.verts[i]);
             v + pos
         });
+
         for (p, q) in [(b, c), (c, d)] {
             if let Some((hit, n, dist)) = capsule_intersect_triangle(start, end, a, p, q, radius)
                 && best > dist
@@ -129,6 +141,7 @@ pub fn capsule_intersect_object(kind: usize, pos: Vec3, rot: &RotMatrix, start: 
             }
         }
     }
+
     (65536.0 > best).then_some((out.0, out.1, best))
 }
 
@@ -136,15 +149,19 @@ pub fn capsule_intersect_object(kind: usize, pos: Vec3, rot: &RotMatrix, start: 
 /// before the object is moved into place. Returns the point, normal and distance of the nearest contact.
 pub fn sphere_intersect_object(kind: usize, pos: Vec3, rot: &RotMatrix, center: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
     let t = &CITY_OBJECT_TYPES[kind];
+
     if culled(t, pos, center, center, radius) {
         return None;
     }
+
     let mut best = 65536.0f32;
     let mut out = (Vec3::ZERO, Vec3::ZERO);
+
     for q in &t.quads {
         let [a, b, c, d] = q.map(|i| turn(rot, t.verts[i]));
         let n = calculate_face_normal(a, b, c);
         let [a, b, c, d] = [a, b, c, d].map(|v| v + pos);
+
         for (p, q) in [(b, c), (c, d)] {
             if let Some((hit, dist)) = sphere_project_onto_triangle(center, n, a, p, q, radius)
                 && !(best <= dist)
@@ -154,5 +171,6 @@ pub fn sphere_intersect_object(kind: usize, pos: Vec3, rot: &RotMatrix, center: 
             }
         }
     }
+    
     (65536.0 > best).then_some((out.0, out.1, best))
 }

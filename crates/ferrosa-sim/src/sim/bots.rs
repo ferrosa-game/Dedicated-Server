@@ -180,7 +180,7 @@ impl Sim {
     /// The bot's human (`hid`) looks around every other tick: each living enemy within 128 in front of its chest and in
     /// plain sight is remembered or seen again, then its memories fade and it picks the nearest it is sure of.
     fn bot_find_targets(&mut self, pid: PlayerId, hid: usize) {
-        if (self.tick as i32 ^ pid.0 as i32) & 1 != 0 {
+        if (self.tick as i32 ^ pid.i32()) & 1 != 0 {
             return;
         }
         let Some(me) = self.humans.get(hid) else { return };

@@ -72,36 +72,43 @@ impl Sim {
     /// a player without a team can apply to join (or to manage it when it has no manager), and a member gets its
     /// requisition page.
     pub(crate) fn corp_base_menu(&mut self, pid: PlayerId, pos: Vec3) {
-        let Some(k) = self.world.map.level.bases.iter().position(|b| b.contains(pos)) else {
-            if let Some(p) = self.players.get_mut(pid.idx()) {
-                p.menu = MenuType::Empty;
+        let Some(corp_id) = self.world.map.level.bases.iter().position(|b| b.contains(pos)) else {
+            if let Some(player) = self.players.get_mut(pid.idx()) {
+                player.menu = MenuType::Empty;
             }
+
             return;
         };
-        let manager = self.corp_state[k].manager;
-        let applied = self.corp_state[k].applicants.contains(&pid);
-        let Some(p) = self.players.get_mut(pid.idx()) else { return };
-        let member = team_index(p.team) == Some(k);
-        if p.team == Team::Spectator {
-            p.menu = MenuType::WorldCorpApplication;
+
+        let manager = self.corp_state[corp_id].manager;
+        let applied = self.corp_state[corp_id].applicants.contains(&pid);
+
+        let Some(player) = self.players.get_mut(pid.idx()) else { return };
+
+        if player.team == Team::Spectator {
+            player.menu = MenuType::WorldCorpApplication;
+
             match manager {
-                None => p.push_button(APPLY_MANAGER, "Apply Manager", None),
+                None => player.push_button(APPLY_MANAGER, "Apply Manager", None),
                 Some(_) if !applied => {
-                    p.push_button(APPLY, "Apply", None);
+                    player.push_button(APPLY, "Apply", None);
                     self.remove_player_from_corps(pid);
                 }
                 Some(_) => {}
             }
+
             return;
         }
+
         match manager {
-            Some(_) if member && matches!(p.menu, MenuType::WorldCorpApplication | MenuType::Empty) => p.menu = MenuType::WorldCorpRequistion,
+            Some(_) if team_index(player.team) == Some(corp_id) && matches!(player.menu, MenuType::WorldCorpApplication | MenuType::Empty) => player.menu = MenuType::WorldCorpRequistion,
             Some(_) => {}
             None => {
-                if member {
-                    p.menu = MenuType::WorldCorpApplication;
+                if team_index(player.team) == Some(corp_id) {
+                    player.menu = MenuType::WorldCorpApplication;
                 }
-                p.push_button(APPLY_MANAGER, "Apply Manager", None);
+
+                player.push_button(APPLY_MANAGER, "Apply Manager", None);
             }
         }
     }
@@ -112,22 +119,28 @@ impl Sim {
         let Some(p) = self.players.get(pid.idx()) else { return };
         let Some(k) = team_index(p.team) else { return };
         let menu = p.menu as u8;
+
         if !(21..=26).contains(&menu) {
             return;
         }
+
         let tab = |id: i32, open: u8| if menu == open { -1 } else { id };
         let managing = self.corp_state[k].manager == Some(pid);
         let mut buttons = vec![button(tab(TAB_REQUISITION, 25), "Requisition")];
+
         if managing {
             buttons.push(button(tab(TAB_HIRING, 22), "Hiring"));
             buttons.push(button(tab(TAB_FIRING, 23), "Firing"));
             buttons.push(button(tab(TAB_TEAM, 24), "Team"));
+
             if menu == 22 {
                 for &a in &self.corp_state[k].applicants {
                     let name = self.players.get(a.idx()).map_or("", |p| p.username.as_str());
+
                     buttons.push(button(((a.0 as i32) << 16) + HIRE, &format!("Hire {name}")));
                 }
             }
+
             if menu == 23 {
                 for (i, other) in self.players.iter().filter(|&(i, o)| i != pid.idx() && o.team == p.team) {
                     buttons.push(button(((i as i32) << 16) + FIRE, &format!("Fire {}", other.username)));
@@ -136,11 +149,14 @@ impl Sim {
         } else {
             buttons.push(button(tab(TAB_TEAM, 24), "Team"));
         }
+
         if menu == 25 {
             for (id, text, _) in REQUISITIONS {
                 buttons.push(button(id, text));
             }
+
             buttons.push(button(DEPOSIT, "Deposit"));
+
             if managing {
                 buttons.push(button(WITHDRAW_20, "Withdrawl $20"));
                 buttons.push(button(WITHDRAW_100, "Withdrawl $100"));
@@ -148,23 +164,27 @@ impl Sim {
                 buttons.push(button(REPLACE_PHONE, "Replace Phone"));
             }
         }
+
         if menu == 24 {
             buttons.push(button(QUIT_TEAM, "Quit Team"));
         }
-        if let Some(p) = self.players.get_mut(pid.idx()) {
-            p.menu_buttons.clear();
+
+        if let Some(player) = self.players.get_mut(pid.idx()) {
+            player.menu_buttons.clear();
+
             for b in buttons {
-                p.push_button(b.id, &b.text, None);
+                player.push_button(b.id, &b.text, None);
             }
         }
     }
 
     /// The corporation money shown to each player (player_simulation): their corporation's money and credit.
     pub(crate) fn copy_corp_money(&mut self) {
-        for (_, p) in self.players.iter_mut() {
-            let c = team_index(p.team).map(|k| &self.corp_state[k]);
-            p.corp_money = c.map_or(0, |c| c.money);
-            p.corp_credit = c.map_or(0, |c| c.credit);
+        for (_, player) in self.players.iter_mut() {
+            let corp = team_index(player.team).map(|k| &self.corp_state[k]);
+
+            player.corp_money = corp.map_or(0, |c| c.money);
+            player.corp_credit = corp.map_or(0, |c| c.credit);
         }
     }
 
@@ -173,7 +193,7 @@ impl Sim {
         let Some(p) = self.players.get(pid.idx()) else { return };
         let Some(pos) = p.human.and_then(|h| self.humans.get(h)).map(|h| h.pos) else { return };
         let Some(k) = self.world.map.level.bases.iter().rposition(|base| base.contains(pos)) else { return };
-        let home = team_index(p.team) == Some(k);
+
         if (21..=26).contains(&action) {
             if b & TAB != 0 {
                 let menu = match b & 255 {
@@ -184,35 +204,45 @@ impl Sim {
                     4 => 25,
                     _ => return,
                 };
+
                 if let Some(p) = self.players.get_mut(pid.idx()) {
                     p.menu = menu_type(menu);
                 }
+
                 return;
             }
-            if action == 24 && b == QUIT_TEAM && home {
+
+            if action == 24 && b == QUIT_TEAM && team_index(p.team) == Some(k) {
                 self.set_player_team(pid, Team::Spectator);
                 self.update_player_event(pid);
+
                 return;
             }
         }
-        if !home {
+
+        if team_index(p.team) != Some(k) {
             if action == 20 {
                 self.corp_apply(pid, k, b);
             }
+
             return;
         }
+
         let manager = self.corp_state[k].manager;
+
         if manager == Some(pid) {
             match action {
-                22 if b & 255 == HIRE => self.corp_hire(k, b >> 16),
+                22 if b & 255 == HIRE => self.corp_hire(k, PlayerId((b >> 16) as u32)),
                 22 => {}
-                23 => self.corp_fire(pid, k, b >> 16),
+                23 => self.corp_fire(pid, k, PlayerId((b >> 16) as u32)),
                 25 => self.corp_requisition(pid, k, b),
                 20 => self.corp_apply(pid, k, b),
                 _ => {}
             }
+
             return;
         }
+
         match action {
             25 if manager.is_some() => self.corp_requisition(pid, k, b),
             20 => self.corp_apply(pid, k, b),
@@ -227,18 +257,23 @@ impl Sim {
             APPLY_MANAGER if self.corp_state[k].manager.is_none() => {
                 self.remove_player_from_corps(pid);
                 self.set_player_team(pid, Team::CORPORATIONS[k]);
+
                 if self.corp_state[k].manager.is_none() {
                     self.set_team_manager(k, pid);
                 }
+
                 if let Some(p) = self.players.get_mut(pid.idx()) {
                     p.menu = MenuType::WorldCorpRequistion;
                 }
+
                 self.update_player_event(pid);
                 self.broadcast_corp_missions(k);
                 self.corp_state[k].applicants.clear();
             }
+
             APPLY if self.corp_state[k].manager.is_some() => {
                 let list = &mut self.corp_state[k].applicants;
+
                 if !list.contains(&pid) && list.len() < MAX_APPLICANTS {
                     list.push(pid);
                 }
@@ -247,22 +282,22 @@ impl Sim {
         }
     }
 
-    fn corp_hire(&mut self, k: usize, target: i32) {
-        let target = PlayerId(target as u32);
+    fn corp_hire(&mut self, k: usize, target: PlayerId) {
         if self.players.get(target.idx()).is_none() {
             return;
         }
+
         self.set_player_team(target, Team::CORPORATIONS[k]);
         self.update_player_event(target);
         self.remove_player_from_corps(target);
         self.broadcast_corp_missions(k);
     }
 
-    fn corp_fire(&mut self, pid: PlayerId, k: usize, target: i32) {
-        let target = PlayerId(target as u32);
+    fn corp_fire(&mut self, pid: PlayerId, k: usize, target: PlayerId) {
         if target == pid || self.players.get(target.idx()).is_none_or(|p| team_index(p.team) != Some(k)) {
             return;
         }
+
         self.set_player_team(target, Team::Spectator);
         self.update_player_event(target);
     }
@@ -272,17 +307,21 @@ impl Sim {
     fn corp_requisition(&mut self, pid: PlayerId, k: usize, b: i32) {
         let Some(p) = self.players.get(pid.idx()) else { return };
         let Some(human) = p.human else { return };
+
         let kind = match b {
             REPLACE_PHONE => Some(ItemKind::Phone),
             _ => REQUISITIONS.iter().find(|r| r.0 == b).map(|r| r.2),
         };
+
         if let Some(kind) = kind {
             if p.items_bought > REQUISITION_LIMIT {
                 return;
             }
+
             if kind == ItemKind::Phone {
                 self.disconnect_phone(k);
             }
+
             let Some(item) = self.give_item(human, kind as u8, 0..7, |state| match state {
                 ItemState::Radio { channel, .. } => *channel = k as i32,
                 ItemState::Phone(phone) => {
@@ -293,18 +332,23 @@ impl Sim {
             }) else {
                 return;
             };
+
             if kind == ItemKind::DiskBlack {
                 let vol = self.fs.alloc_volume(REQUISITION_DISK_CAPACITY);
                 self.items.get_mut(item).unwrap().volume = vol;
             }
+
             if kind == ItemKind::Phone {
                 self.phone_update(item);
             }
+
             let price = if kind == ItemKind::Phone { PHONE_PRICE } else { self.item_types[kind as usize].price };
             self.corp_state[k].money -= price;
+
             if let Some(p) = self.players.get_mut(pid.idx()) {
                 p.items_bought += 1;
             }
+
             return;
         }
         match b {
@@ -317,9 +361,11 @@ impl Sim {
     /// Deposit: the cash in the right hand goes into the corporation's account.
     fn corp_deposit(&mut self, human: usize, k: usize) {
         let Some(slot) = self.humans.get(human).map(|h| h.inventory[0]) else { return };
+
         if slot.count <= 0 {
             return;
         }
+
         let Some(item) = self.items.get_mut(slot.items[0] as usize) else { return };
         let Some(value) = item.state.cash().map(Cash::value) else { return };
         self.corp_state[k].money += value;
@@ -335,14 +381,18 @@ impl Sim {
             WITHDRAW_1000 => 6,
             _ => 3,
         };
+
         let value = BILL_VALUES[code as usize];
         let c = &self.corp_state[k];
+
         if c.money - value < -c.credit {
             return;
         }
+
         let Some(inv) = self.humans.get(human).map(|h| h.inventory) else { return };
         let is_cash = |id: i32| self.items.get(id as usize).is_some_and(|i| i.item_type == ItemKind::CashWorld);
         let slot = if inv[0].count > 0 && !is_cash(inv[0].items[0]) { 1 } else { 0 };
+
         if inv[slot].count <= 0 {
             self.give_item(human, ItemKind::CashWorld as u8, slot..slot + 1, |state| {
                 if let ItemState::Cash(cash) = state {
@@ -352,10 +402,12 @@ impl Sim {
             });
         } else {
             let Some(cash) = self.items.get_mut(inv[slot].items[0] as usize).and_then(|i| i.state.cash_mut()) else { return };
+
             if !cash.insert(0, code) {
                 return;
             }
         }
+
         self.corp_state[k].money -= value;
     }
 

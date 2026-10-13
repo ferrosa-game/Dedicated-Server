@@ -21,6 +21,7 @@ pub struct SetOrigin {
 impl Sim {
     fn item_set_cell_event(&mut self, cell: IVec3, taken: u32) {
         let e = EventItemSetCell { area: 0, block_x: cell.x, block_y: cell.y, block_z: cell.z, taken };
+
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::ItemSetCell(e) });
     }
 
@@ -29,23 +30,29 @@ impl Sim {
     pub(crate) fn spawn_item_from_grid_cell(&mut self, word: u32, index: usize, cell: IVec3) -> Option<usize> {
         let area = &self.world.map.level.area;
         let bit = 1u32.wrapping_shl(index as u32);
+
         if area.taken(cell.x, cell.y, cell.z) & bit != 0 {
             return None;
         }
+
         let e = area.item_sets.set(word)?.entries.get(index)?.clone();
         let (pos, rot) = entry_pose(&e, cell, area.block_size, (word >> 24) & 3);
         let kind = ItemKind::try_from(e.kind as u8).ok()?;
         let id = self.create_item(kind, pos, None, rot)?;
         let area = &mut self.world.map.level.area;
         let taken = area.taken(cell.x, cell.y, cell.z) | bit;
+
         area.set_taken(cell.x, cell.y, cell.z, taken);
         self.item_set_cell_event(cell, taken);
+
         if let Some(item) = self.items.get_mut(id) {
             item.set_origin = Some(SetOrigin { cell, word: (word & (3 << 24)) + (word & 1023), index });
         }
+
         if kind == ItemKind::Computer {
             self.place_set_computer(id, pos, cell);
         }
+
         Some(id)
     }
 
@@ -53,6 +60,7 @@ impl Sim {
     pub(crate) fn spawn_hit_set(&mut self, hit: SetHit, cell: IVec3) -> Vec<(usize, usize)> {
         let count = self.world.map.level.area.item_sets.set(hit.set).map_or(0, |s| s.entries.len());
         let taken = self.world.map.level.area.taken(cell.x, cell.y, cell.z);
+
         (0..count)
             .filter(|&i| taken & 1u32.wrapping_shl(i as u32) == 0)
             .filter_map(|i| self.spawn_item_from_grid_cell(hit.cell_word(), i, cell).map(|id| (i, id)))
@@ -67,16 +75,21 @@ impl Sim {
                 for x in min.x..=max.x {
                     let area = &self.world.map.level.area;
                     let word = area.item_set(x, y, z);
+
                     if word == 0 {
                         continue;
                     }
+
                     let taken = area.taken(x, y, z);
                     let count = area.item_sets.set(word).map_or(0, |s| s.entries.len());
+
                     for i in 0..count {
                         if taken & 1u32.wrapping_shl(i as u32) != 0 {
                             continue;
                         }
+
                         let Some(id) = self.spawn_item_from_grid_cell(word, i, IVec3::new(x, y, z)) else { continue };
+
                         if let Some(item) = self.items.get_mut(id) {
                             item.physics_sim = true;
                             item.physics_settled = true;

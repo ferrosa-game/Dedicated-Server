@@ -47,14 +47,18 @@ impl Sim {
                 self.links.free(link);
             }
         }
+
         let n = (text.iter().position(|&c| c == 0).unwrap_or(text.len()) + 1).min(MEMO_LEN - 1);
         let Some(item) = self.items.get_mut(id) else { return };
         item.link_mask = 0;
+
         let ItemState::Memo(buf) = &mut item.state else { return };
         for (k, b) in buf.iter_mut().enumerate().take(n) {
             *b = text.get(k).copied().unwrap_or(0);
         }
+
         buf[MEMO_LEN - 1] = 0;
+
         for block in 0..=(n >> 6) {
             self.memo_block(id, block);
         }
@@ -134,15 +138,19 @@ impl Sim {
     pub(crate) fn place_corporation_memo(&mut self, k: usize, text: &[u8]) {
         let (h, m, pm) = clock_time(self.world_time);
         let mut memo = format!("\n{} Internal Memo\n{}:{:02} {}\n\n", Team::CORPORATION_NAMES[k], h, m, if pm { "PM" } else { "AM" }).into_bytes();
+
         memo.extend_from_slice(&text[..text.iter().position(|&c| c == 0).unwrap_or(text.len())]);
         memo.truncate(2047);
+
         let base = &self.world.map.level.bases[k];
         let mut rot = IDENTITY;
         let axis = rot[1];
         rotate_orientation(&mut rot, axis, (base.table_orientation as f64 - 90.0_f64.to_radians()) as f32);
+
         let pos = rot[0] * MEMO_BACK + base.table;
         let Some(id) = self.create_item(ItemKind::Paper, pos, None, rot) else { return };
         self.write_memo(id, &memo);
+
         if let Some(i) = self.items.get_mut(id) {
             i.despawn_time = KEEP;
         }
@@ -152,15 +160,19 @@ impl Sim {
     pub(crate) fn print_to_memo(&mut self, id: usize, c: &crate::computer::Computer) {
         const PRINTS: i32 = 3;
         let Some(k) = usize::try_from(c.team).ok().filter(|&k| k < self.corp_state.len()) else { return };
+
         if self.corp_state[k].prints > PRINTS {
             return;
         }
+
         let Some(body) = self.items.get(id).and_then(|i| self.bodies.get(i.body)) else { return };
         let (p, rot) = (body.pos, body.rot);
         let pos = rot[0] * 0.5 + p;
         let Some(memo) = self.create_item(ItemKind::Paper, pos, None, rot) else { return };
+
         self.print_screen(memo, c);
         self.corp_state[k].prints += 1;
+
         if let Some(i) = self.items.get_mut(memo) {
             i.physics_settled = true;
         }
@@ -170,15 +182,19 @@ impl Sim {
     pub(crate) fn print_screen(&mut self, memo: usize, c: &crate::computer::Computer) {
         let mut text = Vec::new();
         let mut l = c.top_line;
+
         for _ in 0..23 {
             let line = &c.lines[l as usize & 31];
             let n = crate::computer::text_len(line);
+
             if text.len() + n + 1 < MEMO_LEN {
                 text.extend_from_slice(&line[..n]);
                 text.push(b'\n');
             }
+
             l = (l + 1) & 31;
         }
+
         self.write_memo(memo, &text);
     }
 }

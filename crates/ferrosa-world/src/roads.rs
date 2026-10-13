@@ -80,6 +80,7 @@ impl RoadNetwork {
             city_inters.iter().map(|&p| Intersection { pos: IVec3::new(p.x, p.y - 1, p.z), ..Default::default() }).collect();
 
         let mut streets = Vec::with_capacity(city_streets.len());
+
         for (si, &(i0, i1, left, right)) in city_streets.iter().enumerate() {
             let d = intersections[i1].pos - intersections[i0].pos;
             let axis = if d.x <= d.z { Axis::Z } else { Axis::X };
@@ -99,8 +100,10 @@ impl RoadNetwork {
                     }
                 }
             }
+
             streets.push(Street { i0, i1, axis, left, right });
         }
+
         Self { intersections, streets }
     }
 
@@ -116,6 +119,7 @@ impl RoadNetwork {
 
     pub fn bounds(&self) -> Option<(i32, i32, i32, i32)> {
         let first = self.intersections.first()?;
+
         Some(self.intersections.iter().fold((first.pos.x, first.pos.x, first.pos.z, first.pos.z), |(a, b, c, d), it| {
             (a.min(it.pos.x), b.max(it.pos.x), c.min(it.pos.z), d.max(it.pos.z))
         }))
@@ -127,6 +131,7 @@ impl RoadNetwork {
         let a = it.get(id)?;
 
         let mut b = st[a.streets[0]?].i1;
+
         if it[b].streets[1].is_none() {
             b = st[it[b].streets[0]?].i1;
             it[b].streets[1]?;
@@ -165,6 +170,7 @@ impl RoadNetwork {
         for s in &self.streets {
             self.street_build_blocks(ground, area, dims, s);
         }
+
         for (id, it) in self.intersections.iter().enumerate() {
             intersection_build_blocks(area, dims, id as u32, it);
         }
@@ -174,6 +180,7 @@ impl RoadNetwork {
         let i0 = self.intersections[s.i0];
         let i1 = self.intersections[s.i1];
         let x_road = s.axis == Axis::X;
+
         let (a0, run, c) = if x_road {
             let a0 = i0.pos.x + i0.ext_px;
             (a0, i1.pos.x - i1.ext_nx - a0, i0.pos.z)
@@ -181,26 +188,32 @@ impl RoadNetwork {
             let a0 = i0.pos.z + i0.ext_pz;
             (a0, i1.pos.z - i1.ext_nz - a0, i0.pos.x)
         };
+
         let (row_up, row_down) = if x_road { (0, 2) } else { (1, 3) };
         let curb = CURB | MESH;
         let at = move |a: i32, y: i32, cc: i32| if x_road { (a, y, cc) } else { (cc, y, a) };
+
         let put_textured = |area: &mut AreaGrid, a: i32, y: i32, cc: i32, v: u32, textures: [u16; 8]| {
             let (x, y, z) = at(a, y, cc);
             area.create_block(x, y, z, v, textures, dims);
         };
+
         let put = |area: &mut AreaGrid, a: i32, y: i32, cc: i32, v: u32| put_textured(area, a, y, cc, v, CONCRETE);
         let marks = if x_road { [0x4201, 0x4101, 0x4501, 0x4401, 0x4801] } else { [0x4701, 0x4601, 0x4a01, 0x4901, 0x4301] };
 
         let (left, right) = (s.left, s.right);
         let (cl, cr) = (c - left - 1, c + right);
+
         let curbs_flat = |area: &mut AreaGrid, a: i32, y: i32| {
             if x_road {
                 if a < 0 || y + 1 < 0 {
                     return;
                 }
+
                 if cl >= 0 {
                     put(area, a, y + 1, cl, curb);
                 }
+
                 if cr >= 0 {
                     put(area, a, y + 1, cr, curb);
                 }
@@ -208,6 +221,7 @@ impl RoadNetwork {
                 if cl >= 0 && a >= 0 && y + 1 >= 0 {
                     put(area, a, y + 1, cl, curb);
                 }
+
                 if a >= 0 && cr >= 0 && y + 1 >= 0 {
                     put(area, a, y + 1, cr, curb);
                 }
@@ -216,11 +230,13 @@ impl RoadNetwork {
 
         let mut last_lane = ASPHALT;
         let mut ramp = Ramp::new(i0.pos.y, run, i1.pos.y - i0.pos.y, ground.roundcity());
+
         for k in 0..run.max(0) {
             let a = a0 + k;
             let y = ramp.enter(k);
             let in_window = ramp.in_window;
             let rising = ramp.rise > 0 && in_window;
+
             let slope = |boxes: bool| {
                 let (row, col) = if rising { (row_up, ramp.counter) } else { (row_down, ramp.step - 1 - ramp.counter) };
                 slope_id(ramp.step, boxes, row, col).unwrap_or(0) | MESH
@@ -229,14 +245,17 @@ impl RoadNetwork {
             if k == 0 {
                 curbs_flat(area, a0, y);
             }
+
             if run - 1 > k {
                 if in_window {
                     let id = slope(true);
+
                     if x_road {
                         if a >= 0 && y >= 0 {
                             if cl >= 0 {
                                 put(area, a, y, cl, id);
                             }
+
                             if cr >= 0 {
                                 put(area, a, y, cr, id);
                             }
@@ -245,6 +264,7 @@ impl RoadNetwork {
                         if cl >= 0 && a >= 0 && y >= 0 {
                             put(area, a, y, cl, id);
                         }
+
                         if a >= 0 && cr >= 0 && y >= 0 {
                             put(area, a, y, cr, id);
                         }
@@ -261,7 +281,9 @@ impl RoadNetwork {
                 if cc < 0 || y < 0 || a < 0 {
                     continue;
                 }
+
                 let i = cc - c;
+
                 lane[5] = if i == -1 {
                     marks[0]
                 } else if i == 0 {
@@ -273,31 +295,41 @@ impl RoadNetwork {
                 } else {
                     marks[3]
                 };
+
                 if in_window {
                     lane[0] = lane[5];
                 }
+
                 put_textured(area, a, y, cc, if in_window { slope(false) } else { CUBE }, lane);
             }
+
             last_lane = lane;
+
             for i in (-left - 1)..=right {
                 let (x, _, z) = at(a, y, c + i);
+
                 ground.stamp_roadmap(x, z, y as f32 * 4.0);
             }
+
             ramp.leave();
         }
 
         let mut end = last_lane;
         end[5] = marks[4];
+
         for cc in (c - left)..(c + right) {
             if x_road {
                 if i0.ext_px > 0 && (i0.ext_pz > 0 || i0.ext_nz > 0) {
                     let x = i0.pos.x + i0.ext_px;
+
                     if i0.pos.y >= 0 && cc >= 0 && x >= 0 {
                         area.create_block(x, i0.pos.y, cc, CUBE, end, dims);
                     }
                 }
+
                 if i1.ext_nx > 0 && (i1.ext_pz > 0 || i1.ext_nz > 0) {
                     let x = i1.pos.x - i1.ext_nx - 1;
+
                     if x >= 0 && i1.pos.y >= 0 && cc >= 0 {
                         area.create_block(x, i1.pos.y, cc, CUBE, end, dims);
                     }
@@ -305,12 +337,14 @@ impl RoadNetwork {
             } else {
                 if i0.ext_pz > 0 && (i0.ext_px > 0 || i0.ext_nx > 0) {
                     let z = i0.pos.z + i0.ext_pz;
+
                     if cc >= 0 && i0.pos.y >= 0 && z >= 0 {
                         area.create_block(cc, i0.pos.y, z, CUBE, end, dims);
                     }
                 }
                 if i1.ext_nz > 0 && (i1.ext_px > 0 || i1.ext_nx > 0) {
                     let z = i1.pos.z - i1.ext_nz - 1;
+
                     if z >= 0 && i1.pos.y >= 0 && cc >= 0 {
                         area.create_block(cc, i1.pos.y, z, CUBE, end, dims);
                     }
@@ -323,6 +357,7 @@ impl RoadNetwork {
 fn intersection_build_blocks(area: &mut AreaGrid, dims: &dyn BlockDims, id: u32, it: &Intersection) {
     let (x, y, z) = (it.pos.x, it.pos.y, it.pos.z);
     let (l0, l1, l2, l3) = (it.ext_px, it.ext_pz, it.ext_nx, it.ext_nz);
+
     for zz in (z - l3)..(z + l1) {
         for xx in (x - l2)..(x + l0) {
             if y >= 0 && zz >= 0 && xx >= 0 {
@@ -330,32 +365,39 @@ fn intersection_build_blocks(area: &mut AreaGrid, dims: &dyn BlockDims, id: u32,
             }
         }
     }
+
     let curb = CURB | MESH;
-    let mut put = |xx: i32, yy: i32, zz: i32| {
+
+    let mut make_block = |xx: i32, yy: i32, zz: i32| {
         if xx >= 0 && yy >= 0 && zz >= 0 {
             area.create_block(xx, yy, zz, curb, CONCRETE, dims);
         }
     };
+
     if it.streets[0].is_none() {
         for zz in (z - l3 - 1)..=(z + l1) {
-            put(x + l0, y + 1, zz);
+            make_block(x + l0, y + 1, zz);
         }
     }
+
     if it.streets[2].is_none() {
         for zz in (z - l3 - 1)..=(z + l1) {
-            put(x - l0 - 1, y + 1, zz);
+            make_block(x - l0 - 1, y + 1, zz);
         }
     }
+
     if it.streets[1].is_none() {
         for xx in (x - l2 - 1)..=(x + l0) {
-            put(xx, y + 1, z + l1);
+            make_block(xx, y + 1, z + l1);
         }
     }
+
     if it.streets[3].is_none() {
         for xx in (x - l2 - 1)..=(x + l0) {
-            put(xx, y + 1, z - l3 - 1);
+            make_block(xx, y + 1, z - l3 - 1);
         }
     }
+
     if it.streets.iter().filter(|s| s.is_some()).count() > 2 {
         let lights = [
             (2usize, x + l0, z + l1, 1u32),
@@ -363,6 +405,7 @@ fn intersection_build_blocks(area: &mut AreaGrid, dims: &dyn BlockDims, id: u32,
             (3, x - l0 - 1, z + l1, (1 << 24) | (1 << 10) | 1),
             (1, x + l0, z - l1 - 1, (1 << 24) | (3 << 10) | 1),
         ];
+
         for (side, lx, lz, v) in lights {
             if it.streets[side].is_some() && lx >= 0 && y + 1 >= 0 && lz >= 0 {
                 area.set_object(lx, y + 1, lz, id << 12 | v);
@@ -385,6 +428,7 @@ impl Ramp {
     fn new(y0: i32, run: i32, rise: i32, roundcity: bool) -> Self {
         let arise = rise.abs();
         let half = run >> 1;
+
         let (step, half_width) = if rise == 0 {
             (6, 0)
         } else if roundcity {
@@ -394,14 +438,17 @@ impl Ramp {
             let step = (run / arise).max(1);
             (step, (arise * step) >> 1)
         };
+
         Self { lo: half - half_width, hi: half + half_width, step, rise, y: y0, counter: 0, in_window: false }
     }
 
     fn enter(&mut self, k: i32) -> i32 {
         self.in_window = self.lo <= k && self.hi > k;
+
         if self.in_window && self.rise > 0 && self.counter % self.step == 0 {
             self.y += 1;
         }
+
         self.y
     }
 
@@ -410,6 +457,7 @@ impl Ramp {
             if self.rise < 0 && self.counter % self.step == self.step - 1 {
                 self.y -= 1;
             }
+
             self.counter = (self.counter + 1) % self.step;
         }
     }

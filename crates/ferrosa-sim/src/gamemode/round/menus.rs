@@ -1,10 +1,9 @@
 use ferrosa_protocol::{
-    Team,
-    clientbound::game::{ItemKind, MenuType, events::chat::ChatType},
+    Team, clientbound::game::{ItemKind, MenuType, VehicleKind, events::chat::ChatType},
 };
 
 use super::Sim;
-use crate::{PlayerId, items::state::ItemState};
+use crate::{PlayerId, human::InventorySlot, items::{self, state::ItemState}};
 
 /// The vehicle stock the corporations buy from in round mode.
 pub const VEHICLE_STOCK: usize = 8;
@@ -47,7 +46,7 @@ impl Buyer {
 pub struct GhostHuman {
     pub id: usize,
     pub pos: glam::Vec3,
-    pub inventory: [crate::human::InventorySlot; crate::human::INVENTORY_SLOTS],
+    pub inventory: [InventorySlot; crate::human::INVENTORY_SLOTS],
 }
 
 /// One vehicle on sale: whether it is still there, its type, colour and price.
@@ -78,16 +77,18 @@ impl Sim {
     /// randomize_corp_vehicle_stock: each vehicle still on sale is sold off with a 1 in 8 chance, then every empty slot
     /// gets a random type and colour at its list price.
     pub(crate) fn randomize_corp_vehicle_stock(&mut self) {
-        for o in self.modes.round.vehicle_stock.iter_mut().filter(|o| o.active) {
+        for offer in self.modes.round.vehicle_stock.iter_mut().filter(|o| o.active) {
             if rand::random_ratio(1, 8) {
-                o.active = false;
+                offer.active = false;
             }
         }
-        for o in self.modes.round.vehicle_stock.iter_mut().filter(|o| !o.active) {
+
+        for offer in self.modes.round.vehicle_stock.iter_mut().filter(|o| !o.active) {
             let kind = crate::vehicle::random_stock_vehicle();
             let price = self.vehicle_types.get(kind as usize).map_or(0, |t| t.price);
             let color = rand::random_range(0..VEHICLE_COLORS);
-            *o = VehicleOffer { active: true, kind, color, price };
+
+            *offer = VehicleOffer { active: true, kind, color, price };
         }
     }
 
@@ -97,6 +98,7 @@ impl Sim {
         if let Some(pos) = outside {
             self.round_base_menu(pid, pos);
         }
+
         self.round_menu_buttons(pid);
     }
 
@@ -119,6 +121,7 @@ impl Sim {
     pub(crate) fn round_menu_buttons(&mut self, pid: PlayerId) {
         let Some(p) = self.players.get(pid.idx()) else { return };
         let mut buttons = Vec::new();
+
         match p.menu as u8 {
             17 => {
                 for (i, o) in self.modes.round.vehicle_stock.iter().enumerate() {
@@ -126,9 +129,11 @@ impl Sim {
                         buttons.push((SOLD, "SOLD".to_string(), Some(0)));
                         continue;
                     }
+
                     let color = usize::try_from(o.color).ok().and_then(|c| COLOR_NAMES.get(c)).copied().unwrap_or("");
                     let name = self.vehicle_types.get(o.kind as usize).map_or("", |t| t.name.as_str());
                     let mut text = format!("{color} {name}");
+
                     text.truncate(63);
                     buttons.push((i as i32, text, Some(o.price)));
                 }
@@ -140,6 +145,7 @@ impl Sim {
             }
             _ => return,
         }
+
         if let Some(p) = self.players.get_mut(pid.idx()) {
             for (id, text, extra) in buttons {
                 p.push_button(id, &text, extra);
@@ -150,16 +156,20 @@ impl Sim {
     /// handle_buy_menu_selection: the buy pages of round mode (menus 14 to 19).
     pub(crate) fn round_buy_menu(&mut self, pid: PlayerId, packed: u32) {
         let Some(p) = self.players.get_mut(pid.idx()) else { return };
+
         let b = packed & 255;
         if (p.human.is_some() || p.ghost_human) && (TAB..TAB + 6).contains(&b) {
             p.menu = menu_type((b - TAB + 14) as u8);
         }
+
         let human = match p.human {
             Some(h) => Buyer::Live(h),
             None if p.ghost_human && p.ghost.is_some() => Buyer::Ghost,
             None => return,
         };
+
         let target = (packed as i32) >> 16;
+
         match (p.menu as u8, b) {
             (14, 0..5) => self.round_buy_item(pid, human, WEAPONS[b as usize]),
             (15, 0..5) => self.round_buy_item(pid, human, AMMO[b as usize]),
@@ -191,31 +201,31 @@ impl Sim {
 
     /// An item for the money, into the first free pocket (a briefcase into a hand).
     fn round_buy_item(&mut self, pid: PlayerId, human: Buyer, kind: ItemKind) {
-        let Some(p) = self.players.get(pid.idx()) else { return };
+        let Some(player) = self.players.get(pid.idx()) else { return };
         let price = self.item_types[kind as usize].price;
-        if p.items_bought > BUY_LIMIT || !(p.money >= price || price == 0) {
+
+        if player.items_bought > BUY_LIMIT || !(player.money >= price || price == 0) {
             return;
         }
+
         let slots = if kind == ItemKind::Briefcase { 0..2 } else { 2..7 };
         self.buyer_give(pid, human, kind, slots, |_| {});
+
         let Some(p) = self.players.get_mut(pid.idx()) else { return };
         p.money -= price;
+        p.items_bought += 1;
 
         let e = p.make_update_round_event(self.tick);
         self.events.push(e);
-
-        if let Some(p) = self.players.get_mut(pid.idx()) {
-            p.items_bought += 1;
-        }
     }
 
     fn update_human_look(&mut self, pid: PlayerId, human: Buyer) {
-        let Some(p) = self.players.get(pid.idx()) else { return };
-        let look = p.customization;
+        let Some(player) = self.players.get(pid.idx()) else { return };
+        let look = player.customization;
 
-        if let Some(h) = human.live().and_then(|h| self.humans.get_mut(h)) {
-            h.customization.suit_color = look.suit_color;
-            h.customization.necklace = look.necklace;
+        if let Some(human) = human.live().and_then(|h| self.humans.get_mut(h)) {
+            human.customization.suit_color = look.suit_color;
+            human.customization.necklace = look.necklace;
         }
 
         self.update_player_event(pid);
@@ -225,35 +235,42 @@ impl Sim {
     /// into a pocket.
     fn round_buy_vehicle(&mut self, pid: PlayerId, human: Buyer, slot: usize) {
         let offer = self.modes.round.vehicle_stock[slot];
-        let Some(p) = self.players.get(pid.idx()) else { return };
-        let Some(k) = team_index(p.team) else { return };
-        if !offer.active || p.money < offer.price {
+        let Some(player) = self.players.get(pid.idx()) else { return };
+        let Some(team_idx) = team_index(player.team) else { return };
+
+        if !offer.active || player.money < offer.price {
             return;
         }
+
         let Some(pos) = self.buyer_pos(pid, human) else { return };
-        if !self.world.map.level.bases[k].contains(pos) {
+        if !self.world.map.level.bases[team_idx].contains(pos) {
             return;
         }
-        let Some(vehicle) = self.corporation_spawn_vehicle(offer.kind, k, offer.color) else { return };
+
+        let Some(vehicle) = self.corporation_spawn_vehicle(offer.kind, team_idx, offer.color) else { return };
         self.buyer_give(pid, human, ItemKind::Key, 2..7, |state| {
             if let ItemState::Key { vehicle: v } = state {
                 *v = Some(vehicle);
             }
         });
+
         let Some(p) = self.players.get_mut(pid.idx()) else { return };
         p.money -= offer.price;
+
         let e = p.make_update_round_event(self.tick);
         self.events.push(e);
         self.modes.round.vehicle_stock[slot].active = false;
     }
 
     /// corporation_spawn_vehicle: a vehicle in the first free car space of the corporation's base.
-    pub(crate) fn corporation_spawn_vehicle(&mut self, kind: ferrosa_protocol::clientbound::game::VehicleKind, k: usize, color: i32) -> Option<usize> {
+    pub(crate) fn corporation_spawn_vehicle(&mut self, kind: VehicleKind, k: usize, color: i32) -> Option<usize> {
         let spaces = self.world.map.level.bases[k].car_spaces.clone();
         let taken = &mut self.corp_state[k].car_space_taken;
         taken.resize(spaces.len(), false);
+
         let i = taken.iter().position(|t| !t)?;
         taken[i] = true;
+
         let (pos, rot) = spaces[i];
         self.spawn_vehicle(kind, color, pos, rot)
     }
@@ -269,7 +286,7 @@ impl Sim {
         }
 
         let Some(pos) = self.buyer_pos(pid, human) else { return };
-        if !self.world.map.level.bases[k].contains(pos) || self.corp_state[k].fired.len() >= MAX_FIRED || target == pid.0 as i32 {
+        if !self.world.map.level.bases[k].contains(pos) || self.corp_state[k].fired.len() >= MAX_FIRED || target == pid.i32() {
             return;
         }
 
@@ -294,9 +311,8 @@ impl Sim {
         t.team = Team::Spectator;
         t.manager_tab = false;
         t.ghost_human = t.human.take().is_some();
-        if t.ghost_human {
-            t.ghost = ghost;
-        }
+        if t.ghost_human { t.ghost = ghost; }
+
         let (e, m) = (t.make_update_player_event(self.tick), t.make_update_round_event(self.tick));
         let name = t.username.clone();
         self.events.push(e);
@@ -318,24 +334,31 @@ impl Sim {
             Buyer::Live(h) => return self.give_item(h, kind as u8, slots, init),
             Buyer::Ghost => self.players.get(pid.idx())?.ghost?,
         };
+
         let item = self.create_item(kind, ghost.pos, None, ferrosa_physics::rotation::IDENTITY)?;
         init(&mut self.items.get_mut(item)?.state);
+
         let is_gun = self.item_types[kind as usize].is_gun;
-        let g = self.players.get_mut(pid.idx())?.ghost.as_mut()?;
+        let ghost = self.players.get_mut(pid.idx())?.ghost.as_mut()?;
+
         for slot in slots {
-            let count = g.inventory[slot].count;
+            let count = ghost.inventory[slot].count;
             if count > 1 || (slot <= 1 && count == 1) || (slot == 2 && !is_gun) || (slot > 2 && is_gun) {
                 continue;
             }
+
             if count <= 7 {
-                g.inventory[slot].items[count as usize] = item as i32;
-                g.inventory[slot].count = count + 1;
+                ghost.inventory[slot].items[count as usize] = item as i32;
+                ghost.inventory[slot].count = count + 1;
+
                 let i = self.items.get_mut(item)?;
-                i.parent_human = g.id as i32;
+                i.parent_human = ghost.id as i32;
                 i.parent_slot = slot as i32;
             }
+
             break;
         }
+
         Some(item)
     }
 
@@ -359,7 +382,7 @@ impl Sim {
                         c.despawn_time = 0;
                     }
 
-                    super::items::remove_link(&mut self.items, child, id as usize);
+                    items::remove_link(&mut self.items, child, id as usize);
                 }
             }
         }

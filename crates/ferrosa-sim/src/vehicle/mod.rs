@@ -192,6 +192,7 @@ pub fn spawn_vehicle(
     let centre = body_centre(pos, &rot, t.center_of_mass);
     let body = bodies.create(RigidBodyType::Vehicle, centre, rot, vel, t.inertia, t.mass)?;
     let [r0, r1, r2] = rot;
+
     let wheels = t
         .wheels
         .iter()
@@ -206,6 +207,7 @@ pub fn spawn_vehicle(
             let side = (r * r * 3.0 + 0.0625) * (1.0 / 12.0);
             let inertia = Vec3::new(r * r * 0.5, side, side);
             let wheel_body = bodies.create(RigidBodyType::Wheel, world_pos, rot, vel, inertia, w.mass)?;
+
             Some(Wheel {
                 body: wheel_body,
                 half_width: WHEEL_HALF_WIDTH,
@@ -224,32 +226,41 @@ pub fn spawn_vehicle(
             })
         })
         .collect();
+
     let mut bogies = Vec::new();
-    if kind == ferrosa_protocol::clientbound::game::VehicleKind::Train {
+
+    if kind == VehicleKind::Train {
         let [_, r1, r2] = rot;
         let ends = [(centre - r1 + r2 * -6.0, Vec3::new(0.0, -1.0, -6.0)), (-1.25 * r1 + centre + r2 * 6.0, Vec3::new(0.0, -1.0, 6.0))];
+
         for (at, anchor) in ends {
             let bogie = bodies.create(RigidBodyType::Vehicle, at, rot, vel, BOGIE_INERTIA, BOGIE_MASS)?;
             bodies.create_bond(Bond::ItemPoint(ItemPoint::vehicle(body, bogie, anchor, Vec3::ZERO)));
+
             let turn = bodies.create_bond(Bond::ItemAngular(ItemAngular::vehicle(body, bogie)))?;
             bogies.push((bogie, turn));
         }
     }
+
     let rotor = if kind == ferrosa_protocol::clientbound::game::VehicleKind::Helicopter {
         let [_, r1, _] = rot;
         let at = r1 * ROTOR_HEIGHT + centre;
         let rotor_body = bodies.create(RigidBodyType::Vehicle, at, rot, vel, ROTOR_INERTIA, ROTOR_MASS)?;
+
         if let Some(b) = bodies.get_mut(rotor_body) {
             b.coefs = ROTOR_COEFS;
         }
+
         let point_bond = bodies.create_bond(Bond::ItemPoint(ItemPoint::vehicle(body, rotor_body, Vec3::new(0.0, ROTOR_HEIGHT, 0.0), Vec3::ZERO)))?;
         let angular_bond = bodies.create_bond(Bond::ItemAngular(ItemAngular::vehicle(body, rotor_body)))?;
         Some(Rotor { body: rotor_body, point_bond, angular_bond, angles: [0.0; 2] })
     } else {
         None
     };
+
     let driven = if kind == ferrosa_protocol::clientbound::game::VehicleKind::Hatchback { vec![0, 1] } else { vec![2, 3] };
     let vel = vel.unwrap_or(Vec3::ZERO);
+
     vehicles.insert(Vehicle {
         kind,
         controllable_state: t.controllable_state,

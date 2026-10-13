@@ -1,3 +1,4 @@
+use ferrosa_map::file_types::{it3::It3File, itm::ItmFile};
 use ferrosa_protocol::clientbound::game::ItemKind;
 use glam::Vec3;
 
@@ -65,7 +66,9 @@ fn inverse_inertia(b: Vec3) -> Vec3 {
     if !(b.x > 0.0 && b.y > 0.0 && b.z > 0.0) {
         return Vec3::ONE;
     }
+
     let (x2, y2, z2) = (b.x * b.x, b.y * b.y, b.z * b.z);
+
     Vec3::new(1.0 / ((y2 + z2) / 3.0), 1.0 / ((z2 + x2) / 3.0), 1.0 / ((y2 + x2) / 3.0))
 }
 
@@ -143,30 +146,39 @@ pub fn item_types() -> Vec<ItemType> {
         })
         .collect();
 
-    for (t, (is_gun, mirrored_aim, hands, hold_pos, hold_rot)) in types.iter_mut().zip(hold_data()) {
-        t.is_gun = is_gun != 0;
-        t.mirrored_aim = mirrored_aim;
-        t.hands = hands;
-        t.hold_pos = hold_pos;
-        t.hold_rot = hold_rot;
+    for (item_type, (is_gun, mirrored_aim, hands, hold_pos, hold_rot)) in types.iter_mut().zip(hold_data()) {
+        item_type.is_gun = is_gun != 0;
+        item_type.mirrored_aim = mirrored_aim;
+        item_type.hands = hands;
+        item_type.hold_pos = hold_pos;
+        item_type.hold_rot = hold_rot;
     }
-    for (t, ammo) in types.iter_mut().zip(MAGAZINE_AMMO) {
-        t.magazine_ammo = ammo;
+
+    for (item_type, ammo) in types.iter_mut().zip(MAGAZINE_AMMO) {
+        item_type.magazine_ammo = ammo;
     }
+
     for (kind, fire_rate, bullet_type, bullet_velocity, bullet_spread) in GUNS {
-        let t = &mut types[kind as usize];
-        (t.fire_rate, t.bullet_type, t.bullet_velocity, t.bullet_spread) = (fire_rate, bullet_type, bullet_velocity, bullet_spread);
+        let item_type = &mut types[kind as usize];
+
+        item_type.fire_rate = fire_rate;
+        item_type.bullet_type = bullet_type;
+        item_type.bullet_velocity = bullet_velocity;
+        item_type.bullet_spread = bullet_spread;
     }
-    for (t, hold) in types.iter_mut().zip(GUN_HOLD_POS) {
-        t.gun_hold_pos = hold;
+
+    for (item_type, hold) in types.iter_mut().zip(GUN_HOLD_POS) {
+        item_type.gun_hold_pos = hold;
     }
+
     for (kind, onto) in MOUNTS {
         for &o in onto {
             types[kind as usize].can_mount_to[o as usize] = 1;
         }
     }
-    for (t, pockets) in types.iter_mut().zip(POCKETS) {
-        t.pockets = pockets;
+
+    for (item_type, pockets) in types.iter_mut().zip(POCKETS) {
+        item_type.pockets = pockets;
     }
 
     let ball = &mut types[SoccerBall as usize];
@@ -174,7 +186,7 @@ pub fn item_types() -> Vec<ItemType> {
     ball.inv_inertia = Vec3::splat(1.0 / (r * r * 0.45));
 
     let uzi = std::path::Path::new("data").join("uzi.itm");
-    match ferrosa_map::file_types::itm::ItmFile::load(&uzi) {
+    match ItmFile::load(&uzi) {
         Ok(itm) => {
             for kind in [Auto5, Uzi] {
                 types[kind as usize].inv_inertia = Vec3::ONE / itm.inertia;
@@ -187,15 +199,18 @@ pub fn item_types() -> Vec<ItemType> {
         if !t.can_collide || i == TableTest as usize {
             continue;
         }
+
         t.hull = Some(match i {
             i if i == Bottle as usize => ConvexHull::prism(0.125, 0.09375, 0.5, false),
             i if i == Watermelon as usize => ConvexHull::prism(0.1875, 0.09375, 0.6, true),
             _ => ConvexHull::bounding_box(t.bounds),
         });
     }
+
     for (kind, file) in IT3_MESHES {
         let path = std::path::Path::new("data").join("item").join(file);
-        match ferrosa_map::file_types::it3::It3File::load(&path) {
+
+        match It3File::load(&path) {
             Ok(it3) => {
                 if let Some(c) = it3.collision {
                     types[kind as usize].hull = Some(ConvexHull::from_it3(&c));

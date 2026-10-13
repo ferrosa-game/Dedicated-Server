@@ -29,17 +29,22 @@ pub fn segment_intersect_plane_two_sided(n: Vec3, start: Vec3, end: Vec3, point:
     let to_end = pe.dot(n);
     let ps = point - start;
     let to_start = ps.dot(n);
+
     if to_start > 0.0 && to_end > 0.0 {
         return None;
     }
+
     if 0.0 > to_start && 0.0 > to_end {
         return None;
     }
+
     let d = end - start;
     let den = n.dot(d);
+
     if den == 0.0 {
         return None;
     }
+
     let t = to_start / den;
     Some((t, d * t + start))
 }
@@ -49,9 +54,11 @@ fn disc_edge(best: &mut DiscHit, centre: Vec3, axis: Vec3, a: Vec3, b: Vec3) {
     let Some((_, p)) = segment_intersect_plane_two_sided(axis, a, b, centre) else { return };
     let d = centre - p;
     let dist = d.length();
+
     if !(best.dist > dist) {
         return;
     }
+
     let normal = d.normalize_or_zero();
     *best = DiscHit { pos: p, normal, dist };
 }
@@ -63,9 +70,11 @@ fn disc_edge(best: &mut DiscHit, centre: Vec3, axis: Vec3, a: Vec3, b: Vec3) {
 #[allow(clippy::too_many_arguments)]
 pub fn sphere_intersect_face(hit: &mut DiscHit, centre: Vec3, axis: Vec3, radius: f32, a: Vec3, b: Vec3, c: Vec3) -> bool {
     hit.dist = radius;
+
     let n = hit.normal;
     let t = n.cross(axis);
     let len2 = t.length_squared();
+
     if len2 >= PARALLEL {
         let along = axis.dot(centre);
         let plane = a.dot(n);
@@ -73,33 +82,41 @@ pub fn sphere_intersect_face(hit: &mut DiscHit, centre: Vec3, axis: Vec3, radius
         let p = t.cross(u) / len2;
         let d = centre - p;
         let len = len2.sqrt();
+
         let dir = if len == 0.0 {
             Vec3::ZERO
         } else {
             let inv = 1.0 / len;
             t * inv
         };
+
         let proj = d.dot(dir);
         let q = p + dir * proj;
         hit.pos = q;
         let e = centre - q;
         let dist = e.length();
+
         if radius > dist {
             let side = |w: Vec3, e: Vec3| {
                 let c = w.cross(e);
                 c.dot(n)
             };
+
             let last = {
                 let (w, e) = ((q - c), (a - c));
                 let k = w.cross(e);
                 k.dot(n)
             };
+
             let inside = side(q - a, b - a) >= 0.0 && side(q - b, c - b) >= 0.0 && last >= 0.0;
+
             if inside {
                 hit.dist = dist;
             }
         }
+
     }
+
     disc_edge(hit, centre, axis, a, b);
     disc_edge(hit, centre, axis, b, c);
     disc_edge(hit, centre, axis, c, a);
@@ -111,14 +128,17 @@ pub fn sphere_intersect_face(hit: &mut DiscHit, centre: Vec3, axis: Vec3, radius
 fn sphere_intersect_terrain_mesh(mesh: &TerrainMesh, centre: Vec3, axis: Vec3, radius: f32) -> Option<DiscHit> {
     let mut best: Option<DiscHit> = None;
     let mut best_dist = NO_HIT;
+
     for quad in mesh.faces.chunks(2) {
         let [ia, ib, ic] = quad[0];
         let (a, b, c) = (mesh.verts[ia], mesh.verts[ib], mesh.verts[ic]);
         let mut hit = DiscHit { pos: Vec3::ZERO, normal: calculate_face_normal(a, b, c), dist: radius };
+
         if sphere_intersect_face(&mut hit, centre, axis, radius, a, b, c) && !(best_dist <= hit.dist) {
             best_dist = hit.dist;
             best = Some(hit);
         }
+
         if let Some(&[_, _, id]) = quad.get(1)
             && sphere_intersect_face(&mut hit, centre, axis, radius, a, c, mesh.verts[id])
             && !(best_dist <= hit.dist)
@@ -127,6 +147,7 @@ fn sphere_intersect_terrain_mesh(mesh: &TerrainMesh, centre: Vec3, axis: Vec3, r
             best = Some(hit);
         }
     }
+
     best.filter(|_| NO_HIT > best_dist)
 }
 
@@ -143,6 +164,7 @@ fn take(best: &mut Option<DiscHit>, best_dist: &mut f32, hit: Option<DiscHit>) {
 #[allow(clippy::too_many_arguments)]
 fn face_hit(centre: Vec3, axis: Vec3, radius: f32, normal: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Option<DiscHit> {
     let mut hit = DiscHit { pos: Vec3::ZERO, normal, dist: radius };
+
     sphere_intersect_face(&mut hit, centre, axis, radius, a, b, c).then_some(hit)
 }
 
@@ -150,16 +172,21 @@ fn face_hit(centre: Vec3, axis: Vec3, radius: f32, normal: Vec3, a: Vec3, b: Vec
 /// triangles under the face's normal.
 fn cube_faces(centre: Vec3, axis: Vec3, radius: f32, cell: IVec3, s: f32, v: u32) -> Option<DiscHit> {
     let base = Vec3::new(cell.x as f32 * s, cell.y as f32 * s, cell.z as f32 * s);
+
     let corner = |i: usize| {
         let c = CUBE_CORNERS[i];
         c * s + base
     };
+
     let (mut best, mut best_dist) = (None, NO_HIT);
+
     for r in (0..6).filter(|&r| v & (1 << r) != 0 && v & (64 << r) != 0) {
         let [a, b, c, d] = CUBE_FACES[r].map(corner);
+
         take(&mut best, &mut best_dist, face_hit(centre, axis, radius, CUBE_NORMALS[r], a, b, c));
         take(&mut best, &mut best_dist, face_hit(centre, axis, radius, CUBE_NORMALS[r], a, c, d));
     }
+
     best
 }
 
@@ -170,11 +197,14 @@ fn custom_shape(meshes: &BlockMeshes, centre: Vec3, axis: Vec3, radius: f32, cel
     let base = Vec3::new(cell.x as f32 * s, cell.y as f32 * s, cell.z as f32 * s);
     let sc = |p: Vec3| p * s + base;
     let (mut best, mut best_dist) = (None, NO_HIT);
+
     for q in &mesh.quads {
         let [a, b, c, d] = q.map(|i| sc(mesh.verts[i as usize]));
+
         take(&mut best, &mut best_dist, face_hit(centre, axis, radius, calculate_face_normal(a, b, c), a, b, c));
         take(&mut best, &mut best_dist, face_hit(centre, axis, radius, calculate_face_normal(a, c, d), a, c, d));
     }
+
     best
 }
 
@@ -183,14 +213,17 @@ fn custom_shape(meshes: &BlockMeshes, centre: Vec3, axis: Vec3, radius: f32, cel
 fn sphere_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, centre: Vec3, axis: Vec3, radius: f32) -> Option<DiscHit> {
     let f = AreaFrame::new(area);
     let (c, mn, mx) = (centre.to_array(), f.min.to_array(), f.max.to_array());
+
     if (0..3).any(|k| mn[k] > c[k] + radius) || (0..3).any(|k| c[k] - radius > mx[k]) {
         return None;
     }
+
     let local = f.to_local(centre);
     let l = local.to_array();
     let lo: [i32; 3] = std::array::from_fn(|k| cvtt((l[k] - radius) * f.inv));
     let hi: [i32; 3] = std::array::from_fn(|k| cvtt((l[k] + radius) * f.inv));
     let (mut best, mut best_dist) = (None, NO_HIT);
+
     for y in lo[1]..=hi[1] {
         for z in lo[2]..=hi[2] {
             for x in lo[0]..=hi[0] {
@@ -199,6 +232,7 @@ fn sphere_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, centre: Vec3, ax
                 let idx = cell_index(x, y, z);
                 let footprint = |v: u32| cell - IVec3::new((v & 255) as i32, ((v >> 16) & 255) as i32, ((v >> 8) & 255) as i32);
                 let v = rec.layer0[idx];
+
                 let hit = match v & TYPE_MASK {
                     CUBE => cube_faces(local, axis, radius, cell, f.size, v),
                     MESH => custom_shape(meshes, local, axis, radius, cell, f.size, v),
@@ -208,7 +242,9 @@ fn sphere_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, centre: Vec3, ax
                     }
                     _ => None,
                 };
+
                 take(&mut best, &mut best_dist, hit);
+
                 let v = rec.layer1[idx];
                 let hit = match v & TYPE_MASK {
                     MESH => custom_shape(meshes, local, axis, radius, cell, f.size, v),
@@ -218,10 +254,12 @@ fn sphere_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, centre: Vec3, ax
                     }
                     _ => None,
                 };
+
                 take(&mut best, &mut best_dist, hit);
             }
         }
     }
+
     best.map(|h| {
         let p = f.rotate_back(h.pos);
         DiscHit { pos: Vec3::new(p.x + f.origin.x, p.y + f.origin.y, p.z + f.origin.z), normal: f.rotate_back(h.normal), dist: h.dist }
@@ -236,8 +274,10 @@ pub fn sphere_intersect_level(ground: &Ground, area: &AreaGrid, meshes: &BlockMe
     let mesh = TerrainMesh::build(ground, min, max);
     let mut best_dist = NO_HIT;
     let mut best = None;
+
     take(&mut best, &mut best_dist, sphere_intersect_terrain_mesh(&mesh, centre, axis, radius));
     take(&mut best, &mut best_dist, sphere_intersect_area(area, meshes, centre, axis, radius));
+
     best
 }
 
@@ -247,44 +287,56 @@ pub fn segment_intersect_sphere(start: Vec3, end: Vec3, center: Vec3, radius: f3
     let d = end - start;
     let len = d.length();
     let c = center - start;
+
     let dir = if len == 0.0 {
         Vec3::ZERO
     } else {
         let k = 1.0 / len;
         d * k
     };
+
     let t = dir.dot(c);
+
     if 0.0 > t {
         return None;
     }
+
     let c2 = c.length_squared();
     let d2 = c2 - t * t;
     let r2 = radius * radius;
+
     if d2 > r2 || r2 > c2 {
         return None;
     }
+
     let h = (r2 - d2).sqrt();
     let frac = (t - h) / len;
+
     if frac > 1.0 {
         return None;
     }
+
     let p = (end - start) * frac + start;
     let n = p - center;
     let nl = n.length();
+
     let n = if nl == 0.0 {
         Vec3::ZERO
     } else {
         let k = 1.0 / nl;
         n * k
     };
+
     Some((frac, p, n))
 }
 
 /// sphere_intersect_mesh: the wheel disc against each of the triangles under its own normal, the nearest hit.
 pub fn sphere_intersect_triangles(tris: &[crate::track::TrackTriangle], centre: Vec3, axis: Vec3, radius: f32) -> Option<DiscHit> {
     let (mut best, mut best_dist) = (None, NO_HIT);
+
     for &[a, b, c] in tris {
         take(&mut best, &mut best_dist, face_hit(centre, axis, radius, calculate_face_normal(a, b, c), a, b, c));
     }
+
     best.filter(|_| NO_HIT > best_dist)
 }

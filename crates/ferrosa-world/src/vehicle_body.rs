@@ -18,6 +18,7 @@ fn register_unique_pair(edges: &mut Vec<[usize; 2]>, a: usize, b: usize) {
     if edges.len() >= MAX_MESH_EDGES || edges.iter().any(|&[x, y]| (x == a && y == b) || (x == b && y == a)) {
         return;
     }
+
     edges.push([a, b]);
 }
 
@@ -30,23 +31,28 @@ impl VehicleBody {
         let centred = match file.offset {
             Some(offset) => {
                 let shift = |p: &mut Vec3| *p -= offset;
+
                 file.nodes.iter_mut().for_each(|n| shift(&mut n.pos));
                 file.vertices.iter_mut().for_each(shift);
                 file.parts.iter_mut().flat_map(|p| p.points.iter_mut()).for_each(shift);
                 file.wheels.iter_mut().for_each(|w| shift(&mut w.pos));
+
                 positions.into_iter().map(|p| p - offset).collect()
             }
             None => {
                 let sum = positions.iter().fold(Vec3::ZERO, |s, p| s + p);
                 let inv = 1.0 / positions.len() as f32;
                 let m = sum * inv;
+
                 positions.into_iter().map(|p| p - m).collect::<Vec<_>>()
             }
         };
 
         let mut edges = Vec::new();
+
         for f in file.faces.iter().filter(|f| f.indices.len() == 4) {
             let f: Vec<usize> = f.indices.iter().map(|&i| i as usize).collect();
+
             for k in 0..4 {
                 register_unique_pair(&mut edges, f[k], f[(k + 1) % 4]);
             }
@@ -54,6 +60,7 @@ impl VehicleBody {
 
         let faces = file.faces.iter().map(|f| std::array::from_fn(|k| f.indices.get(k).map_or(0, |&i| i as usize))).collect();
         let mesh = ConvexHull::new(centred.clone(), faces, edges);
+
         Some(Self { file, mesh })
     }
 }

@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use ferrosa_protocol::clientbound::game::{GameState, ItemKind};
+use ferrosa_world::trace;
 use glam::Vec3;
 
 use super::{Earshot, Sim, TickCtx};
@@ -55,6 +56,7 @@ fn add_earshot(earshots: &mut [Option<Earshot>; 8], e: Earshot) {
         *free = Some(e);
         return;
     }
+
     if let Some(first) = earshots[0]
         && first.distance / (first.volume + EVICT_EPSILON) > e.distance / e.volume
     {
@@ -66,9 +68,11 @@ impl Sim {
     /// The walkie-talkie channel lists logic_item rebuilds each tick: every radio, in item order, on its channel.
     pub(crate) fn build_radio_channels(&mut self) {
         self.radio_channels = vec![Vec::new(); RADIO_CHANNELS];
+
         for (id, item) in self.items.iter() {
             if let ItemState::Radio { channel, .. } = item.state {
                 let list = &mut self.radio_channels[(channel & 0x7f) as usize];
+
                 if list.len() < CHANNEL_RADIOS {
                     list.push(id);
                 }
@@ -82,10 +86,12 @@ impl Sim {
             .iter()
             .map(|(id, i)| {
                 let phone = i.state.phone();
+
                 let (transmitting, channel) = match i.state {
                     ItemState::Radio { channel, transmitting } => (transmitting, channel),
                     _ => (false, 0),
                 };
+
                 let v = VoiceItem {
                     kind: i.item_type,
                     pos: i.pos2,
@@ -96,6 +102,7 @@ impl Sim {
                     transmitting,
                     channel,
                 };
+
                 (id, v)
             })
             .collect()
@@ -113,31 +120,37 @@ impl Sim {
         let head = |h: usize| ctx.heads.get(&h).map(|&(pos, _)| pos);
         let at = own.and_then(head).or_else(|| client.spectating.and_then(head)).or_else(|| head(0)).unwrap_or(Vec3::ZERO);
         let map = &ctx.world.map;
+
         let line_of_sight = |from: Vec3, to: Vec3| -> f32 {
             if to.distance(from) <= SIGHT_RANGE
-                && crate::world::trace::line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, from, to).is_none()
+                && trace::line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, from, to).is_none()
             {
                 1.0
             } else {
                 BLOCKED_VOLUME
             }
         };
+
         let items = &ctx.voice_items;
         let silenced = |p: PlayerId| ctx.players.get(p.idx()).is_none_or(|p| p.voice.is_silenced);
         let speaker_of = |it: &VoiceItem| usize::try_from(it.parent_human).ok().and_then(|h| ctx.human_players.get(&h).copied().flatten());
+
         for slot in client.earshots.iter_mut() {
             let Some(e) = slot else { continue };
             let Some(speaker) = ctx.players.get(e.player.idx()) else {
                 *slot = None;
                 continue;
             };
+
             let level = speaker.voice.volume_level;
             let mut keep = !speaker.voice.is_silenced;
+
             if let Some(item) = e.item {
                 let Some(it) = items.get(&item) else {
                     *slot = None;
                     continue;
                 };
+
                 match it.kind {
                     ItemKind::Phone => {
                         keep &= it
@@ -150,20 +163,27 @@ impl Sim {
                     }
                     _ => {}
                 }
+
                 e.distance = it.pos.distance(at);
                 e.volume = (line_of_sight(it.pos, at) - e.volume) * SMOOTHING + e.volume;
+
                 if !keep || e.distance > e.volume {
                     *slot = None;
                 }
+
                 continue;
             }
+
             e.human = speaker.human;
+
             if restarting {
                 if !keep {
                     *slot = None;
                 }
+
                 continue;
             }
+
             match (own, e.human) {
                 (None, None) => {}
                 (Some(_), None) => keep = false,
@@ -171,49 +191,64 @@ impl Sim {
                     if !ctx.heads.get(&0).is_some_and(|&(_, alive)| alive) {
                         keep = false;
                     }
+
                     let Some(pos) = head(h) else {
                         *slot = None;
                         continue;
                     };
+
                     e.distance = pos.distance(at);
                     e.volume = (line_of_sight(pos, at) - e.volume) * SMOOTHING + e.volume;
                 }
             }
+
             if !keep || e.distance > e.volume * range(level) {
                 *slot = None;
             }
         }
+
         for (_, p) in ctx.players.iter() {
             let id = p.player_id;
+
             if id == player_id || p.voice.is_silenced || client.earshots.iter().flatten().any(|e| e.player == id && e.human == p.human) {
                 continue;
             }
+
             let (d, volume) = if restarting || (own.is_none() && p.human.is_none()) {
                 (NEAR_DISTANCE, 1.0)
             } else {
                 let Some(&(pos, alive)) = p.human.and_then(|h| ctx.heads.get(&h)) else { continue };
+
                 if !alive {
                     continue;
                 }
+
                 (pos.distance(at), line_of_sight(pos, at))
             };
+
             if range(p.voice.volume_level) * volume > d {
                 add_earshot(&mut client.earshots, Earshot { player: id, human: p.human, item: None, source: None, distance: d, volume });
             }
         }
+
         for (&a, it) in items.iter() {
             match it.kind {
                 ItemKind::Phone => {
                     let Some(b) = it.connected else { continue };
+
                     if it.parent_human == -1 || it.parent_slot != 0 || !it.on_call {
                         continue;
                     }
+
                     let Some(speaker) = speaker_of(it).filter(|&s| !silenced(s)) else { continue };
+
                     if client.earshots.iter().flatten().any(|e| e.player == speaker && e.item == Some(b)) {
                         continue;
                     }
+
                     let Some(other) = items.get(&b).filter(|o| o.connected == Some(a)) else { continue };
                     let (d, volume) = (other.pos.distance(at), line_of_sight(other.pos, at));
+
                     if volume > d {
                         add_earshot(
                             &mut client.earshots,
@@ -225,13 +260,17 @@ impl Sim {
                     if !it.transmitting || it.parent_human == -1 || it.parent_slot > 1 {
                         continue;
                     }
+
                     let Some(speaker) = speaker_of(it).filter(|&s| !silenced(s)) else { continue };
+
                     for &r in ctx.radio_channels.get((it.channel & 0x7f) as usize).map_or(&[][..], |l| &l[..]) {
                         if r == a || client.earshots.iter().flatten().any(|e| e.player == speaker && e.item == Some(r)) {
                             continue;
                         }
+
                         let Some(other) = items.get(&r) else { continue };
                         let (d, volume) = (other.pos.distance(at), line_of_sight(other.pos, at));
+
                         if volume > d {
                             add_earshot(&mut client.earshots, Earshot { player: speaker, human: None, item: Some(r), source: Some(a), distance: d, volume });
                         }
@@ -240,6 +279,7 @@ impl Sim {
                 _ => {}
             }
         }
+
         client.earshots
     }
 }

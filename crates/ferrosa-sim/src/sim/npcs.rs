@@ -8,7 +8,7 @@ use ferrosa_protocol::{
 use glam::Vec3;
 
 use super::Sim;
-use crate::{PlayerId, time::TICKS_PER_SECOND};
+use crate::{PlayerId, items, time::TICKS_PER_SECOND};
 
 pub const MAX_NPCS: usize = 1024;
 /// An NPC's bot comes in when a living player is within 96 of it, stays while one is within 104, and leaves when
@@ -37,14 +37,18 @@ impl Sim {
     /// create_npc: the first free NPC slot.
     pub(crate) fn create_npc(&mut self, kind: i32, pos: Vec3, yaw: f32) -> Option<usize> {
         let npc = Npc { kind, pos, yaw, waypoints: Vec::new(), bot: None, human: None, timer: 0 };
+
         if let Some(i) = self.npcs.iter().position(Option::is_none) {
             self.npcs[i] = Some(npc);
             return Some(i);
         }
+
         if self.npcs.len() >= MAX_NPCS {
             return None;
         }
+
         self.npcs.push(Some(npc));
+
         Some(self.npcs.len() - 1)
     }
 
@@ -110,14 +114,17 @@ impl Sim {
     /// The end of do_npc's check: a killed NPC lets its bot go and waits 18000 ticks.
     fn check_npc_dead(&mut self, idx: usize) {
         let Some(h) = self.npcs[idx].as_ref().and_then(|n| n.human) else { return };
+
         if self.humans.get(h).is_some_and(|h| h.health.vitality > 0) {
             return;
         }
+
         let bot = self.npcs[idx].as_mut().and_then(|n| {
             n.human = None;
             n.timer = 5 * TICKS_PER_SECOND;
             n.bot.take()
         });
+
         if let Some(pid) = bot {
             self.delete_bot_player(pid);
         }
@@ -127,10 +134,12 @@ impl Sim {
     fn despawn_npc_bot(&mut self, idx: usize) {
         let Some(n) = self.npcs[idx].as_mut() else { return };
         let (human, bot) = (n.human.take(), n.bot.take());
+
         if let Some(h) = human {
             self.clear_inventory(h);
             self.delete_human(h);
         }
+
         if let Some(pid) = bot {
             self.delete_bot_player(pid);
         }
@@ -140,13 +149,16 @@ impl Sim {
     fn clear_inventory(&mut self, h: usize) {
         let Some(hu) = self.humans.get(h) else { return };
         let held: Vec<usize> = hu.inventory.iter().flat_map(|s| s.items[..s.count.max(0) as usize].iter().map(|&i| i as usize)).collect();
+
         for id in held {
             if let Some(&child) = self.items.get(id).and_then(|i| i.children.first()) {
                 if let Some(c) = self.items.get_mut(child) {
                     c.despawn_time = 0;
                 }
-                super::items::remove_link(&mut self.items, child, id);
+
+                items::remove_link(&mut self.items, child, id);
             }
+
             if let Some(i) = self.items.get_mut(id) {
                 i.despawn_time = 0;
             }
@@ -157,12 +169,14 @@ impl Sim {
     fn delete_bot_player(&mut self, pid: PlayerId) {
         let Some(p) = self.players.get(pid.idx()) else { return };
         let (human, account) = (p.human, p.account_id);
+
         if let Some(h) = human.and_then(|h| self.humans.get_mut(h))
             && h.player == Some(pid)
         {
             h.player = None;
             h.account = (account != u32::MAX).then_some(account);
         }
+
         let p = self.players.remove(pid.idx());
         let e = EventUpdatePlayer {
             active: false,
@@ -173,6 +187,7 @@ impl Sim {
             customization: p.customization,
             name: p.username,
         };
+
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdatePlayer(e) });
     }
 
@@ -181,6 +196,7 @@ impl Sim {
     fn spawn_bot(&mut self, idx: usize) {
         let Some(pid) = self.create_player() else { return };
         let Some(npc) = self.npcs[idx].clone() else { return };
+
         self.npcs[idx].as_mut().unwrap().bot = Some(pid);
 
         let Some(p) = self.players.get_mut(pid.idx()) else { return };

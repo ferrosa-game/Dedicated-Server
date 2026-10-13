@@ -102,12 +102,15 @@ impl RigidBodies {
     pub fn create(&mut self, kind: RigidBodyType, pos: Vec3, rot: RotMatrix, vel: Option<Vec3>, inertia: Vec3, mass: f32) -> Option<usize> {
         let inv_inertia = Vec3::from_array(inertia.to_array().map(|i| if i <= 0.0 { 0.0 } else { 1.0 / i }));
         let mut min_inertia = inertia.x;
+
         if min_inertia > inertia.y {
             min_inertia = inertia.y;
         }
+
         if !(min_inertia <= inertia.z) {
             min_inertia = inertia.z;
         }
+
         self.bodies.insert(RigidBody {
             kind,
             settled: false,
@@ -160,19 +163,7 @@ impl RigidBodies {
     pub fn simulate(&mut self) {
         let gravity = GRAVITY * self.gravity_scale;
 
-        // self.bodies.par_iter_mut().for_each(|(_, b)| {
-        //     if b.settled {
-        //         return;
-        //     }
-        //
-        //     let vy = b.vel.y - gravity;
-        //     b.vel.y = vy;
-        //     b.pos.x += b.vel.x;
-        //     b.pos.y += vy;
-        //     b.pos.z += b.vel.z;
-        //     b.ang_vel = rk4_rotation(&mut b.rot, b.ang_momentum, b.inv_inertia);
-        // });
-
+        // Tried to par_iter_mut, but it took longer to do.
         for (_, b) in self.bodies.iter_mut() {
             if b.settled {
                 continue;
@@ -190,6 +181,7 @@ impl RigidBodies {
     pub fn add_impulse(&mut self, id: usize, offset: Vec3, impulse: Vec3) {
         let Some(b) = self.bodies.get_mut(id) else { return };
         let (r, j) = (offset, impulse);
+
         b.vel += j;
         b.ang_momentum = j.cross(r) + b.ang_momentum;
     }
@@ -216,6 +208,7 @@ impl RigidBodies {
         let (Some(a), Some(b)) = (self.bodies.get(body_a), self.bodies.get(body_b)) else { return };
         let inv = 1.0 / (a.mass + b.mass);
         let (weight_a, weight_b) = (b.mass * inv, a.mass * inv);
+
         self.bonds.insert(Bond::BodyContact(BodyContact {
             body_a,
             body_b,
@@ -306,21 +299,26 @@ fn solve_world_contact(b: &mut RigidBody, c: &Contact) {
     let k = -c.softness;
     let u = (r.cross(w) + v) * k + c.bias * n;
     let d = u.dot(n);
+
     if !(d > 0.0) {
         return;
     }
+
     let mut j = n * d;
     let t = u - j;
     let tlen = t.length();
     let mut slide = 0.0f32;
+
     if tlen > 0.0 {
         let inv = 1.0 / tlen;
         let d = t * inv;
         let jlen = j.length();
         let limit = c.friction * jlen;
         let k = 24.5 / 3600.0;
+
         let m = if tlen > limit {
             slide = (((tlen - limit) * jlen) * 60.0) * 8.0 + 0.0;
+
             if limit > k {
                 slide += ((jlen * (limit - k)) * 60.0) * 8.0;
                 k
@@ -329,14 +327,17 @@ fn solve_world_contact(b: &mut RigidBody, c: &Contact) {
             }
         } else if tlen > k {
             slide = 0.0 + ((jlen * (tlen - k)) * 60.0) * 8.0;
+
             k
         } else {
             tlen
         };
+
         j.x += d.x * m;
         j.y += d.y * m;
         j.z += m * d.z;
     }
+
     b.slide += slide;
     b.impulse += j;
     b.ang_impulse = j.cross(r) + b.ang_impulse;
@@ -349,18 +350,22 @@ fn solve_body_contact(bodies: &mut Table<RigidBody>, c: &BodyContact) {
     let ns = -s;
     let u = (va + ra.cross(wa)) * ns + bias * n + (rb.cross(wb) + vb) * s;
     let d = u.dot(n);
+
     if !(d > 0.0) {
         return;
     }
+
     let mut j = n * d;
     let t = u - j;
     let tlen = t.length();
+
     if tlen > 0.0 {
         let inv = 1.0 / tlen;
         let d = t * inv;
         let jlen = j.length();
         let limit = c.friction * jlen;
         let m = if limit < tlen { limit } else { tlen };
+
         j.x += d.x * m;
         j.y += d.y * m;
         j.z += m * d.z;
@@ -372,6 +377,7 @@ fn solve_body_contact(bodies: &mut Table<RigidBody>, c: &BodyContact) {
         let l = a.ang_impulse;
         a.ang_impulse = j.cross(ra) * wa_ + l;
     }
+
     if let Some(b) = bodies.get_mut(c.body_b) {
         b.impulse = nwb * j + b.impulse;
         let l = b.ang_impulse;
@@ -386,41 +392,51 @@ fn solve_ground_contact(b: &mut RigidBody, c: &GroundContact) {
     let nd = -c.damping;
     let u = (v + 0.0 - g) * nd + (c.drift * k + push * n);
     let d = u.dot(n);
+
     if !(d > 0.0) {
         return;
     }
+
     let mut j = n * d;
     let t = u - j;
     let tl = t.length();
+
     if tl > 0.0 {
         let inv = 1.0 / tl;
         let d = t * inv;
         let jl = j.length();
         let limit = c.friction * jl;
         let m = if limit < tl { limit } else { tl };
+
         j.x += d.x * m;
         j.y += d.y * m;
         j.z += d.z * m;
     }
+
     let w = d * 1024.0;
     let w = if 1.0 < w { 1.0 } else { w };
     b.impulse = Vec3::new(b.impulse.x + j.x, c.lift * j.y + b.impulse.y, j.z + b.impulse.z);
+
     let a = (c.stiffness * c.spin_gain) * w;
     let s = (-c.damping * c.spin_gain) * w;
     let av = b.ang_vel;
     let l = b.ang_impulse;
+
     b.ang_impulse = s * av + a * c.spin + l;
 }
 
 fn apply_impulses(b: &mut RigidBody) {
     b.vel += b.impulse;
+
     let mut l = b.ang_momentum + b.ang_impulse;
     let len = l.length();
     let cap = b.min_inertia * 8.0;
+
     if len > cap {
         let s = cap / len;
         l *= s;
     }
+
     b.ang_momentum = l;
     b.ang_vel = angular_velocity(&b.rot, l, b.inv_inertia);
 }

@@ -74,18 +74,23 @@ impl Sim {
             self.corp_state[k].credit = rating.max(0);
             self.scale_missions_for_manager(k, rating);
         }
+
         self.disconnect_phone(k);
+
         let base = &self.world.map.level.bases[k];
         let mut rot = IDENTITY;
         let axis = rot[1];
         rotate_orientation(&mut rot, axis, (base.table_orientation as f64 - 90.0_f64.to_radians()) as f32);
+
         if let Some(id) = self.create_item(ItemKind::Phone, base.table, None, rot) {
             if let Some(phone) = self.items.get_mut(id).and_then(|i| i.state.phone_mut()) {
                 phone.texture = 0;
                 phone.number = (k as i32 + 1) * PHONE_NUMBER_STEP;
             }
+
             self.phone_update(id);
         }
+
         self.corp_state[k].manager = Some(pid);
         let name = self.players.get(pid.idx()).map_or(String::new(), |p| p.username.clone());
         self.send_chat(&format!("{name} is now manager of {}", Team::CORPORATION_NAMES[k]), ChatType::Announce, -1, 0);
@@ -125,16 +130,20 @@ impl Sim {
     pub(crate) fn update_corp_player_ratings(&mut self, k: usize) {
         let team = Team::CORPORATIONS[k];
         let members = self.players.iter().filter(|(_, p)| p.team == team).count() as i32;
+
         if members == 0 {
             return;
         }
+
         let tenth = self.corp_state[k].money / 10;
         let share = if tenth < 0 { tenth * 2 } else { tenth };
         let (manager_share, member_share) = if members == 1 { (share, share) } else { (share / 2, share / 2 / (members - 1)) };
         let manager = self.corp_state[k].manager;
+
         for (i, p) in self.players.iter_mut().filter(|(_, p)| p.team == team) {
             p.corp_rating += if manager.is_some_and(|m| m.idx() == i) { manager_share } else { member_share };
         }
+
         self.corp_state[k].money = 0;
     }
 
@@ -144,9 +153,11 @@ impl Sim {
         if self.corp_state[k].manager != Some(pid) {
             return;
         }
+
         if self.rules.world_corporations {
             self.update_corp_player_ratings(k);
         }
+
         self.corp_state[k].manager = None;
     }
 
@@ -186,19 +197,23 @@ impl Sim {
         if hit.area == -1 {
             return;
         }
+
         let word = map.level.area.collision_cell_resolved(hit.block.x, hit.block.y, hit.block.z) & 0xfcffffff;
         if self.gamestate != GameState::InGame || !self.rules.door_knocks {
             return;
         }
+
         let Some(k) = self.players.get(player.unwrap_or(PlayerId(0)).idx()).and_then(|p| team_index(p.team)) else { return };
         let base = &map.level.bases[k];
         let (a, b) = (base.interior_min, base.interior_max);
         if pos.x < a.x - DOOR_REACH || b.x + DOOR_REACH <= pos.x || pos.z < a.z - DOOR_REACH || DOOR_REACH + b.z <= pos.z {
             return;
         }
+
         let garage = map.level.tables.garage_door();
         let frame = (garage[0] | MESH) <= word && word <= (garage[3] | MESH);
         let door = hit.object == GARAGE_DOOR as i32;
+
         match (self.corp_state[k].door_open, door || frame, frame) {
             (false, true, _) => self.set_team_door(k, true),
             (true, _, true) => self.set_team_door(k, false),

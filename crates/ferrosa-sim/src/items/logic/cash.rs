@@ -19,13 +19,14 @@ impl Sim {
             _ => {}
         }
 
-        let Some(c) = self.items.get_mut(item_id).and_then(|i| i.state.cash_mut()) else { return };
-        if c.spread < 0 {
-            c.spread = 0;
+        let Some(cash) = self.items.get_mut(item_id).and_then(|i| i.state.cash_mut()) else { return };
+
+        if cash.spread < 0 {
+            cash.spread = 0;
         }
 
-        if c.bills < c.spread {
-            c.spread = c.bills;
+        if cash.bills < cash.spread {
+            cash.spread = cash.bills;
         }
     }
 

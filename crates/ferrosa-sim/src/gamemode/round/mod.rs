@@ -1,11 +1,10 @@
 use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::{
-    GameMode, Team,
-    clientbound::game::{GameState, ItemKind, MenuType, events::chat::ChatType},
+    GameMode, Team, clientbound::game::{GameState, ItemKind, MenuType, VehicleKind, events::chat::ChatType},
 };
 use glam::Vec3;
 
-use crate::{PlayerId, items::state::ItemState};
+use crate::{PlayerId, items::state::ItemState, sim::memos, traffic::spawn::create_traffic_car};
 use crate::{
     items,
     sim::{Sim, missions},
@@ -149,19 +148,6 @@ fn round_corp(team: Team) -> Option<usize> {
     Team::CORPORATIONS[..ROUND_CORPS].iter().position(|&t| t == team)
 }
 
-/// sprintf_comma: thousands separated by commas.
-fn comma(v: i32) -> String {
-    let digits = v.unsigned_abs().to_string();
-    let mut out = String::new();
-    for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(c);
-    }
-    if v < 0 { format!("-{out}") } else { out }
-}
-
 impl Sim {
     /// The corporation player counts of logic_simulation: active players on a corporation team with a human (in round
     /// mode, with or without).
@@ -222,10 +208,12 @@ impl Sim {
         if on_teams == 0 {
             if self.round_max_time != timer {
                 self.game_timer = timer - 1;
+
                 if (5402..=IDLE_TIME).contains(&timer) {
                     self.game_timer = IDLE_TIME;
                     return;
                 }
+
                 return self.intermission_countdown(false);
             }
 
@@ -234,6 +222,7 @@ impl Sim {
 
             if (5402..=IDLE_TIME).contains(&timer) {
                 self.game_timer = IDLE_TIME;
+
                 return;
             }
 
@@ -259,20 +248,26 @@ impl Sim {
         if all_ready && self.game_timer > ROUND_START {
             self.game_timer = ROUND_START;
         }
+
         if self.game_timer == ROUND_START {
             self.round_setup();
         }
+
         if self.game_timer > ROUND_START - 1 {
             return;
         }
+
         let all_driving =
             self.players.iter().all(|(_, p)| round_corp(p.team).is_none() || p.human.and_then(|h| self.humans.get(h)).is_none_or(|h| h.vehicle.is_some()));
+
         if all_driving {
             self.game_timer -= 7;
         }
+
         if self.game_timer > 0 {
             return;
         }
+
         for k in 0..ROUND_CORPS {
             for slot in 0..missions::MISSION_SLOTS {
                 if self.corp_state[k].missions[slot].active {
@@ -280,10 +275,12 @@ impl Sim {
                 }
             }
         }
+
         for k in 0..ROUND_CORPS {
             self.push_team_door_event(k, true);
             self.corp_state[k].door_open = true;
         }
+
         self.apply_team_doors();
         self.gamestate = GameState::InGame;
         self.game_timer = self.modes.round.cfg.roundtime * DAY;
@@ -292,55 +289,66 @@ impl Sim {
     /// The round set up at 5400 ticks: traffic, the vehicle stock, the missions, the managers announced, each round
     /// corporation's town car (and minivan for more than four players) and the two phones on its table.
     fn round_setup(&mut self) {
-        self.do_traffic = Some(crate::sim::traffic::TRAFFIC_CARS);
+        self.do_traffic = Some(128);
         self.randomize_corp_vehicle_stock();
         self.generate_round_missions();
+
         for k in 0..ROUND_CORPS {
             if let Some(m) = self.corp_state[k].manager.and_then(|m| self.players.get(m.idx())) {
                 let line = format!("{} Manager: {}", TEAM_NAMES[k], m.username);
                 self.send_chat(&line, ChatType::Announce, -1, 0);
             }
         }
+
         for k in 0..ROUND_CORPS {
             if let Some(v) = self.corporation_spawn_vehicle(ferrosa_protocol::clientbound::game::VehicleKind::TownCar, k, 0) {
                 let map = &self.world.map;
-                let car = crate::traffic::spawn::create_traffic_car(
+                let car = create_traffic_car(
                     &mut self.traffic,
                     map,
                     &self.vehicle_types,
-                    ferrosa_protocol::clientbound::game::VehicleKind::TownCar,
+                    VehicleKind::TownCar,
                     0,
                     0,
                     0,
                     0,
                     0.0,
                 );
+
                 self.traffic.cars[car].is_bot = 0;
                 self.traffic.cars[car].vehicle = v as i32;
+
                 if let Some(veh) = self.vehicles.get_mut(v) {
                     veh.traffic_car = car as i32;
                 }
             }
+
             if self.corp_state[k].player_count > MINIVAN_PLAYERS {
                 self.corporation_spawn_vehicle(ferrosa_protocol::clientbound::game::VehicleKind::Minivan, k, 0);
             }
+
             let base = &self.world.map.level.bases[k];
             let mut rot = IDENTITY;
             let axis = rot[1];
             rotate_orientation(&mut rot, axis, (base.table_orientation as f64 - 90.0_f64.to_radians()) as f32);
+
             let axis = rot[1];
             rotate_orientation(&mut rot, axis, 180.0_f32.to_radians());
+
             let t = base.table;
             let [r0, _, r2] = rot;
             let first = PHONE_BACK * r2 + t;
             let second = PHONE_SIDE * r0 + first;
             let number = (k as i32 + 1) * PHONE_NUMBER_STEP + 1;
+
             for (pos, texture, number) in [(first, 0, number - 1), (second, 1, number)] {
                 let Some(id) = self.create_item(ItemKind::Phone, pos, None, rot) else { continue };
+
                 if let Some(p) = self.items.get_mut(id).and_then(|i| i.state.phone_mut()) {
                     p.texture = texture;
                     p.number = number;
                 }
+
                 self.phone_update(id);
             }
         }
@@ -358,19 +366,21 @@ impl Sim {
         let mut rot = IDENTITY;
         let axis = rot[1];
         rotate_orientation(&mut rot, axis, yaw);
-        let Some(p) = self.players.get_mut(pid.idx()) else { return };
-        p.customization.model = 1;
-        if p.customization.suit_color <= 2 {
-            p.customization.suit_color = k as u8;
-        }
-        p.customization.tie_color = TIES[k];
-        let Some(h) = self.spawn_human(pos, &rot, Some(pid)) else { return };
-        let Some(p) = self.players.get_mut(pid.idx()) else { return };
-        p.human = Some(h);
-        p.ghost_human = false;
-        p.menu = MenuType::Empty;
-        if let Some(hu) = self.humans.get_mut(h) {
-            hu.view_yaw = yaw;
+
+        let Some(player) = self.players.get_mut(pid.idx()) else { return };
+
+        player.customization.model = 1;
+        if player.customization.suit_color <= 2 { player.customization.suit_color = k as u8; }
+        player.customization.tie_color = TIES[k];
+
+        let Some(human_id) = self.spawn_human(pos, &rot, Some(pid)) else { return };
+        let Some(player) = self.players.get_mut(pid.idx()) else { return };
+        player.human = Some(human_id);
+        player.ghost_human = false;
+        player.menu = MenuType::Empty;
+
+        if let Some(human) = self.humans.get_mut(human_id) {
+            human.view_yaw = yaw;
         }
 
         self.update_player_event(pid);
@@ -380,6 +390,7 @@ impl Sim {
     fn round_in_game(&mut self) {
         self.game_timer -= 1;
         self.round_elapsed += 1;
+
         if self.game_timer % DAY == 0 {
             for (_, p) in self.players.iter_mut() {
                 p.items_bought = 0;
@@ -389,9 +400,11 @@ impl Sim {
                 p.bills_withdrawn = 0;
             }
         }
+
         if self.round_elapsed > LOOT_GRACE && !self.loot_all_in_bases() && self.all_members_home() {
             self.game_timer -= 10;
         }
+
         for k in 0..ROUND_CORPS {
             let team = Team::CORPORATIONS[k];
             if !self.corp_state[k].door_open && !self.players.iter().any(|(_, p)| p.team == team && p.human.is_some()) {
@@ -400,12 +413,15 @@ impl Sim {
                 self.apply_team_doors();
             }
         }
+
         if self.loot_all_in_vaults() && self.game_timer > ENDGAME {
             self.game_timer = ENDGAME;
         }
+
         if !self.players.iter().any(|(_, p)| !p.is_bot && p.human.is_some()) && self.game_timer > ENDGAME {
             self.game_timer = ENDGAME;
         }
+
         if self.game_timer <= 0 {
             self.round_complete();
             self.gamestate = GameState::Restarting;
@@ -420,16 +436,16 @@ impl Sim {
     /// Whether every disk and round cash lies inside one of the round corporations' bases.
     fn loot_all_in_bases(&self) -> bool {
         let bases = &self.world.map.level.bases[..ROUND_CORPS];
+
         self.items.iter().filter(|(_, i)| Self::is_loot(i.item_type)).all(|(_, i)| bases.iter().any(|b| b.contains(i.pos2)))
     }
 
     /// Whether every round corporation member with a human is inside their own base.
     fn all_members_home(&self) -> bool {
         (0..ROUND_CORPS).all(|k| {
-            let team = Team::CORPORATIONS[k];
             self.players
                 .iter()
-                .filter(|(_, p)| p.team == team)
+                .filter(|(_, p)| p.team == Team::CORPORATIONS[k])
                 .filter_map(|(_, p)| p.human.and_then(|h| self.humans.get(h)))
                 .all(|h| self.world.map.level.bases[k].contains(h.pos))
         })
@@ -438,27 +454,32 @@ impl Sim {
     /// is_position_in_vault for every disk and round cash, against any round corporation's vault.
     fn loot_all_in_vaults(&self) -> bool {
         let bases = &self.world.map.level.bases[..ROUND_CORPS];
+
         self.items.iter().filter(|(_, i)| Self::is_loot(i.item_type)).all(|(_, i)| bases.iter().any(|b| b.in_vault(i.pos2, 0.0)))
     }
 
     fn round_restarting(&mut self) {
         self.game_timer -= 1;
-        let t = self.game_timer;
-        if t == TOP10_HEADER {
+
+        if self.game_timer == TOP10_HEADER {
             self.send_chat("Top 10 list", ChatType::Announce, -1, 0);
-        } else if t <= TOP10_FIRST && t > 0 && (TOP10_FIRST - t) % TOP10_STEP == 0 {
-            self.print_top10((TOP10_FIRST - t) / TOP10_STEP);
+        } else if self.game_timer <= TOP10_FIRST && self.game_timer > 0 && (TOP10_FIRST - self.game_timer) % TOP10_STEP == 0 {
+            self.print_top10((TOP10_FIRST - self.game_timer) / TOP10_STEP);
         }
-        if t > 0 {
+
+        if self.game_timer > 0 {
             return;
         }
+
         for (_, p) in self.players.iter_mut() {
             p.manager_tab = false;
         }
+
         for k in 0..ROUND_CORPS {
             let team = Team::CORPORATIONS[k];
             let price = self.corporations[k].price;
             let mut best = (0, None);
+
             for (i, p) in self.players.iter().filter(|(_, p)| p.team == team) {
                 let worth = if self.modes.round.cfg.weekly {
                     self.saved_accounts.players.iter().find(|a| a.account_id == p.account_id).map_or(0, |a| a.money as i32)
@@ -469,36 +490,44 @@ impl Sim {
                     }
                     continue;
                 };
+
                 if worth > best.0 {
                     best = (worth, Some(i));
                 }
             }
+
             if let (_, Some(i)) = best {
                 if let Some(p) = self.players.get_mut(i) {
                     p.manager_tab = true;
                 }
+
                 if self.corp_state[k].manager != Some(PlayerId(i as u32)) {
                     self.corp_state[k].manager = Some(PlayerId(i as u32));
                     self.corp_state[k].fired.clear();
                 }
             }
         }
+
         for pid in self.players.iter().map(|(_, p)| p.player_id).collect::<Vec<_>>() {
             self.save_inventory(pid);
         }
+
         self.reset_game();
     }
 
     /// print_top10_money_list: line `n` of the accounts ranked by money.
     fn print_top10(&mut self, n: i32) {
-        let name = |n: &[u8]| String::from_utf8_lossy(n.split(|&b| b == 0).next().unwrap_or(&[])).into_owned();
-        let mut ranked: Vec<(u32, String)> = self.saved_accounts.players.iter().map(|a| (a.money, name(&a.player_name))).collect();
+        let mut ranked: Vec<(u32, String)> = self.saved_accounts.players.iter().map(|a| (a.money, a.name())).collect();
+
         if n as usize >= ranked.len() {
             return;
         }
+
         ranked.sort_by_key(|&(m, _)| std::cmp::Reverse(m as i32));
+
         let (money, name) = &ranked[n as usize];
-        let line = format!("{}. {}   ${}", n + 1, name, comma(*money as i32));
+        let line = format!("{}. {}   ${}", n + 1, name, memos::with_commas(*money as i32));
+
         self.send_chat(&line, ChatType::Announce, -1, 0);
     }
 
@@ -523,12 +552,13 @@ impl Sim {
             corp.shares = WEEK_SHARES;
             corp.price = WEEK_PRICE;
         }
-        let startcash = self.modes.round.cfg.startcash;
+
         for (_, p) in self.players.iter_mut() {
-            p.money = startcash;
+            p.money = self.modes.round.cfg.startcash;
             p.stocks = 0;
             p.saved_inventory = Default::default();
         }
+
         self.modes.round.weekday = 1;
     }
 
@@ -538,14 +568,17 @@ impl Sim {
         if self.modes.round.cfg.weekly {
             return;
         }
+
         for (_, p) in self.players.iter() {
             if p.account_id == u32::MAX {
                 continue;
             }
+
             let worth = match self.corporations.get(p.team as usize) {
                 Some(c) => (p.money as f32 + p.stocks as f32 * (SALE_SHARE * c.price)) as i32,
                 None => p.money,
             };
+
             if let Some(a) = self.saved_accounts.get_player_data(p.account_id) {
                 a.money = worth as u32;
             }
@@ -555,10 +588,10 @@ impl Sim {
     /// reset_game's weather outside world mode, rolled before the reseed: a sun angle (the first roll is thrown away),
     /// the clock at 11:00 and an axial tilt.
     pub(crate) fn roll_weather(&mut self) {
-        let pi = 3.14159265359;
-        let angle = (((rand::random_range(0..256) as i32 + SUN_BASE) as f64 * pi) * SUN_SPAN * SUN_STEP) as f32;
+        let angle = (((rand::random_range(0..256) as i32 + SUN_BASE) as f64 * std::f64::consts::PI) * SUN_SPAN * SUN_STEP) as f32;
+        let tilt = ((rand::random_range(0..256) as f64 * std::f64::consts::PI) * SUN_STEP) as f32;
+
         self.world_time = CLOCK_START;
-        let tilt = ((rand::random_range(0..256) as f64 * pi) * SUN_STEP) as f32;
         self.world.set_sun(angle, tilt);
     }
 
@@ -567,6 +600,7 @@ impl Sim {
     pub(crate) fn reset_round(&mut self) {
         self.save_accounts();
         self.save_stats();
+
         self.modes.round.weekday += 1;
         if self.modes.round.cfg.weekly && self.modes.round.weekday > WEEK_DAYS {
             self.weekly_reset();
@@ -576,6 +610,7 @@ impl Sim {
         self.round_elapsed = 0;
         self.round_max_time = game_minutes(2);
         self.game_timer = game_minutes(2);
+
         self.reset_corporation_rounds();
         self.reset_lobby_players_and_world();
     }
@@ -584,32 +619,36 @@ impl Sim {
     /// managers dropped and the share prices set to 100 on the first reset, and the shares counted again.
     pub(crate) fn reset_corporation_rounds(&mut self) {
         let first = self.round_number == 0;
-        for (k, c) in self.corp_state.iter_mut().enumerate() {
-            c.funds = 0;
-            c.player_count = 0;
-            c.car_space_taken.clear();
+
+        for (k, corp_state) in self.corp_state.iter_mut().enumerate() {
+            corp_state.funds = 0;
+            corp_state.player_count = 0;
+            corp_state.car_space_taken.clear();
+
             if first {
-                c.manager = None;
+                corp_state.manager = None;
             }
-            let team = Team::CORPORATIONS[k];
+
             let corp = &mut self.corporations[k];
+
             if first {
                 corp.price = 100.0;
             }
-            corp.shares = 100 + self.players.iter().filter(|(_, p)| p.team == team).map(|(_, p)| p.stocks).sum::<i32>();
+
+            corp.shares = 100 + self.players.iter().filter(|(_, p)| p.team == Team::CORPORATIONS[k]).map(|(_, p)| p.stocks).sum::<i32>();
         }
     }
 
     /// The lobby part of reset_game outside world mode: every player back in the lobby without a human, the world
     /// emptied and the round counted.
     pub(crate) fn reset_lobby_players_and_world(&mut self) {
-        for (_, p) in self.players.iter_mut() {
-            p.items_bought = 0;
-            p.vehicles_bought = 0;
-            p.human = None;
-            p.ghost_human = false;
-            p.is_ready = false;
-            p.menu = MenuType::Lobby;
+        for (_, player) in self.players.iter_mut() {
+            player.items_bought = 0;
+            player.vehicles_bought = 0;
+            player.human = None;
+            player.ghost_human = false;
+            player.is_ready = false;
+            player.menu = MenuType::Lobby;
         }
 
         self.clear_world();
@@ -620,6 +659,7 @@ impl Sim {
     /// started over and each connection's object and event state with it.
     pub(crate) fn clear_world(&mut self) {
         let gravity = self.bodies.gravity_scale;
+
         self.bodies = ferrosa_physics::RigidBodies::default();
         self.bodies.gravity_scale = gravity;
         self.humans = ferrosa_physics::Table::new(crate::human::MAX_HUMANS);
@@ -630,33 +670,40 @@ impl Sim {
         self.traffic = crate::traffic::Traffic::new(&self.world.map.streets, self.world.map.map_name == "round");
         self.events.clear();
 
-        for c in self.clients.values_mut() {
-            c.reset_for_round();
+        for clients in self.clients.values_mut() {
+            clients.reset_for_round();
         }
     }
 
     /// save_inventory: what the player's human holds, kept for their next human.
     pub(crate) fn save_inventory(&mut self, pid: PlayerId) {
-        let Some(p) = self.players.get_mut(pid.idx()) else { return };
-        p.saved_inventory = Default::default();
-        let Some(h) = p.human.and_then(|h| self.humans.get(h)) else { return };
+        let Some(player) = self.players.get_mut(pid.idx()) else { return };
+        player.saved_inventory = Default::default();
+
+        let Some(human) = player.human.and_then(|h| self.humans.get(h)) else { return };
+
         let mut saved: [Vec<SavedItem>; 7] = Default::default();
         let mut keys = Vec::new();
-        for (slot, s) in h.inventory.iter().enumerate() {
+
+        for (slot, s) in human.inventory.iter().enumerate() {
             for &id in &s.items[..s.count.max(0) as usize] {
                 let Some(item) = self.items.get(id as usize) else { continue };
                 let kind = item.item_type as i32;
+
                 if kind <= ItemKind::Bandage as i32 {
                     let left = item.state.left();
-                    let mut entry = SavedItem { kind, a: 0, b: left };
+                    let mut entry = SavedItem { kind, a: 0, b: item.state.left() };
+
                     if let Some(mag) = item.children.first().and_then(|&c| self.items.get(c)) {
                         let rounds = mag.state.left();
                         entry.a = 1;
                         entry.b = rounds;
+
                         if left > 0 && rounds <= self.item_types[mag.item_type as usize].magazine_ammo {
                             entry.b = rounds + 1;
                         }
                     }
+
                     saved[slot].push(entry);
                 } else if item.item_type == ItemKind::Key {
                     if let ItemState::Key { vehicle: Some(v) } = item.state
@@ -674,9 +721,11 @@ impl Sim {
                 }
             }
         }
+
         for (_, v) in keys {
             self.save_world_key(v);
         }
+
         if let Some(p) = self.players.get_mut(pid.idx()) {
             p.saved_inventory = saved;
         }
@@ -690,51 +739,63 @@ impl Sim {
         let team = p.team;
         let saved = p.saved_inventory.clone();
         let Some(pos) = self.humans.get(human).map(|h| h.bones[0].pos) else { return };
+
         for (slot, items) in saved.iter().enumerate() {
-            for s in items {
-                let Ok(kind) = ItemKind::try_from(s.kind as u8) else { continue };
-                let item = if s.kind <= ItemKind::Bandage as i32 {
+            for saved_item in items {
+                let Ok(kind) = ItemKind::try_from(saved_item.kind as u8) else { continue };
+
+                let item = if saved_item.kind <= ItemKind::Bandage as i32 {
                     let Some(id) = self.create_item(kind, pos, None, IDENTITY) else { continue };
-                    if !self.item_types[s.kind as usize].is_gun {
+
+                    if !self.item_types[saved_item.kind as usize].is_gun {
                         if let Some(i) = self.items.get_mut(id) {
-                            i.state.set_left(s.b);
+                            i.state.set_left(saved_item.b);
                         }
-                    } else if s.a > 0
-                        && let Ok(mag_kind) = ItemKind::try_from(s.kind as u8 + 1)
+                    } else if saved_item.a > 0
+                        && let Ok(mag_kind) = ItemKind::try_from(saved_item.kind as u8 + 1)
                         && let Some(mag) = self.create_item(mag_kind, pos, None, IDENTITY)
                     {
                         if let Some(i) = self.items.get_mut(mag) {
-                            i.state.set_left(s.b);
+                            i.state.set_left(saved_item.b);
                         }
+
                         items::attach_child(&mut self.items, &self.item_types, id, mag);
                     }
+
                     id
                 } else if kind == ItemKind::Key && self.rules.keys_keep_vehicles {
                     let Some(id) = self.create_item(ItemKind::Key, pos, None, IDENTITY) else { continue };
-                    let v = self.world_key_vehicle(s.a);
+                    let v = self.world_key_vehicle(saved_item.a);
+
                     if let Some(i) = self.items.get_mut(id) {
                         i.state = ItemState::Key { vehicle: v };
                     }
+
                     id
                 } else if kind == ItemKind::Key {
                     let Some(k) = round_corp(team) else { continue };
-                    let Some(kind) = u8::try_from(s.a).ok().and_then(|a| ferrosa_protocol::clientbound::game::VehicleKind::try_from(a).ok()) else { continue };
-                    let Some(v) = self.corporation_spawn_vehicle(kind, k, s.b) else { continue };
+                    let Some(kind) = u8::try_from(saved_item.a).ok().and_then(|a| ferrosa_protocol::clientbound::game::VehicleKind::try_from(a).ok()) else { continue };
+                    let Some(v) = self.corporation_spawn_vehicle(kind, k, saved_item.b) else { continue };
                     let Some(id) = self.create_item(ItemKind::Key, pos, None, IDENTITY) else { continue };
+
                     if let Some(i) = self.items.get_mut(id) {
                         i.state = ItemState::Key { vehicle: Some(v) };
                     }
+
                     id
                 } else if kind == ItemKind::CashWorld {
                     let Some(id) = self.create_item(kind, pos, None, IDENTITY) else { continue };
+
                     if let Some(c) = self.items.get_mut(id).and_then(|i| i.state.cash_mut()) {
-                        c.bills = s.a;
-                        c.codes = s.b as u32;
+                        c.bills = saved_item.a;
+                        c.codes = saved_item.b as u32;
                     }
+
                     id
                 } else {
                     continue;
                 };
+
                 self.link_to_slot(human, item, slot);
             }
         }

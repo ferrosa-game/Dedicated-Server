@@ -97,11 +97,15 @@ impl AreaGrid {
         if !self.in_range(x, y, z) {
             return None;
         }
+
         let page = self.chunk_pages[self.chunk_slot(x, y, z)];
+
         if page == NONE {
             return None;
         }
+
         let id = self.block_records[page as usize * PAGE + Self::block_slot(x, y, z)];
+
         (id != NONE).then_some(id as usize)
     }
 
@@ -117,11 +121,14 @@ impl AreaGrid {
     /// Every block with a record: the cell its 8 x 8 x 8 cells start at, and the record.
     pub fn blocks(&self) -> impl Iterator<Item = (IVec3, &BlockRecord)> + '_ {
         let c = self.chunks;
+
         (0..c.x).flat_map(move |cx| (0..c.y).flat_map(move |cy| (0..c.z).map(move |cz| IVec3::new(cx, cy, cz)))).flat_map(move |chunk| {
             let page = self.chunk_pages[((chunk.x * c.y + chunk.y) * c.z + chunk.z) as usize];
+
             (0..PAGE).filter(move |_| page != NONE).filter_map(move |slot| {
                 let id = self.block_records[page as usize * PAGE + slot];
                 let block = IVec3::new((slot >> 6) as i32, ((slot >> 3) & 7) as i32, (slot & 7) as i32);
+
                 (id != NONE).then(|| ((chunk * 8 + block) * 8, &*self.records[id as usize]))
             })
         })
@@ -131,16 +138,21 @@ impl AreaGrid {
         if !self.in_range(x, y, z) {
             return None;
         }
+
         let chunk = self.chunk_slot(x, y, z);
+
         if self.chunk_pages[chunk] == NONE {
             self.chunk_pages[chunk] = (self.block_records.len() / PAGE) as u32;
             self.block_records.resize(self.block_records.len() + PAGE, NONE);
         }
+
         let slot = self.chunk_pages[chunk] as usize * PAGE + Self::block_slot(x, y, z);
+
         if self.block_records[slot] == NONE {
             self.block_records[slot] = self.records.len() as u32;
             self.records.push(BlockRecord::new());
         }
+
         Some(&mut self.records[self.block_records[slot] as usize])
     }
 
@@ -158,6 +170,7 @@ impl AreaGrid {
         if v & TYPE_MASK != FOOTPRINT {
             return v;
         }
+
         self.layer1(x - (v & 255) as i32, y - ((v >> 16) & 255) as i32, z - ((v >> 8) & 255) as i32)
     }
 
@@ -177,6 +190,7 @@ impl AreaGrid {
         if !self.in_range(x, y, z) {
             return;
         }
+
         if let Some(i) = self.record_id(x, y, z) {
             self.records[i].object[cell_index(x, y, z)] = v;
         }
@@ -185,6 +199,7 @@ impl AreaGrid {
     pub fn set_item_set(&mut self, x: i32, y: i32, z: i32, v: u32) {
         if let Some(r) = self.record_mut(x, y, z) {
             let c = cell_index(x, y, z);
+
             r.item_set[c] = v;
             r.taken[c] = 0;
         }
@@ -205,6 +220,7 @@ impl AreaGrid {
         if !self.in_range(x, y, z) {
             return;
         }
+
         if let Some(i) = self.record_id(x, y, z) {
             self.records[i].taken[cell_index(x, y, z)] = mask;
         }
@@ -217,6 +233,7 @@ impl AreaGrid {
                 if r.layer1[c] & TYPE_MASK == MESH {
                     r.layer1[c] &= 0xff00_ffff;
                 }
+
                 r.taken[c] = 0;
             }
         }
@@ -226,12 +243,15 @@ impl AreaGrid {
     /// bit 15 set, less those against neighbouring cubes.
     pub fn create_block(&mut self, x: i32, y: i32, z: i32, v: u32, textures: [u16; 8], dims: &dyn BlockDims) {
         let faces = textures.iter().enumerate().fold(0u8, |m, (i, &w)| if (w as i16) >= 0 { m | 1 << i } else { m });
+
         if x < 0 || y < 0 || z < 0 || v == 0 {
             return;
         }
+
         if self.record_mut(x, y, z).is_none() {
             return;
         }
+
         match v & TYPE_MASK {
             CUBE => {
                 let Some(r) = self.record_mut(x, y, z) else { return };
@@ -242,6 +262,7 @@ impl AreaGrid {
                 r.cell_textures[c] = textures;
 
                 let below = self.layer0(x, y - 1, z);
+
                 if below & TYPE_MASK == CUBE || y == 0 {
                     self.and_layer0(x, y, z, !1);
                     self.set_layer0(x, y - 1, z, below & !32);
@@ -267,8 +288,10 @@ impl AreaGrid {
             MESH => {
                 let Some(r) = self.record_mut(x, y, z) else { return };
                 let c = cell_index(x, y, z);
+
                 r.layer0[c] = v;
                 r.cell_textures[c] = textures;
+
                 self.footprint(x, y, z, v, dims, Self::set_layer0);
             }
 
@@ -298,6 +321,7 @@ impl AreaGrid {
 
     fn footprint(&mut self, x: i32, y: i32, z: i32, v: u32, dims: &dyn BlockDims, set: fn(&mut Self, i32, i32, i32, u32)) {
         let d = dims.dims(v & 65535);
+
         for i in 0..d.y {
             for j in 0..d.z {
                 for r in 0..d.x {

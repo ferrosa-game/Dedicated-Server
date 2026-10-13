@@ -1,4 +1,5 @@
 use ferrosa_protocol::{Team, clientbound::game::events::chat::ChatType};
+use ferrosa_world::skeleton::BoneId;
 use glam::Vec3;
 
 use super::Sim;
@@ -83,36 +84,31 @@ impl Sim {
         usize::try_from(team).ok().and_then(|t| self.world.map.level.bases.get(t)).is_some_and(|b| b.contains(pos))
     }
 
-    /// punish_team_kill: outside world and eliminator modes, a player who hurt a teammate takes a share of the damage
-    /// to their own head.
-    pub(crate) fn punish_team_kill(&mut self, player: PlayerId, damage: i32) {
-        if self.players.get(player.idx()).is_none_or(|p| p.god_mode) || damage <= 0 || !self.rules.punish_team_kills {
-            return;
-        }
-        self.handle_team_kill(player, damage);
-    }
-
     /// The /godmode chat command: the player's god mode on or off, announced to admins.
     pub(crate) fn godmode_command(&mut self, pid: PlayerId) {
         let Some(p) = self.players.get_mut(pid.idx()) else { return };
-
         p.god_mode = !p.god_mode;
+
         let line = if p.god_mode { "godmode on" } else { "godmode off" };
         self.send_chat(line, ChatType::AdminChat, -1, 0);
     }
 
     /// handle_team_kill: the team damage is logged and dealt to the player's head, and the player's details resent.
-    fn handle_team_kill(&mut self, player: PlayerId, damage: i32) {
-        let Some(p) = self.players.get(player.idx()) else { return };
+    pub fn handle_team_kill(&mut self, player: PlayerId, damage: i32) {
+        let Some(player) = self.players.get(player.idx()) else { return };
 
-        println!("[Sim] {}({}) team damage: {damage}", p.username, p.phone_number);
-
-        let share = self.rules.team_damage;
-        if let Some(h) = p.human.and_then(|h| self.humans.get_mut(h)) {
-            damage_human(h, crate::human::BoneId::Head, damage * share / 100);
+        if player.god_mode || damage <= 0 || !self.rules.punish_team_kills {
+            return;
         }
 
-        let (update, round) = (p.make_update_player_event(self.tick), p.make_update_round_event(self.tick));
+        println!("[Sim] {}({}) team damage: {damage}", player.username, player.phone_number);
+
+        let share = self.rules.team_damage;
+        if let Some(h) = player.human.and_then(|h| self.humans.get_mut(h)) {
+            damage_human(h, BoneId::Head, damage * share / 100);
+        }
+
+        let (update, round) = (player.make_update_player_event(self.tick), player.make_update_round_event(self.tick));
         self.events.push(update);
         self.events.push(round);
     }
@@ -120,13 +116,16 @@ impl Sim {
     /// The scoring of one player hurting another: a teammate is punished (not in eliminator) and the attacker's
     /// criminal rating goes up, as bullet_simulation does it.
     pub(crate) fn score_hurt(&mut self, attacker: Option<PlayerId>, victim: Option<PlayerId>, damage: i32) {
-        let (Some(a), Some(v)) = (attacker, victim) else { return };
-        if a == v {
+        let (Some(attacker), Some(victim)) = (attacker, victim) else { return };
+
+        if attacker == victim {
             return;
         }
-        self.handle_criminal_rating(a, v, damage);
-        if self.rules.punish_team_kills && self.same_team(a, v) {
-            self.punish_team_kill(a, damage);
+
+        self.handle_criminal_rating(attacker, victim, damage);
+
+        if self.same_team(attacker, victim) {
+            self.handle_team_kill(attacker, damage);
         }
     }
 
@@ -138,12 +137,13 @@ impl Sim {
     /// human, and a driver who ran over a teammate (or themselves) is punished.
     pub(crate) fn score_run_over(&mut self, driver: PlayerId, victim: Option<PlayerId>) {
         let Some(victim) = victim else { return };
+
         if driver != victim {
             self.handle_criminal_rating(driver, victim, RUN_OVER_SCORE);
         }
 
         if self.same_team(driver, victim) {
-            self.punish_team_kill(driver, RUN_OVER_SCORE);
+            self.handle_team_kill(driver, RUN_OVER_SCORE);
         }
     }
 }

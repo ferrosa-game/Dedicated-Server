@@ -109,16 +109,19 @@ impl Default for Locomotion {
 
 fn weighted(h: &Human, count: usize, value: impl Fn(&super::Bone) -> Vec3) -> Vec3 {
     let (mut sum, mut total) = (Vec3::ZERO, 0.0f32);
+
     for b in &h.bones[..count] {
         let v = value(b);
         let m = b.mass;
         total += m;
         sum += v * m;
     }
+
     if total > 0.0 {
         let inv = 1.0 / total;
         sum *= inv;
     }
+
     sum
 }
 
@@ -132,6 +135,7 @@ pub fn calculate_center_of_mass(h: &mut Human) {
     let vel = weighted(h, TORSO_BONES, |b| b.vel);
     let torso_ang = weighted(h, TORSO_BONES, |b| b.ang_vel);
     let body_ang = weighted(h, h.bones.len(), |b| b.ang_vel);
+
     let l = &mut h.locomotion;
     l.torso_center = center;
     l.torso_vel = blend_half(vel, l.torso_vel);
@@ -139,16 +143,15 @@ pub fn calculate_center_of_mass(h: &mut Human) {
     l.torso_ang_vel = blend_half(torso_ang, l.torso_ang_vel);
     l.body_ang_vel = body_ang;
 
-    l.torso_rot = h.bones[0].rot;
-    let mut q = rot_matrix_to_quaternion(&l.torso_rot);
-    let p = l.torso_quat;
-    let dot = ((p[1] * q[1] + q[0] * p[0]) + p[2] * q[2]) + q[3] * p[3];
-    if 0.0 > dot {
-        q = q.map(|c| -c);
-    }
-    let q = [q[0] * 0.5 + p[0] * 0.5, q[1] * 0.5 + p[1] * 0.5, q[2] * 0.5 + p[2] * 0.5, q[3] * 0.5 + 0.5 * p[3]];
-    l.torso_quat = quaternion_normalize(q);
+    l.torso_quat = blend_quat_half(rot_matrix_to_quaternion(&h.bones[0].rot), l.torso_quat);
     l.torso_rot = quaternion_to_rot_matrix(l.torso_quat);
+}
+
+/// Halfway between two orientations, `new` first flipped onto `old`'s side so the blend takes the short way round.
+fn blend_quat_half(new: [f32; 4], old: [f32; 4]) -> [f32; 4] {
+    let dot = old[0] * new[0] + old[1] * new[1] + old[2] * new[2] + old[3] * new[3];
+    let new = if dot < 0.0 { new.map(|c| -c) } else { new };
+    quaternion_normalize(std::array::from_fn(|i| new[i] * 0.5 + old[i] * 0.5))
 }
 
 /// What a human's feet stand on: the level and the vehicles near the human.
@@ -165,6 +168,7 @@ pub fn trace_hit(surface: &Surface, start: Vec3, end: Vec3) -> Option<(Vec3, Opt
     let m = surface.map;
     let level = line_intersect_level(&m.ground, &m.level.area, &m.level.meshes, start, end).map(|h| (h.hit.fraction, h.hit.pos));
     let (mut best, mut vehicle) = (level.unwrap_or((1.0, Vec3::ZERO)), None);
+
     for &id in surface.nearby {
         let Some(v) = surface.vehicles.get(id) else { continue };
         let Some(t) = surface.vehicle_types.get(v.kind as usize) else { continue };
@@ -175,6 +179,7 @@ pub fn trace_hit(surface: &Surface, start: Vec3, end: Vec3) -> Option<(Vec3, Opt
             vehicle = Some(id);
         }
     }
+
     (!(1.0 <= best.0)).then_some((best.1, vehicle))
 }
 

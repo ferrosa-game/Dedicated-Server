@@ -33,6 +33,7 @@ pub fn update_signals(traffic: &mut Traffic, map: &StreetMap) {
     for (sg, i) in traffic.signals.iter_mut().zip(&map.intersections) {
         sg.timer += 1;
         sg.cycle = CYCLE;
+
         if sg.timer > CYCLE - 1 {
             sg.phase = (sg.phase + 1) & 3;
             if i.streets[sg.phase as usize] == -1 {
@@ -43,15 +44,20 @@ pub fn update_signals(traffic: &mut Traffic, map: &StreetMap) {
             }
             sg.timer = 0;
         }
+
         sg.lights = [0; 8];
         let p = sg.phase as usize;
+
         sg.lights[p] = GREEN;
         let second = if i.streets[(p + 1) & 3] != -1 { p + 4 } else { (p + 2) & 3 };
+
         sg.lights[second] = GREEN;
+
         if sg.timer > AMBER_AT {
             sg.lights[p] = AMBER;
             sg.lights[second] = AMBER;
         }
+
         if i.streets.iter().filter(|&&s| s == -1).count() > 1 {
             sg.lights = [GREEN; 8];
         }
@@ -63,22 +69,29 @@ pub fn update_signals(traffic: &mut Traffic, map: &StreetMap) {
 pub fn move_virtual_car(traffic: &mut Traffic, map: &Map, types: &[VehicleType], id: usize) {
     let (radius, wheel_y) = types.get(traffic.cars[id].kind as usize).and_then(|t| t.wheels.first()).map_or((0.0, 0.0), |w| (w.radius, w.local_pos.y));
     let c = &mut traffic.cars[id];
+
     if c.is_bot != DRIVEN {
         c.target_speed = 0.0;
     }
+
     let v = c.vel;
     let speed = v.length();
     let st = c.steer;
     let mut turn = 0.0;
+
     if st.abs() > 0.0 {
         let mut r = ((c.wheelbase as f64) / (st.abs() as f64).tan()) as f32;
+
         if 0.0 > st {
             r = -r;
         }
+
         turn = speed / r;
     }
+
     let y = turn + c.yaw;
     let yd = y as f64;
+
     c.yaw = if -180.0_f64.to_radians() > yd {
         (yd + 360.0_f64.to_radians()) as f32
     } else if yd > 180.0_f64.to_radians() {
@@ -86,25 +99,30 @@ pub fn move_virtual_car(traffic: &mut Traffic, map: &Map, types: &[VehicleType],
     } else {
         y
     };
+
     let (s, co) = (c.yaw as f64).sin_cos();
     let (s, co) = (s as f32, co as f32);
     let proj = (v.x * co + 0.0 * v.y) + v.z * s;
     let (mut vx, mut vy, mut vz) = (co * proj, 0.0 * proj, proj * s);
     let along = (co * vx + 0.0 * vy) + s * vz;
     let target = c.target_speed;
+
     if target > along {
         let d = (target - along) * ACCEL_GAIN;
+
         let (a, lift) = if d > 1.0 {
             (ACCEL_MAX, 0.0)
         } else {
             let a = (d * ACCEL_SCALE) / TICKS2;
             (a, 0.0 * a)
         };
+
         vx += co * a;
         vy += lift;
         vz += a * s;
     } else {
         let d = (along - target) * BRAKE_GAIN;
+
         let a = if d > BRAKE_LIMIT {
             BRAKE_MAX
         } else {
@@ -112,27 +130,35 @@ pub fn move_virtual_car(traffic: &mut Traffic, map: &Map, types: &[VehicleType],
             vy += 0.0 * a;
             a
         };
+
         vx += co * a;
         vz += s * a;
+
         if PARK_TARGET > target && PARK_SPEED > ((vx * vx + vy * vy) + vz * vz).sqrt() {
             (vx, vy, vz) = (0.0, 0.0, 0.0);
         }
     }
+
     c.vel = Vec3::new(vx, vy, vz);
     c.pos = Vec3::new(vx + c.pos.x, vy + c.pos.y, vz + c.pos.z);
+
     let ride = WHEEL_RIDE * radius - wheel_y;
     let up = Vec3::Y;
     let p = c.pos;
     let start = up + up + p;
     let end = p + up * GROUND_DEPTH;
+
     if let Some(h) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, start, end) {
         c.pos.y = ride + h.hit.pos.y;
     }
+
     let mut rot = IDENTITY;
     let axis = rot[1];
     rotate_orientation(&mut rot, axis, 90.0_f32.to_radians());
+
     let axis = rot[1];
     rotate_orientation(&mut rot, axis, c.yaw);
+
     let back = -c.wheelbase;
     let p = c.pos;
     let rear = rot[2] * back + p;
@@ -143,5 +169,6 @@ pub fn move_virtual_car(traffic: &mut Traffic, map: &Map, types: &[VehicleType],
         let axis = rot[0];
         rotate_orientation(&mut rot, axis, pitch);
     }
+
     c.rot = rot;
 }

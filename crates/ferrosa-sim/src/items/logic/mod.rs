@@ -26,15 +26,20 @@ impl Sim {
     /// last tick's.
     pub(crate) fn item_behaviours(&mut self) {
         self.build_radio_channels();
+
         for id in self.items.ids() {
             self.item_despawn_rules(id);
+
             let Some(kind) = self.items.get(id).map(|i| i.item_type) else { continue };
+
             if self.item_types[kind as usize].is_gun {
                 self.fire_gun(id);
             }
+
             if kind == ItemKind::Computer {
                 self.with_computer(id, |sim, c| sim.logic_computer(id, c));
             }
+
             match kind {
                 ItemKind::Key => self.key_logic(id),
                 ItemKind::Radio => {
@@ -53,9 +58,11 @@ impl Sim {
                 ItemKind::Grenade if self.gamestate == GameState::InGame => self.grenade_logic(id),
                 _ => {}
             }
+
             if !(kind == ItemKind::Grenade && self.gamestate != GameState::InGame) {
                 self.use_logic(id);
             }
+
             if let Some(item) = self.items.get_mut(id) {
                 item.last_input_flags = item.input_flags;
                 item.input_flags = 0;
@@ -71,40 +78,51 @@ impl Sim {
         const MAGNUM_FIRE_TICK: i32 = 6;
         const LEVER_BACK: f32 = -0.625;
         const LEVER_UP: f32 = 0.03125;
-        let in_game = self.gamestate == GameState::InGame;
+
         let Some(item) = self.items.get(id) else { return };
         let (kind, holder, trigger, body_id) = (item.item_type, item.parent_human, item.has_input(ItemInput::Use), item.body);
+
         let mag = item.children.first().copied();
+
         let ty = &self.item_types[kind as usize];
         let (fire_rate, bullet_type, velocity, spread, gun_mass) = (ty.fire_rate, ty.bullet_type, ty.bullet_velocity, ty.bullet_spread, ty.mass);
+
         let item = self.items.get_mut(id).unwrap();
         let ItemState::Gun { rounds, cooldown, trigger_ticks } = &mut item.state else { return };
+
         if *cooldown > 0 {
             *cooldown -= 1;
         }
-        if holder == -1 || !in_game {
+
+        if holder == -1 || self.gamestate != GameState::InGame {
             return;
         }
+
         let semi = matches!(kind, ItemKind::Magnum | ItemKind::Pistol);
         let fire_tick = if kind == ItemKind::Magnum { MAGNUM_FIRE_TICK } else { FIRE_TICK };
+
         if trigger {
             if kind == ItemKind::Magnum || *trigger_ticks <= 1 || semi {
                 *trigger_ticks += 1;
             }
         } else {
             *trigger_ticks = 0;
+
             if semi {
                 *cooldown = 0;
             }
         }
+
         let chamber = |items: &mut ferrosa_physics::Table<Item>| {
             let Some(m) = mag.and_then(|m| items.get_mut(m)) else { return false };
+
             if let ItemState::Stock { left } = &mut m.state
                 && *left > 0
             {
                 *left -= 1;
                 return true;
             }
+
             false
         };
 
@@ -117,36 +135,46 @@ impl Sim {
 
         let item = self.items.get_mut(id).unwrap();
         let ItemState::Gun { rounds, cooldown, trigger_ticks } = &mut item.state else { return };
+
         if *cooldown > 0 || *trigger_ticks != fire_tick || *rounds <= 0 {
             return;
         }
+
         let Some(body) = self.bodies.get(body_id) else { return };
         let ([_, r1, r2], p, bv) = (body.rot, body.pos, body.vel);
+
         let k = -velocity;
         let mut vel = r2 * k + bv;
         let s = calculate_spread_vector(&mut self.noise_seed, spread, 0.0);
         vel += s;
+
         let muzzle = r2 * 0.0 + p;
         let shooter = self.humans.get(holder as usize).and_then(|h| h.player);
+
         if create_bullet(&mut self.bullets, bullet_type, muzzle, vel, shooter, self.bodies.gravity_scale) {
             self.stats.bullets += 1;
         }
+
         let shown = p - bv;
         let e = EventBullet { bullet_type, item_id: id as i32, pos: shown, vel };
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Bullet(e) });
+
         let s = calculate_spread_vector(&mut self.noise_seed, spread + spread, 0.0);
         let r = vel + s;
         let bm = BULLET_DATA.get(bullet_type as usize).map_or(0.0, |d| d.0);
         let push = -((bm + bm) / gun_mass);
         let lever = r2 * LEVER_BACK + r1 * LEVER_UP;
         let turn = lever.cross(r);
+
         if let Some(body) = self.bodies.get_mut(body_id) {
             body.vel = push * r + body.vel;
             let l = body.ang_momentum;
             body.ang_momentum = turn * push + l;
         }
+
         *rounds -= 1;
         *cooldown = fire_rate;
+
         if *rounds == 1
             && chamber(&mut self.items)
             && let Some(ItemState::Gun { rounds, .. }) = self.items.get_mut(id).map(|i| &mut i.state)
@@ -169,8 +197,10 @@ impl Sim {
         let never_despawns = matches!(kind, ItemKind::CashRound | ItemKind::CashWorld | ItemKind::Phone | ItemKind::Rope);
         let refresh = |d: i32| if (d - 1) as u32 <= 65534 { NEVER_DESPAWN } else { d };
         let item = self.items.get_mut(id).unwrap();
+
         let countdown = if held && item.parent_item == -1 {
             item.despawn_time = if d > 65535 { NEVER_DESPAWN } else { refresh(d) };
+
             false
         } else if item.parent_item != -1 {
             if in_ground_gun && !disk {
@@ -193,14 +223,18 @@ impl Sim {
             item.despawn_time = refresh(d);
             false
         };
+
         if !countdown {
             return;
         }
+
         let d = item.despawn_time;
         let next = if d <= game_minutes(5) { d - 1 } else { game_minutes(5) - 1 };
         item.despawn_time = next;
+
         if !item.children.is_empty() {
             item.despawn_time = game_minutes(5);
+
             if modeless {
                 item.despawn_time = NEVER_DESPAWN;
             }
@@ -221,12 +255,14 @@ impl Sim {
         let Some(item) = self.items.get(id) else { return };
         let (pressed, was_pressed) = (item.has_input(ItemInput::Use), item.had_input(ItemInput::Use));
         let kind = item.item_type;
+
         if !pressed {
             if kind == ItemKind::Burger && was_pressed {
                 self.burger_logic(id);
             } else if let Some(ItemState::Bandage { progress, .. }) = self.items.get_mut(id).map(|i| &mut i.state) {
                 *progress = 0;
             }
+
             return;
         }
         if !was_pressed {
@@ -235,11 +271,13 @@ impl Sim {
                 ItemKind::BriefcaseOpen => Some(ItemKind::Briefcase),
                 _ => None,
             };
+
             if let Some(t) = toggled {
                 self.items.get_mut(id).unwrap().item_type = t;
                 return;
             }
         }
+
         if kind == ItemKind::Bandage {
             self.bandage_logic(id);
         }

@@ -44,6 +44,7 @@ impl AreaFrame {
         let o = a.origin;
         let s = a.block_size;
         let c = a.chunks;
+
         Self {
             origin: o,
             m: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
@@ -57,35 +58,43 @@ impl AreaFrame {
     pub fn to_local(&self, p: Vec3) -> Vec3 {
         let m = &self.m;
         let d = p - self.origin;
+
         Vec3::new(m[0] * d.x + m[1] * d.y + m[2] * d.z, m[3] * d.x + m[4] * d.y + m[5] * d.z, d.x * m[6] + d.y * m[7] + d.z * m[8])
     }
 
     pub fn rotate_back(&self, v: Vec3) -> Vec3 {
         let m = &self.m;
+
         Vec3::new(m[0] * v.x + m[3] * v.y + m[6] * v.z, m[1] * v.x + m[4] * v.y + m[7] * v.z, m[2] * v.x + m[5] * v.y + m[8] * v.z)
     }
 }
 
 fn masked_cell_faces(start: Vec3, end: Vec3, cell: IVec3, s: f32, v: u32) -> Option<(f32, Vec3, Vec3)> {
     let base = Vec3::new(cell.x as f32 * s, cell.y as f32 * s, cell.z as f32 * s);
+
     let corner = |i: usize| {
         let c = CUBE_CORNERS[i];
         c * s + base
     };
+
     for r in 0..6 {
         if v & (1 << r) == 0 || v & (64 << r) == 0 {
             continue;
         }
+
         let f = CUBE_FACES[r];
         let n = CUBE_NORMALS[r];
         let a = corner(f[0]);
+
         if let Some((t, p)) = segment_intersect_face(n, start, end, a, corner(f[1]), corner(f[2])) {
             return Some((t, p, n));
         }
+
         if let Some((t, p)) = segment_intersect_face(n, start, end, a, corner(f[2]), corner(f[3])) {
             return Some((t, p, n));
         }
     }
+
     None
 }
 
@@ -95,6 +104,7 @@ fn scaled_cell_mesh(meshes: &BlockMeshes, start: Vec3, end: Vec3, cell: IVec3, s
     let sc = |p: Vec3| p * s + base;
     let mut best = 1.0f32;
     let mut out = (Vec3::ZERO, Vec3::ZERO, 0u32);
+
     let take = |n: Vec3, a: Vec3, b: Vec3, c: Vec3, attr: u32, best: &mut f32, out: &mut (Vec3, Vec3, u32)| {
         if let Some((t, p)) = segment_intersect_face(n, start, end, a, b, c)
             && !(*best <= t)
@@ -103,22 +113,29 @@ fn scaled_cell_mesh(meshes: &BlockMeshes, start: Vec3, end: Vec3, cell: IVec3, s
             *out = (p, n, attr);
         }
     };
+
     for (i, q) in mesh.quads.iter().enumerate() {
         let [a, b, c, d] = q.map(|i| sc(mesh.verts[i as usize]));
         let attr = i as u32;
+
         take(calculate_face_normal(a, b, c), a, b, c, attr, &mut best, &mut out);
         take(calculate_face_normal(a, c, d), a, c, d, attr, &mut best, &mut out);
     }
+
     let skip = (v >> 16) & 1023;
+
     for (i, w) in mesh.walls.iter().enumerate() {
         if skip & (1 << (i & 31)) != 0 {
             continue;
         }
+
         let [a, b, c, d] = w.map(sc);
         let attr = i as u32 | 0x10000;
+
         let n = calculate_face_normal(a, b, c);
         take(n, a, b, c, attr, &mut best, &mut out);
         take(n, a, c, d, attr, &mut best, &mut out);
+
         let n = calculate_face_normal(a, c, b);
         take(n, a, c, b, attr, &mut best, &mut out);
         take(n, a, d, c, attr, &mut best, &mut out);

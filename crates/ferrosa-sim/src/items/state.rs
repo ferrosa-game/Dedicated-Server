@@ -69,48 +69,57 @@ impl Cash {
     /// cash_separate: puts a bill of `code` in at `index` (on top past the end), moving the bills above it up; a
     /// stack holds ten.
     pub(crate) fn insert(&mut self, index: i32, code: u32) -> bool {
-        let c = self.bills;
-        if c > 8 {
+        let bills = self.bills;
+        if bills > 8 {
             return false;
         }
-        self.bills = c + 1;
+
+        self.bills += 1;
+
         let mut v = self.codes;
-        let pos = if c < index {
-            3 * (c + 1)
+
+        let pos = if bills < index {
+            3 * (bills + 1)
         } else {
-            let mut k = 3 * c;
+            let mut k = 3 * bills;
+
             loop {
                 let mask = !(7u32 << ((k + 3) & 31)) & v;
                 v = (((v >> (k & 31)) & 7) << ((k + 3) & 31)) | mask;
                 k -= 3;
+
                 if k == 3 * index - 3 {
                     break;
                 }
             }
+
             3 * index
         };
+
         v = (v & !(7u32 << (pos & 31))) | (code << (pos & 31));
+
         self.spread += 1;
         self.codes = v;
+
         true
     }
 
     /// cash_combine: takes out bill `index`, moving the bills above it down. Returns false when it was the last
     /// bill, which leaves the stack to despawn.
     pub(crate) fn remove(&mut self, index: i32) -> bool {
-        let c = self.bills;
+        let bills = self.bills;
 
-        if c == 0 {
+        if bills == 0 {
             return false;
         }
 
-        if c < 0 {
+        if bills < 0 {
             return true;
         }
 
-        self.bills = c - 1;
+        self.bills -= 1;
 
-        if c - 1 < index {
+        if bills - 1 < index {
             return true;
         }
 
@@ -120,7 +129,8 @@ impl Cash {
             let mask = !(7u32 << (k & 31)) & v;
             v = (((mask >> ((k + 3) & 31)) & 7) << (k & 31)) | mask;
             k += 3;
-            if k == 3 * c {
+
+            if k == 3 * bills {
                 break;
             }
         }
@@ -135,6 +145,7 @@ impl ItemState {
     /// The state a freshly created item of this type starts in.
     pub(crate) fn new(kind: ItemKind, ty: &ItemType) -> Self {
         let left = ty.magazine_ammo;
+
         match kind {
             ItemKind::Bandage => Self::Bandage { usage_left: left, progress: 0 },
             ItemKind::Burger => Self::Burger { bites_left: left },

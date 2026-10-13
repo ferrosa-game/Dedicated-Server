@@ -62,26 +62,32 @@ fn table_set() -> ItemSet {
         (ItemKind::Box, -0.5, 2.0),
         (ItemKind::Box, -0.5, 2.5),
     ];
+
     ItemSet { entries: entries.iter().map(|&(k, x, y)| entry(k, x, y)).collect() }
 }
 
 /// The big box on two boxes with a row of four watermelons lying on it and three more tipped against them.
 fn melon_set() -> ItemSet {
     let mut entries = vec![entry(ItemKind::BigBox, 0.0, 0.875), entry(ItemKind::Box, -0.5, 0.5), entry(ItemKind::Box, 0.5, 0.5)];
+
     entries.extend((0..4).map(|i| {
         let mut rot = IDENTITY;
         let axis = rot[0];
         rotate_orientation(&mut rot, axis, WATERMELON_LIE);
         SetEntry { kind: ItemKind::Watermelon as i32, pos: Vec3::new(0.5 - i as f32 * 0.25 * 1.5, 1.15625, 0.0), rot }
     }));
+
     entries.extend((0..3).map(|i| {
         let mut rot = IDENTITY;
         let axis = rot[0];
         rotate_orientation(&mut rot, axis, WATERMELON_LIE);
+
         let axis = rot[1];
         rotate_orientation(&mut rot, axis, WATERMELON_TILT);
+
         SetEntry { kind: ItemKind::Watermelon as i32, pos: Vec3::new(0.5 - i as f32 * 0.25 * 1.5 - 0.1875, 1.4375, 0.0), rot }
     }));
+
     ItemSet { entries }
 }
 
@@ -99,6 +105,7 @@ impl ItemSets {
 
         for name in names {
             let file = ItemSetFile::load(&data_dir.join("itemset").join(format!("{name}.sis"))).ok();
+
             let entries = file
                 .map(|f| {
                     f.entries
@@ -132,12 +139,16 @@ pub fn entry_pose(e: &SetEntry, cell: IVec3, s: f32, turn: u32) -> (Vec3, RotMat
     let half = 0.5 * s;
     let base = Vec3::new(cell.x as f32 * s + half, cell.y as f32 * s, cell.z as f32 * s + half);
     let angle = (turn as f64 * HALF_TURN * 0.5) as f32;
+
     let mut m = IDENTITY;
     rotate_orientation(&mut m, Vec3::Y, angle);
+
     let [r0, r1, r2] = m;
     let p = e.pos;
     let pos = r0 * p.x + base + r1 * p.y + r2 * p.z;
+
     let mut rot = e.rot;
     rotate_orientation(&mut rot, Vec3::Y, angle);
+
     (pos, rot)
 }

@@ -66,6 +66,7 @@ impl Sim {
         if self.world_time > SHOPS_CLOSE {
             return;
         }
+        
         for b in self.world.map.level.buildings.iter_mut().filter(|b| b.kind == BURGER_SHOP) {
             b.shop = vec![ShopEntry { kind: 0, price: BURGER_PRICE, extra: 0 }];
         }
@@ -261,7 +262,7 @@ impl Sim {
         let kind = u8::try_from(e.kind).ok().and_then(|k| ferrosa_protocol::clientbound::game::VehicleKind::try_from(k).ok());
         let vid = kind.and_then(|kind| self.spawn_vehicle(kind, e.extra, pos, rot));
         if let Some(v) = vid.and_then(|v| self.vehicles.get_mut(v)) {
-            v.owner = pid.0 as i32;
+            v.owner = pid.i32();
         }
         if let Some(p) = self.players.get_mut(pid.idx()) {
             p.money -= e.price;

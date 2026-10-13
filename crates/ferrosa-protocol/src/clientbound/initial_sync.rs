@@ -33,7 +33,6 @@ impl WireWrite for InitialSync {
 }
 
 impl WireRead for InitialSync {
-    /// After the packet's type byte.
     fn read(r: &mut Reader) -> Result<Self, CodecError> {
         let round_number = r.u32()?;
         let gamemode = GameMode::try_from(r.bits(4)?)?;

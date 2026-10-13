@@ -226,8 +226,7 @@ impl Sim {
             average as i32
         );
         for (i, a) in accounts.iter().enumerate() {
-            let name = String::from_utf8_lossy(a.player_name.split(|&b| b == 0).next().unwrap_or(&[])).into_owned();
-            let line = format!("{i}:{name}:{} ({})", (a.play_time / 10) as i32, a.account_id as i32);
+            let line = format!("{i}:{}:{} ({})", a.name(), (a.play_time / 10) as i32, a.account_id as i32);
             out += &line;
             if a.ban_time != 0 {
                 out += &format!(" BANNED {}", a.ban_time as i32);

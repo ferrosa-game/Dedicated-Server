@@ -144,7 +144,6 @@ impl WireRead for ClientGamePacket {
 }
 
 impl WireWrite for ClientGamePacket {
-    /// client_send: the type byte (4) and the packet.
     fn write(&self, w: &mut Writer) {
         w.byte(4);
         w.u32(self.round_num);

@@ -40,7 +40,7 @@ impl Sim {
             return self.kick(conn, src, "Server is full");
         };
         if let Some(p) = self.players.get_mut(player_id.idx()) {
-            p.username = super::admin::account_name(&accout_data);
+            p.username = accout_data.name();
         }
 
         self.clients.insert(

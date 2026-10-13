@@ -3,7 +3,7 @@ use ferrosa_protocol::clientbound::game::{
     events::{Event, ServerEvent, phone_sound::EventPhoneSound, sound::Sound, update_phone::EventUpdatePhone},
 };
 
-use crate::{input::ItemInput, sim::Sim};
+use crate::{input::ItemInput, sim::Sim, time::game_minutes};
 
 const PHONE_BUSY_TICKS: i32 = 359;
 const PHONE_RING_TICKS: i32 = 767;
@@ -47,9 +47,11 @@ pub struct Phone {
 }
 
 impl Sim {
+    /// Create and push a phone update event
     pub(crate) fn phone_update(&mut self, id: usize) {
         let Some(p) = self.items.get(id).and_then(|i| i.state.phone()) else { return };
         let e = EventUpdatePhone { item_id: id as i32, phone_status: p.status as i32, display_phone_number: p.display_number, phone_texture: p.texture };
+
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdatePhone(e) });
     }
 
@@ -59,6 +61,7 @@ impl Sim {
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::PhoneSound(e) });
     }
 
+    /// Check if its a phone.
     pub(crate) fn is_phone(&self, id: usize) -> bool {
         self.items.get(id).is_some_and(|i| matches!(i.item_type, ItemKind::Phone | ItemKind::PhonePay))
     }
@@ -70,6 +73,7 @@ impl Sim {
         let rising = item.pressed(ItemInput::Use);
 
         let Some(p) = item.state.phone_mut() else { return };
+
         if p.cooldown > 0 {
             p.cooldown -= 1;
         }
@@ -91,7 +95,8 @@ impl Sim {
                 p.ring_timer += 1;
 
                 let timer = p.ring_timer;
-                if tick & 0x3f == 0 {
+
+                if tick.is_multiple_of(game_minutes(1) as u32) {
                     self.phone_sound(Sound::PhoneBusy, id, 1.0);
                 }
 
@@ -160,7 +165,8 @@ impl Sim {
                 self.items.get_mut(id).unwrap().state.phone_mut().unwrap().ring_timer = 0;
             } else {
                 let o = other.unwrap();
-                if tick & 0x7f == 0 {
+
+                if tick.is_multiple_of(game_minutes(2) as u32) {
                     self.phone_sound(Sound::PhoneRing, o, 1.0);
                     self.phone_sound(Sound::PhoneRing, id, 0.5);
                 }

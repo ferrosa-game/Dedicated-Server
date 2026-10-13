@@ -22,12 +22,16 @@ impl<T> Table<T> {
     pub fn insert(&mut self, value: T) -> Option<usize> {
         if let Some(Reverse(i)) = self.free.pop() {
             self.slots[i] = Some(value);
+
             return Some(i);
         }
+
         if self.slots.len() >= self.capacity {
             return None;
         }
+
         self.slots.push(Some(value));
+
         Some(self.slots.len() - 1)
     }
 
@@ -42,6 +46,7 @@ impl<T> Table<T> {
     pub fn remove(&mut self, i: usize) -> Option<T> {
         let value = self.slots.get_mut(i)?.take()?;
         self.free.push(Reverse(i));
+
         Some(value)
     }
 

@@ -278,15 +278,17 @@ impl Player {
 
     /// Adds a menu button; without an extra value it shows whatever its slot last held.
     pub(crate) fn push_button(&mut self, id: i32, text: &str, extra: Option<i32>) {
-        let k = self.menu_buttons.len();
-        if self.button_extras.len() <= k {
-            self.button_extras.resize(k + 1, 0);
+        let button_count = self.menu_buttons.len();
+
+        if self.button_extras.len() <= button_count {
+            self.button_extras.resize(button_count + 1, 0);
         }
+
         if let Some(e) = extra {
-            self.button_extras[k] = e;
+            self.button_extras[button_count] = e;
         }
-        let extra = self.button_extras[k];
-        self.menu_buttons.push(MenuButton { id, text: text.to_string(), extra });
+
+        self.menu_buttons.push(MenuButton { id, text: text.to_string(), extra: self.button_extras[button_count] });
     }
 
     pub(crate) fn process_game_packet(&mut self, msg: Box<ClientGamePacket>) {
@@ -307,6 +309,7 @@ impl Player {
             spin_yaw: msg.unknown,
             spin_pitch: msg.view_pitch_delta,
         };
+
         self.input_bits = msg.input_flags;
         self.control_mode = msg.input_type as u32;
         self.zoom_level = msg.zoom_level as u32;
@@ -357,18 +360,23 @@ impl PlayerTable {
 
     pub(crate) fn insert(&mut self, p: Player) -> usize {
         let k = self.next_key();
+
         if k == self.slots.len() {
             self.slots.push(Some(p));
         } else {
             self.slots[k] = Some(p);
         }
+
         self.count += 1;
+
         k
     }
 
     pub(crate) fn remove(&mut self, k: usize) -> Player {
         let p = self.slots.get_mut(k).and_then(Option::take).expect("no player in that slot");
+
         self.count -= 1;
+
         p
     }
 

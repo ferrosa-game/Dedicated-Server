@@ -100,10 +100,6 @@ fn numbers(s: &str) -> impl Iterator<Item = i32> + '_ {
     })
 }
 
-pub(crate) fn account_name(a: &ferrosa_map::file_types::srk::SrkPlayerData) -> String {
-    String::from_utf8_lossy(a.player_name.split(|&b| b == 0).next().unwrap_or(&[])).into_owned()
-}
-
 impl Sim {
     pub fn set_admin_password(&mut self, password: String) {
         self.admin.password = password;
@@ -159,9 +155,11 @@ impl Sim {
                 self.admin_say(&line);
             }
         }
+
         if msg.starts_with("/godmode") {
             self.godmode_command(pid);
         }
+
         for (cmd, kind) in [
             ("/heli", VehicleKind::Helicopter),
             ("/car", VehicleKind::TownCar),
@@ -174,6 +172,7 @@ impl Sim {
                 self.admin_spawn_vehicle(pid, kind);
             }
         }
+
         if msg.starts_with("/phone") {
             self.admin_phone(pid);
         }
@@ -211,39 +210,50 @@ impl Sim {
         }
         if msg.starts_with("/resetgame") {
             self.admin.reset_requested = true;
+
             if msg.as_bytes().get(10) == Some(&b' ')
                 && let Some(mode) = msg[11..].split_whitespace().next().and_then(crate::gamemode::by_name)
             {
                 self.admin.next_mode = Some(mode);
+
                 mode.on_admin_select(self);
             }
         }
+
         if let Some(rest) = msg.strip_prefix("/ban ")
             && !rest.is_empty()
         {
             let phone = leading_int(rest).unwrap_or(0);
+
             if let Some(i) = self.saved_accounts.players.iter().position(|a| a.phone_number as i32 == phone) {
                 self.admin.pending_ban = Some(i);
-                let name = account_name(&self.saved_accounts.players[i]);
+
+                let name = &self.saved_accounts.players[i].name();
                 self.admin_say(&format!("{name}({phone}) ban?"));
             }
         }
+
         if let Some(rest) = msg.strip_prefix("/give ")
             && !rest.is_empty()
         {
             let mut nums = numbers(rest);
             let phone = nums.next().unwrap_or(0);
             let amount = nums.next().unwrap_or(0);
+
             if let Some(i) = self.saved_accounts.players.iter().position(|a| a.phone_number as i32 == phone) {
                 let a = &mut self.saved_accounts.players[i];
+                let (name, phone) = (a.name(), a.phone_number as i32);
+
                 a.money = (a.money as i32).wrapping_add(amount) as u32;
-                let (id, name, phone) = (a.account_id, account_name(a), a.phone_number as i32);
-                for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == id) {
+
+                for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == a.account_id) {
                     p.money = p.money.wrapping_add(amount);
                 }
+
                 self.admin_say(&format!("{name}({phone}) {amount} cash"));
             }
         }
+
         if let Some(rest) = msg.strip_prefix("/setrating ")
             && !rest.is_empty()
         {
@@ -253,7 +263,7 @@ impl Sim {
             if let Some(i) = self.saved_accounts.players.iter().position(|a| a.phone_number as i32 == phone) {
                 let a = &mut self.saved_accounts.players[i];
                 a.crim_rating = rating as u32;
-                let (id, name, phone) = (a.account_id, account_name(a), a.phone_number as i32);
+                let (id, name, phone) = (a.account_id, a.name(), a.phone_number as i32);
                 for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == id) {
                     p.crim_rating = rating;
                 }
@@ -268,7 +278,7 @@ impl Sim {
             if let Some(i) = self.admin.pending_ban.filter(|&i| i < self.saved_accounts.players.len()) {
                 let a = &mut self.saved_accounts.players[i];
                 a.ban_time = time as u32;
-                let line = format!("{}({}) banned {time}", account_name(a), a.phone_number as i32);
+                let line = format!("{}({}) banned {time}", a.name(), a.phone_number as i32);
                 self.admin_say(&line);
                 self.admin.pending_ban = None;
             }
@@ -307,6 +317,7 @@ impl Sim {
         let Some(h) = self.players.get(pid.idx()).and_then(|p| p.human).and_then(|h| self.humans.get(h)) else { return };
         let (p, r) = (h.bones[0].pos, h.bones[0].rot[2]);
         let pos = r * SPAWN_AHEAD + p;
+
         self.spawn_vehicle(kind, SPAWN_COLOR, pos, IDENTITY);
     }
 
@@ -327,15 +338,15 @@ impl Sim {
             self.mark_item_for_deletion(id);
         }
 
-        let Some(h) = self.players.get(pid.idx()).and_then(|p| p.human) else { return };
-        let Some((pos, rot)) = self.humans.get(h).map(|hu| (hu.bones[0].pos, hu.bones[0].rot)) else { return };
-        let Some(id) = self.create_item(ItemKind::Phone, pos, None, rot) else { return };
+        let Some(human) = self.players.get(pid.idx()).and_then(|p| p.human) else { return };
+        let Some((pos, rot)) = self.humans.get(human).map(|hu| (hu.bones[0].pos, hu.bones[0].rot)) else { return };
+        let Some(phone_id) = self.create_item(ItemKind::Phone, pos, None, rot) else { return };
 
-        if let Some(p) = self.items.get_mut(id).and_then(|i| i.state.phone_mut()) {
+        if let Some(p) = self.items.get_mut(phone_id).and_then(|i| i.state.phone_mut()) {
             p.number = 9999;
         }
 
-        self.link_to_slot(h, id, 6);
+        self.link_to_slot(human, phone_id, 6);
     }
 
     /// /arm [1-5]: a gun with four magazines and two bandages.
@@ -343,8 +354,11 @@ impl Sim {
         let Some(h) = self.players.get(pid.idx()).and_then(|p| p.human) else { return };
         let n = if rest.is_empty() { None } else { scan_int(rest).ok().map(|n| n.unwrap_or(0)) };
         let gun = n.and_then(|n| usize::try_from(n - 1).ok()).filter(|&i| i < ARM_GUNS.len()).map_or(ARM_GUNS[ARM_DEFAULT], |i| ARM_GUNS[i]);
+
         self.give_weapon(h, gun, ARM_MAGAZINES);
+
         let Some((pos, rot)) = self.humans.get(h).map(|hu| (hu.bones[0].pos, hu.bones[0].rot)) else { return };
+
         for _ in 0..ARM_BANDAGES {
             if let Some(id) = self.create_item(ItemKind::Bandage, pos, None, rot) {
                 self.link_to_slot(h, id, 6);
@@ -367,17 +381,17 @@ impl Sim {
         let line = match kind {
             4 => {
                 a.ban_time = value as u32;
-                format!("{} {i} banned {value}", account_name(a))
+                format!("{} {i} banned {value}", a.name())
             }
 
             5 => {
                 a.crim_rating = value as u32;
-                let id = a.account_id;
-                let line = format!("{} {i} rating {value}", account_name(a));
-                for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == id) {
+
+                for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == a.account_id) {
                     p.crim_rating = value;
                 }
-                line
+
+                format!("{} {i} rating {value}", a.name())
             }
             _ => return,
         };

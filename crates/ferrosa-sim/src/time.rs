@@ -11,6 +11,11 @@ pub const WORLD_MINUTE: i32 = 3600;
 pub const WORLD_HOUR: i32 = 60 * WORLD_MINUTE;
 
 #[inline]
+pub fn game_seconds(time: i32) -> i32 {
+    time * 60
+}
+
+#[inline]
 pub fn game_minutes(time: i32) -> i32 {
     time * 60 * TICKS_PER_SECOND
 }

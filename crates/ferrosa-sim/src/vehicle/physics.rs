@@ -5,12 +5,12 @@ use ferrosa_physics::{
 };
 use ferrosa_protocol::clientbound::game::VehicleKind;
 use ferrosa_protocol::clientbound::game::events::sound::Sound;
+use ferrosa_world::capsule::CapsuleHit;
 use glam::Vec3;
 
 use super::{Vehicle, types::VehicleType};
 use crate::{
-    time::TICKS_PER_SECOND_F32,
-    world::{
+    human::physics, time::TICKS_PER_SECOND_F32, world::{
         capsule::{capsule_intersect_triangle, capsule_intersect_triangle_facing},
         collide::{calculate_face_normal, point_in_triangle_oriented, segment_intersect_face},
         map::Map,
@@ -65,29 +65,36 @@ pub fn update_vehicle_bounds(v: &mut Vehicle, bodies: &RigidBodies, types: &[Veh
         let t = &types[v.kind as usize];
         v.prev_pos = v.pos;
         v.prev_rot = v.rot;
+
         let c = t.centroid_offset;
         let [r0, r1, r2] = b.rot;
+
         v.pos = c.x * r0 + b.pos + c.y * r1 + c.z * r2;
         v.rot = b.rot;
         v.vel = b.vel;
         v.ang_vel = b.ang_vel;
+
         let (pos, [r0, r1, r2]) = (v.pos, v.rot);
         let (mut mn, mut mx) = ([HUGE; 3], [-HUGE; 3]);
+
         for q in &t.render_verts {
             let w = [
                 ((q.x * r0.x + pos.x) + q.y * r1.x) + q.z * r2.x,
                 ((r0.y * q.x + pos.y) + r1.y * q.y) + r2.y * q.z,
                 ((r0.z * q.x + pos.z) + r1.z * q.y) + q.z * r2.z,
             ];
+
             for k in 0..3 {
                 if !(mn[k] <= w[k]) {
                     mn[k] = w[k];
                 }
+
                 if !(w[k] <= mx[k]) {
                     mx[k] = w[k];
                 }
             }
         }
+
         v.bounds_min = Vec3::from_array(mn);
         v.bounds_max = Vec3::from_array(mx);
         v.block_min = mn.map(|x| (x * BLOCK_SCALE) as i32);
@@ -97,6 +104,7 @@ pub fn update_vehicle_bounds(v: &mut Vehicle, bodies: &RigidBodies, types: &[Veh
 
 fn crash_sound(v: &Vehicle, out: &mut Vec<VehicleOutput>) {
     let r = rand::random_range(0..256) as f32;
+
     out.push(VehicleOutput::Sound { sound: Sound::CarCrash, pos: v.pos, volume: v.crash * 0.5, pitch: r * (1.0 / 1024.0) + 0.875 });
 }
 
@@ -107,17 +115,22 @@ fn crash_and_drag(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, out: &mu
     let (pv, vel) = (v.prev_vel, v.vel);
     let d = pv - vel;
     let dv = d.length();
+
     v.prev_vel = vel;
+
     if FALLEN > v.pos.y {
         v.despawn_time = 0;
         v.spawned_state = 0;
     }
+
     if v.kind != VehicleKind::NoClip {
         if dv > DAMAGE_SPEED {
             out.push(VehicleOutput::Damage { vehicle: id, amount: (dv * TICKS_PER_SECOND_F32 + 10.0) as i32 });
         }
+
         if dv > CRASH_SPEED {
             v.crash += dv * TICKS_PER_SECOND_F32 * 0.125;
+
             if v.crash > 2.0 {
                 crash_sound(v, out);
                 v.crash -= 2.0;
@@ -126,9 +139,11 @@ fn crash_and_drag(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, out: &mu
             if v.crash > 0.5 {
                 crash_sound(v, out);
             }
+
             v.crash = 0.0;
         }
     }
+
     let Some(b) = bodies.get_mut(v.body) else { return };
     let vel = b.vel;
     let speed = vel.length();
@@ -136,10 +151,12 @@ fn crash_and_drag(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, out: &mu
     let s2 = speed * speed;
     let under = !(b.pos.y > WATER_LEVEL);
     let (hi, lo) = (speed * 0.125, -speed * 0.125);
+
     let clamp = |x: f32| {
         let m = if lo > x { lo } else { x };
         if hi < m { hi } else { m }
     };
+
     let [a0, a1, a2] = b.rot;
     let d0 = a0.dot(dir);
     let k0 = ((s2 * if under { 800.0 } else { 4.0 }) * 0.5) * 0.75;
@@ -158,6 +175,7 @@ fn crash_and_drag(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, out: &mu
 
 fn gear_shift_sound(v: &Vehicle, out: &mut Vec<VehicleOutput>) {
     let (volume, pitch) = if v.gear == 0 { (0.75, 1.0) } else { (1.0, 0.75) };
+
     out.push(VehicleOutput::Sound { sound: Sound::GearShift, pos: v.pos, volume, pitch });
 }
 
@@ -173,8 +191,11 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
     } else {
         0.0
     };
+
     let flags = v.controls;
+
     v.auto_shift = 0;
+
     v.clutch = if flags & CLUTCH_HELD == 0 {
         if 0.875 > v.clutch { v.clutch + 0.125 } else { 1.0 }
     } else if v.clutch > 0.125 {
@@ -182,30 +203,38 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
     } else {
         0.0
     };
+
     let threshold = if v.kind == VehicleKind::Minivan { 450.0_f32.to_radians() } else { 600.0_f32.to_radians() };
+
     let uncontrolled = |v: &mut Vehicle| {
         v.engine_speed *= 0.9375;
         v.brake = 1.0;
         v.gear = 0;
     };
+
     let select = |v: &mut Vehicle, gear: i32, out: &mut Vec<VehicleOutput>| {
         v.gear = gear;
         v.brake = 0.0;
+
         if flags == UNCONTROLLED {
             uncontrolled(v);
+
             if v.prev_gear != 0 {
                 gear_shift_sound(v, out);
             }
         } else if v.prev_gear != v.gear {
             gear_shift_sound(v, out);
         }
+
         match GEAR_RATIOS.iter().find(|(g, _)| *g == v.gear) {
             Some(&(_, r)) => v.gear_ratio = r,
             None if v.gear == 0 => v.gear_ratio = 0.0,
             None => {}
         }
     };
+
     let (gx, gy) = (v.gear_x, v.gear_y);
+
     if -0.5 > gy {
         if 0.5 > gx {
             select(v, 1, out);
@@ -214,10 +243,12 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
         } else {
             v.auto_shift = 1;
             let mut gear = v.gear;
+
             if gear <= 0 {
                 gear = 1;
                 v.gear = 1;
             }
+
             if v.shift_delay > 0 {
                 v.shift_delay -= 1;
             } else {
@@ -226,15 +257,18 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
                     v.shift_delay = SHIFT_DELAY;
                     v.gear = gear;
                 }
+
                 if gear <= 3 && v.engine_speed > threshold {
                     gear += 1;
                     v.shift_delay = SHIFT_DELAY;
                     v.gear = gear;
                 }
             }
+
             if gear > 4 {
                 v.gear = 4;
                 v.brake = 0.0;
+
                 if flags == UNCONTROLLED {
                     uncontrolled(v);
                     v.gear_ratio = 0.0;
@@ -244,6 +278,7 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
             } else if gear < -1 {
                 v.gear = -1;
                 v.brake = 0.0;
+
                 if flags == UNCONTROLLED {
                     uncontrolled(v);
                     v.gear_ratio = 0.0;
@@ -252,6 +287,7 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
                 }
             } else {
                 v.brake = 0.0;
+
                 if flags == UNCONTROLLED {
                     uncontrolled(v);
                     v.gear_ratio = 0.0;
@@ -273,15 +309,20 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
         v.clutch = 0.0;
         select(v, 0, out);
     }
+
     if 0.0 > v.gas_control {
         v.brake = -v.gas_control;
     }
+
     if v.controls & HANDBRAKE != 0 {
         v.brake = 2.0;
     }
+
     v.inv_gear_ratio = if v.gear_ratio == 0.0 { 0.0 } else { 1.0 / v.gear_ratio };
+
     let steer = v.steer_control;
     v.steer = steer;
+
     let a = steer.abs();
     let outer = if a > 0.0 {
         let t = (QUARTER_TURN - a as f64).tan();
@@ -290,17 +331,22 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
     } else {
         0.0
     };
+
     let (w0, w1) = if steer > 0.0 { (outer, a) } else { (-a, -outer) };
     if let Some(w) = v.wheels.get_mut(0) {
         w.steer = w0;
     }
+
     if let Some(w) = v.wheels.get_mut(1) {
         w.steer = w1;
     }
+
     if v.health > 0 && !v.locked {
         let rpm = ((v.engine_speed * TICKS_PER_SECOND_F32 * TICKS_PER_SECOND_F32) as f64 / FULL_TURN) as i32;
+
         if rpm >= 0 {
             v.engine_rpm = rpm;
+
             if v.gear > 0 && rpm == 0 {
                 v.engine_rpm = 1;
             } else if rpm > MAX_RPM {
@@ -313,9 +359,11 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
         v.engine_speed = 0.0;
         v.engine_rpm = if v.gear > 0 { 1 } else { 0 };
     }
+
     if v.gas_control > 0.0 {
         v.gas_control = 0.0;
     }
+
     v.prev_gear = v.gear;
 }
 
@@ -327,12 +375,15 @@ fn wheel_collision(map: &Map, bodies: &mut RigidBodies, v: &Vehicle, k: usize) {
     let (axle, p, r, hw) = (b.rot[0], b.pos, w.radius, w.half_width);
     let reach = r + hw;
     let tris = map.level.area.track.collect(p - reach, p + reach, crate::world::track::WALLS);
+
     for side in [-hw, hw] {
         let Some(p) = bodies.get(w.body).map(|b| b.pos) else { return };
         let c = axle * side + p;
+
         if let Some(hit) = sphere_intersect_level(&map.ground, &map.level.area, &map.level.meshes, c, axle, r) {
             bodies.add_world_contact(w.body, hit.pos - p, hit.normal, r - hit.dist, WHEEL_FRICTION, WHEEL_DEPTH_SCALE, WHEEL_SOFTNESS);
         }
+
         if let Some(hit) = crate::world::sphere::sphere_intersect_triangles(&tris, c, axle, r) {
             bodies.add_world_contact(w.body, hit.pos - p, hit.normal, r - hit.dist, WHEEL_FRICTION, WHEEL_DEPTH_SCALE, WHEEL_SOFTNESS);
         }
@@ -379,12 +430,14 @@ fn sweep_chassis(map: &mut Map, bodies: &mut RigidBodies, v: &Vehicle, t: &Vehic
     let mut glass = Vec::new();
     let Some(mesh) = &t.mesh else { return glass };
     let (pos, [r0, r1, r2]) = (v.pos, v.rot);
+
     for p in &mesh.verts {
         let side = p.x * r0 + pos + r1 * p.y;
         let end = side + r2 * p.z;
         let m = &map.level;
         let Some(hit) = line_intersect_level(&map.ground, &m.area, &m.meshes, pos, end) else { continue };
-        let hole = crate::world::capsule::CapsuleHit {
+
+        let hole = CapsuleHit {
             pos: hit.hit.pos,
             normal: hit.hit.normal,
             dist: 0.0,
@@ -394,16 +447,20 @@ fn sweep_chassis(map: &mut Map, bodies: &mut RigidBodies, v: &Vehicle, t: &Vehic
             face_attr: hit.face_attr,
             set: hit.set,
         };
-        let broke = crate::human::physics::add_bullet_hole(map, hole, end, v.vel, &mut glass);
+
+        let broke = physics::add_bullet_hole(map, hole, end, v.vel, &mut glass);
         if hit.set.is_some() {
             continue;
         }
+
         let n = hit.hit.normal;
         let d = hit.hit.pos - end;
         let mut depth = d.dot(n);
         let (mut at, mut normal) = (hit.hit.pos, n);
+
         if 0.0 > p.y {
             let raised = Vec3::new(end.x + 0.25 * 0.0, end.y + 0.25 * 1.0, end.z + 0.25 * 0.0);
+
             if let Some(h2) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, raised, end) {
                 let n2 = h2.hit.normal;
                 let d2 = h2.hit.pos - end;
@@ -412,14 +469,19 @@ fn sweep_chassis(map: &mut Map, bodies: &mut RigidBodies, v: &Vehicle, t: &Vehic
                 normal = n2;
             }
         }
+
         let (depth_scale, softness) = if broke { (1.0 / 512.0, 1.0 / 256.0) } else { (1.0 / 64.0, 0.03125) };
+
         if depth > MAX_CHASSIS_DEPTH {
             depth = MAX_CHASSIS_DEPTH;
         }
+
         let Some(cb) = bodies.get(v.body) else { continue };
         let offset = at - cb.pos;
+
         bodies.add_world_contact(v.body, offset, normal, depth, CHASSIS_FRICTION, depth_scale, softness);
     }
+
     glass
 }
 
@@ -436,35 +498,45 @@ const RAIL_SOFTNESS: f32 = 0.125;
 fn update_train(v: &mut Vehicle, bodies: &mut RigidBodies, track: &crate::world::track::Track) {
     let Some(c) = bodies.get(v.body).map(|b| b.rot[1]) else { return };
     let up = v.rot[1];
+
     for &(bogie, turn) in &v.bogies {
         let Some(br) = bodies.get(bogie).map(|b| b.rot[1]) else { continue };
         let target = br.cross(c) * BOGIE_TURN;
-        if let Some(ferrosa_physics::bond::Bond::ItemAngular(a)) = bodies.bond_mut(turn) {
+
+        if let Some(Bond::ItemAngular(a)) = bodies.bond_mut(turn) {
             a.target = target;
             a.axis_lock = Some(up);
         }
     }
+
     let cell = |x: f32| crate::world::trace::cvtt(x * (1.0 / 64.0));
     let (x0, x1, z0, z1) = (cell(v.bounds_min.x), cell(v.bounds_max.x), cell(v.bounds_min.z), cell(v.bounds_max.z));
     let mut candidates = Vec::new();
+
     for z in z0..=z1 {
         if z as u32 > 63 {
             continue;
         }
+
         for x in x0..=x1 {
             if x as u32 > 63 {
                 continue;
             }
+
             candidates.extend(track.grid.get(z as usize * crate::world::track::GRID_CELLS + x as usize).into_iter().flatten().copied());
         }
     }
+
     let (lo, hi) = (v.bounds_min, v.bounds_max);
+
     for seg in candidates {
         let Some(m) = track.meshes.get(seg as usize) else { continue };
         if m.kind != 0 || m.box_min.x > hi.x || m.box_min.z > hi.z || lo.x > m.box_max.x || !(lo.z <= m.box_max.z) {
             continue;
         }
+
         let tris = m.rail_triangles();
+
         for &(bogie, _) in &v.bogies {
             for (cx, cz) in BOGIE_CORNERS {
                 let Some((pos, [r0, r1, r2])) = bodies.get(bogie).map(|b| (b.pos, b.rot)) else { continue };
@@ -508,7 +580,9 @@ fn drive_train(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, track: &cra
     let r2 = v.rot[2];
     let s = v.vel.dot(r2);
     v.engine_rpm = (s.abs() * SPEEDO_SCALE * TICKS_PER_SECOND_F32) as i32;
+
     let weight = |i: i32| track.meshes.get(i as usize).map_or(0.0, |m| m.weight);
+
     let mut target = if v.train_segment == -1 {
         TRAIN_CRUISE
     } else {
@@ -517,7 +591,9 @@ fn drive_train(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, track: &cra
         let w = minss(weight(n), minss(weight(p), weight(v.train_segment)));
         w * (w * TRAIN_CRUISE)
     };
+
     let open = v.broken_windows.get(TRAIN_DOOR).copied().unwrap_or(false);
+
     if s > TRAIN_MOVING {
         if !open {
             out.push(VehicleOutput::Update { vehicle: id, kind: DOOR_OPEN, part: TRAIN_DOOR as i32, pos: v.pos, vel: v.vel });
@@ -527,34 +603,45 @@ fn drive_train(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, track: &cra
         out.push(VehicleOutput::Update { vehicle: id, kind: DOOR_CLOSED, part: TRAIN_DOOR as i32, pos: v.pos, vel: v.vel });
         set_door(v, false);
     }
+
     let station = track.spawns.get(v.train_index as usize).map_or(Vec3::ZERO, |s| s.0);
     let p = v.pos;
     let (dx, dy, dz) = (station.x - p.x, station.y - p.y, station.z - p.z);
     let d = ((dy * dy + dx * dx) + dz * dz).sqrt();
+
     if STATION_REACH > d {
         let rel = p - station;
         let mut proj = rel.dot(r2);
+
         if STATION_PLATFORM > proj {
             proj = 0.0;
         }
+
         if v.train_reverse == 1 {
             proj = -proj;
         }
+
         target = (proj * STATION_BRAKE) * TRAIN_CRUISE;
+
         if STOPPED_FAST > s && s > STOPPED_SLOW {
             v.train_wait += 1;
+
             if v.train_wait > STATION_WAIT {
                 v.train_index += 1;
+
                 if v.train_index >= track.spawns.len() as i32 {
                     v.train_index = 0;
                 }
+
                 v.train_wait = 0;
             }
         } else {
             v.train_wait = 0;
         }
     }
+
     let y = (target + s) * SPEED_GAIN;
+
     let f = if PULL_LIMIT > y {
         FULL_PULL
     } else if y > BRAKE_LIMIT {
@@ -562,8 +649,10 @@ fn drive_train(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, track: &cra
     } else {
         ((0.5 * -y) * SPEED_GAIN) / 3600.0
     };
+
     let Some(b) = bodies.get_mut(v.body) else { return };
     let r = b.rot[2];
+
     b.vel = r * f + b.vel;
 }
 
@@ -581,8 +670,6 @@ fn minss(a: f32, b: f32) -> f32 {
 /// step otherwise.
 const ROTOR_RPM_MAX: i32 = 2000;
 const ROTOR_RPM_STEP: i32 = 10;
-const ROTOR_PI: f64 = 3.14159265359;
-const ROTOR_TURN: f64 = 6.28318530718;
 const BLADE_PI: f64 = std::f64::consts::PI;
 /// The hull's drag along its side, up and forward axes, per speed squared.
 const HULL_DRAG: [f32; 3] = [1.5, 3.0, 0.375];
@@ -612,8 +699,8 @@ fn apply_impulse_at(b: &mut RigidBody, offset: Vec3, j: Vec3) {
 /// The main and tail rotors' turn per step at `rpm`.
 fn rotor_steps(rpm: i32) -> (f64, f64) {
     let r = rpm as f32;
-    let main = (((r + r) as f64 * ROTOR_PI) / 60.0) / 60.0;
-    let tail = ((((r * 0.125) + (r * 0.125)) as f64 * ROTOR_PI) / 60.0) / 60.0;
+    let main = (((r + r) as f64 * std::f64::consts::PI) / 60.0) / 60.0;
+    let tail = ((((r * 0.125) + (r * 0.125)) as f64 * std::f64::consts::PI) / 60.0) / 60.0;
     (main, tail)
 }
 
@@ -624,6 +711,7 @@ fn update_helicopter(v: &mut Vehicle, bodies: &mut RigidBodies, driven: bool) {
     let Some(rotor) = v.rotor.as_mut() else { return };
     let rpm = v.engine_rpm;
     let powered = v.health > 0 && !v.locked && driven;
+
     let (main, tail) = if powered {
         v.engine_rpm = if rpm > ROTOR_RPM_MAX - ROTOR_RPM_STEP { ROTOR_RPM_MAX } else { rpm + ROTOR_RPM_STEP };
         rotor_steps(v.engine_rpm)
@@ -634,14 +722,17 @@ fn update_helicopter(v: &mut Vehicle, bodies: &mut RigidBodies, driven: bool) {
         v.engine_rpm = 0;
         (0.0, 0.0)
     };
+
     let a = (rotor.angles[0] as f64 + main) as f32;
     rotor.angles[0] = a;
     rotor.angles[1] = (a as f64 - tail) as f32;
+
     let a = a as f64;
-    if a > ROTOR_PI {
-        rotor.angles[0] = (a - ROTOR_TURN) as f32;
-    } else if -ROTOR_PI > a {
-        rotor.angles[0] = (a + ROTOR_TURN) as f32;
+
+    if a > std::f64::consts::PI {
+        rotor.angles[0] = (a - 1.0f64.to_radians()) as f32;
+    } else if -std::f64::consts::PI > a {
+        rotor.angles[0] = (a + 1.0f64.to_radians()) as f32;
     }
 
     let (Some(hull), Some(blade)) = (bodies.get(v.body).cloned(), bodies.get(rotor.body).cloned()) else { return };
@@ -650,30 +741,38 @@ fn update_helicopter(v: &mut Vehicle, bodies: &mut RigidBodies, driven: bool) {
     let t = quaternion_to_rotation_vector([-q[0], -q[1], -q[2], q[3]]);
     let [b0, b1, b2] = blade.rot;
     let target = b0 * t.x + b1 * t.y + b2 * t.z;
+
     if let Some(Bond::ItemAngular(bond)) = bodies.bond_mut(rotor.angular_bond) {
         bond.target = target;
     }
+
     if !powered {
         return;
     }
 
     let speed = hull.vel.length();
     let dir = hull.vel.normalize_or_zero();
+
     if let Some(h) = bodies.get_mut(v.body) {
         for k in 0..3 {
             let c = dir.dot(hull.rot[k]) * (-(HULL_DRAG[k] * (speed * speed)) / 1000.0);
+
             h.vel += v.rot[k] * c;
         }
     }
 
     let (blade_vel, w, up) = (blade.vel, blade.ang_vel, blade.rot[1]);
+
     let Some(b) = bodies.get_mut(rotor.body) else { return };
     b.ang_momentum += hull.rot[1] * (ROTOR_YAW * v.steer_control);
+
     let collective = (((v.gas_control * 0.125) * 0.25) as f64 * BLADE_PI + BLADE_BITE) as f32 as f64;
     let mut angle = 0.0f32;
+
     for _ in 0..BLADE_POINTS {
         let (c, s) = ((angle as f64).cos(), (angle as f64).sin());
         angle = (BLADE_STEP + angle as f64) as f32;
+
         let r = in_frame(&blade.rot, -c as f32, -s as f32);
         let radial = (in_frame(&blade.rot, (-BLADE_REACH * c) as f32, (-BLADE_REACH * s) as f32)).normalize_or_zero();
         let point_vel = r.cross(w) + blade_vel;
@@ -683,6 +782,7 @@ fn update_helicopter(v: &mut Vehicle, bodies: &mut RigidBodies, driven: bool) {
         let m = air.length();
         let push = air.normalize_or_zero().dot(up) - (radial.dot(blade_vel) * 0.0625) * 0.5;
         apply_impulse_at(b, r, up * (((0.03125 * -(((m * m) * 0.125 * 4.0) * 0.5)) * push) * 0.3125));
+
         let sp = point_vel.length();
         let along = point_vel.normalize_or_zero();
         let sp2 = ((sp * sp) * 0.25) * 4.0;
@@ -702,23 +802,29 @@ pub fn vehicle_simulation(
 ) -> (Vec<VehicleOutput>, Vec<crate::human::physics::HumanOutput>) {
     let mut out = Vec::new();
     let mut glass = Vec::new();
+
     for (id, v) in vehicles.iter_mut() {
         crash_and_drag(id, v, bodies, &mut out);
     }
+
     for (id, v) in vehicles.iter_mut() {
         if v.controllable_state == DRIVEN {
             update_car_drivetrain(v, &mut out);
         }
+
         if v.controllable_state == ROTOR || v.kind == VehicleKind::Helicopter {
             update_helicopter(v, bodies, driven.contains(&id));
         }
+
         if v.kind == VehicleKind::Train {
             update_train(v, bodies, &map.level.area.track);
             drive_train(id, v, bodies, &map.level.area.track, &mut out);
         }
+
         step_wheels(map, bodies, v);
         glass.extend(sweep_chassis(map, bodies, v, &types[v.kind as usize]));
     }
+
     (out, glass)
 }
 
@@ -730,9 +836,11 @@ pub fn step_wheel_constraints(vehicles: &mut Table<Vehicle>, bodies: &mut Table<
         if v.kind == VehicleKind::Helicopter || v.wheels.is_empty() {
             continue;
         }
+
         for w in v.wheels.iter_mut() {
             w.prev_vel = w.vel;
         }
+
         for k in 0..v.wheels.len() {
             let w = &v.wheels[k];
             let (Some(c), Some(wb)) = (bodies.get(v.body), bodies.get(w.body)) else { continue };
@@ -754,10 +862,13 @@ pub fn step_wheel_constraints(vehicles: &mut Table<Vehicle>, bodies: &mut Table<
             let f = -(mw / total);
             let mut wimp = wb.impulse;
             wimp = share * g + wimp;
+
             let mut cimp = c.impulse;
             cimp = f * g + cimp;
+
             let mut cang = c.ang_impulse;
             cang = g.cross(d) * f + cang;
+
             let k38 = w.travel_damping;
             let k9 = 0.125 * k38 * 0.75;
             let k38b = k38 * 0.375;
@@ -766,10 +877,13 @@ pub fn step_wheel_constraints(vehicles: &mut Table<Vehicle>, bodies: &mut Table<
             wimp = share * u + wimp;
             cimp = f * u + cimp;
             cang = u.cross(d) * f + cang;
+
             let mut axle = r0;
+
             if k < 2 {
                 axle = rotate_vector_about_axis(axle, r1, v.wheels[k].steer);
             }
+
             let wr = wb.rot[0];
             let dw = cw - wb.ang_vel;
             let p = -dw.dot(axle);
@@ -781,10 +895,12 @@ pub fn step_wheel_constraints(vehicles: &mut Table<Vehicle>, bodies: &mut Table<
             let mut wang = wb.ang_impulse;
             wang = Vec3::new(share * tx + wang.x, share * ty + wang.y, share * tz + wang.z);
             cang = Vec3::new(tx * f + cang.x, ty * f + cang.y, tz * f + cang.z);
+
             if let Some(wb) = bodies.get_mut(w.body) {
                 wb.impulse = wimp;
                 wb.ang_impulse = wang;
             }
+
             if let Some(c) = bodies.get_mut(v.body) {
                 c.impulse = cimp;
                 c.ang_impulse = cang;
@@ -802,11 +918,14 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
         if v.kind == VehicleKind::Helicopter || v.wheels.is_empty() {
             continue;
         }
+
         let [r0, r1, _] = v.rot;
+
         for k in 0..v.wheels.len() {
             let wbody = v.wheels[k].body;
             let Some(wb) = bodies.get(wbody) else { continue };
             let w = wb.ang_vel;
+
             let (axle, spin) = match k {
                 0 => {
                     let a = rotate_vector_about_axis(r0, r1, v.wheels[0].steer);
@@ -818,7 +937,9 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
                 }
                 _ => (r0, w.dot(r0)),
             };
+
             v.wheels[k].spin = spin;
+
             let (lim, neg) = if k < 2 {
                 if 1.0 >= v.brake {
                     let lim = v.brake * 0.5 / TICKS_PER_SECOND_F32;
@@ -830,6 +951,7 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
                 let lim = v.brake / TICKS_PER_SECOND_F32;
                 (lim, -lim)
             };
+
             let t = if neg > spin {
                 lim
             } else if spin > lim {
@@ -837,13 +959,17 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
             } else {
                 -spin
             };
+
             let Some(wb) = bodies.get_mut(wbody) else { continue };
             let t = t * wb.inertia.x;
             let i = wb.ang_impulse;
+
             wb.ang_impulse = axle * t + i;
         }
+
         let es = v.engine_speed;
         let x = ((60.0 * (es * 60.0)) as f64 / FULL_TURN / if v.kind == VehicleKind::Minivan { 5000.0 } else { 7000.0 }) as f32;
+
         let torque = if x > 1.0 {
             0.0
         } else {
@@ -853,8 +979,10 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
                 let y = 1.0 - x;
                 let c = (((0.0 * y) * y) * y + ((1.875 * y) * y) * x) + ((y * 2.625) * x) * x;
                 let c = c + x * (x * x);
+
                 (1.0 - c, c)
             };
+
             if v.kind == VehicleKind::Minivan {
                 ((0.75 * one_minus) * one_minus + (one_minus + one_minus) * c) + (0.25 * c) * c
             } else if v.kind == VehicleKind::Van {
@@ -863,15 +991,19 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
                 (0.625 * c) * c + ((one_minus + one_minus) * c + (one_minus * 0.75) * one_minus)
             }
         };
+
         let torque = torque * v.throttle;
         let drive = (v.engine_power / 3600.0) * torque / (v.drive_divisor * v.engine_inertia) * 0.03125 + 0.0;
         let q = es * 0.125 * 0.125 * 0.375;
         let loss = (q as f64 * q.abs() as f64) * (1.125 - v.throttle) as f64;
         v.wheel_feedback = 64.0;
+
         let es_new = ((drive as f64 - loss) as f32) + es;
         v.gearbox_inertia = 8.0;
         v.engine_speed = es_new;
+
         let ratio = v.gear_ratio;
+
         let pull = if ratio == 0.0 {
             0.0
         } else {
@@ -883,17 +1015,22 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
             v.gearbox_speed = ((dd * (v.engine_inertia * inv)) * r) * 64.0 + gs;
             0.0 - engine_share
         };
+
         v.engine_speed = es_new + pull;
+
         let mut accum = 0.0f32;
         if !v.driven.is_empty() {
             let mut sum = 0.0f32;
+
             for (i, &d) in v.driven.iter().enumerate() {
                 let Some(wb) = v.wheels.get(d).and_then(|w| bodies.get(w.body)) else { continue };
                 let axle = if i < 2 { rotate_vector_about_axis(r0, r1, v.wheels[d].steer) } else { r0 };
                 let w = wb.ang_vel;
                 sum += (axle.x * w.x + axle.y * w.y) + axle.z * w.z;
             }
+
             let avg = sum * 0.5;
+
             for &d in &v.driven {
                 let Some(wheel) = v.wheels.get(d) else { continue };
                 let diff = avg - wheel.spin;
@@ -903,20 +1040,25 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
                 let imp = (diff * 0.125) * 0.125 * 0.0625 * wb.inertia.x;
                 let i = wb.ang_impulse;
                 wb.ang_impulse = axle * imp + i;
+
                 let inv = 1.0 / (wheel.mass + v.gearbox_inertia);
                 let dg = (v.gearbox_speed * 0.125 - avg * 0.4375) * 0.25;
                 accum -= ((wheel.mass * inv) * dg) * 0.125 * v.wheel_feedback;
                 let imp2 = (dg * (v.gearbox_inertia * inv)) * 0.4375;
                 let axle = steered(d);
                 let i = wb.ang_impulse;
+
                 wb.ang_impulse = axle * imp2 + i;
             }
         }
+
         v.gearbox_speed += accum;
+
         let es = v.engine_speed.abs();
         if es > 0.0 && TINY > es {
             v.engine_speed = 0.0;
         }
+
         let gs = v.gearbox_speed.abs();
         if gs > 0.0 && TINY > gs {
             v.gearbox_speed = 0.0;
@@ -930,14 +1072,17 @@ pub fn capsule_intersect_vehicle(v: &Vehicle, t: &VehicleType, start: Vec3, end:
     if v.kind == VehicleKind::Train {
         return capsule_intersect_train(v, t, start, end, radius);
     }
+
     let (s, e, mn, mx) = (start.to_array(), end.to_array(), v.bounds_min.to_array(), v.bounds_max.to_array());
     if (0..3).any(|k| mn[k] > s[k] + radius && mn[k] > e[k] + radius) || (0..3).any(|k| s[k] - radius > mx[k] && e[k] - radius > mx[k]) {
         return None;
     }
+
     let mesh = t.mesh.as_ref()?;
     let world: Vec<Vec3> = mesh.verts.iter().map(|&p| to_world(v, p)).collect();
     let mut best: Option<(Vec3, Vec3, f32)> = None;
     let mut best_dist = 65536.0f32;
+    
     let mut take = |h: Option<(Vec3, Vec3, f32)>| {
         if let Some(h) = h
             && !(best_dist <= h.2)
@@ -946,13 +1091,17 @@ pub fn capsule_intersect_vehicle(v: &Vehicle, t: &VehicleType, start: Vec3, end:
             best = Some(h);
         }
     };
+
     for f in &t.chassis_faces {
         let (a, b, c) = (world[f[0]], world[f[1]], world[f[2]]);
+
         take(capsule_intersect_triangle(start, end, a, b, c, radius));
+
         if f.len() == 4 {
             take(capsule_intersect_triangle(start, end, a, c, world[f[3]], radius));
         }
     }
+
     best
 }
 
@@ -963,9 +1112,11 @@ fn capsule_intersect_train(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3,
     if (0..3).any(|k| mn[k] > s[k] + radius && mn[k] > e[k] + radius) || (0..3).any(|k| s[k] - radius > mx[k] && e[k] - radius > mx[k]) {
         return None;
     }
+
     let world: Vec<Vec3> = t.render_verts.iter().map(|&p| to_world(v, p)).collect();
     let mut best: Option<(Vec3, Vec3, f32)> = None;
     let mut best_dist = 65536.0f32;
+
     let mut take = |h: Option<(Vec3, Vec3, f32)>| {
         if let Some(h) = h
             && best_dist > h.2
@@ -974,25 +1125,33 @@ fn capsule_intersect_train(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3,
             best = Some(h);
         }
     };
+
     for f in &t.render_faces {
         let (a, b, c) = (world[f[0]], world[f[1]], world[f[2]]);
+
         take(capsule_intersect_triangle(start, end, a, b, c, radius));
+
         if f.len() == 4 {
             take(capsule_intersect_triangle(start, end, a, c, world[f[3]], radius));
         }
     }
+
     for (k, w) in t.windows.iter().enumerate() {
         if v.broken_windows.get(k).copied().unwrap_or(false) {
             continue;
         }
+
         let [a, b, c, d] = w.map(|p| to_world(v, p));
         let n = calculate_face_normal(a, b, c);
+
         take(capsule_intersect_triangle_facing(start, end, a, b, c, n, radius));
         take(capsule_intersect_triangle_facing(start, end, a, c, d, n, radius));
+
         let back = -n;
         take(capsule_intersect_triangle_facing(start, end, a, c, b, back, radius));
         take(capsule_intersect_triangle_facing(start, end, a, d, c, back, radius));
     }
+
     best
 }
 
@@ -1031,22 +1190,28 @@ pub fn trace_vehicle(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3) -> Op
 /// particles the server never creates, but have no render vertices and so bounds nothing reaches.
 pub fn trace_vehicle_parts(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3, wheels: bool) -> Option<VehicleHit> {
     let (s, e, mn, mx) = (start.to_array(), end.to_array(), v.bounds_min.to_array(), v.bounds_max.to_array());
+
     if (0..3).any(|k| mn[k] > s[k] && mn[k] > e[k]) || (0..3).any(|k| s[k] > mx[k] && e[k] > mx[k]) {
         return None;
     }
+
     let world: Vec<Vec3> = t.render_verts.iter().map(|&p| to_world(v, p)).collect();
     let mut best = VehicleHit { fraction: 1.0, pos: Vec3::ZERO, normal: Vec3::ZERO, part: VehiclePart::Wheel(0) };
+
     for (k, f) in t.render_faces.iter().enumerate() {
         let (a, b, c) = (world[f[0]], world[f[1]], world[f[2]]);
         let n = calculate_face_normal(a, b, c);
+
         if let Some((frac, p)) = segment_intersect_face(n, start, end, a, b, c)
             && best.fraction > frac
         {
             best = VehicleHit { fraction: frac, pos: p, normal: n, part: VehiclePart::Body(k) };
         }
+
         if f.len() == 4 {
             let d = world[f[3]];
             let n = calculate_face_normal(a, c, d);
+
             if let Some((frac, p)) = segment_intersect_face(n, start, end, a, c, d)
                 && !(best.fraction <= frac)
             {
@@ -1054,24 +1219,30 @@ pub fn trace_vehicle_parts(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3,
             }
         }
     }
+
     for (k, w) in t.windows.iter().enumerate() {
         if v.broken_windows.get(k).copied().unwrap_or(false) {
             continue;
         }
+
         let [a, b, c, d] = w.map(|p| to_world(v, p));
         let n = calculate_face_normal(a, b, c);
+
         if let Some((frac, p)) = segment_intersect_triangle_two_sided(n, start, end, a, b, c)
             && best.fraction > frac
         {
             best = VehicleHit { fraction: frac, pos: p, normal: n, part: VehiclePart::Window(k) };
         }
+
         let n = calculate_face_normal(a, c, d);
+
         if let Some((frac, p)) = segment_intersect_triangle_two_sided(n, start, end, a, c, d)
             && !(best.fraction <= frac)
         {
             best = VehicleHit { fraction: frac, pos: p, normal: n, part: VehiclePart::Window(k) };
         }
     }
+
     if wheels {
         for (k, w) in v.wheels.iter().enumerate() {
             if let Some((frac, p, n)) = segment_intersect_sphere(start, end, w.world_pos, w.radius)
@@ -1081,6 +1252,7 @@ pub fn trace_vehicle_parts(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3,
             }
         }
     }
+
     (1.0 > best.fraction).then_some(best)
 }
 
@@ -1088,6 +1260,7 @@ pub fn trace_vehicle_parts(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3,
 /// side, when that point is inside the triangle.
 fn segment_intersect_triangle_two_sided(n: Vec3, start: Vec3, end: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Option<(f32, Vec3)> {
     let (t, p) = segment_intersect_plane_two_sided(n, start, end, a)?;
+
     point_in_triangle_oriented(p, n, a, b, c).then_some((t, p))
 }
 
@@ -1095,12 +1268,15 @@ fn segment_intersect_triangle_two_sided(n: Vec3, start: Vec3, end: Vec3, a: Vec3
 /// nearest hit as (fraction, point, normal).
 pub fn segment_intersect_vehicle(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3) -> Option<(f32, Vec3, Vec3)> {
     let (s, e, mn, mx) = (start.to_array(), end.to_array(), v.bounds_min.to_array(), v.bounds_max.to_array());
+
     if (0..3).any(|k| mn[k] > s[k] && mn[k] > e[k]) || (0..3).any(|k| s[k] > mx[k] && e[k] > mx[k]) {
         return None;
     }
+
     let mesh = t.mesh.as_ref()?;
     let world: Vec<Vec3> = mesh.verts.iter().map(|&p| to_world(v, p)).collect();
     let mut best = (1.0f32, Vec3::ZERO, Vec3::ZERO);
+
     let mut take = |n: Vec3, a: Vec3, b: Vec3, c: Vec3| {
         if let Some((frac, p)) = segment_intersect_face(n, start, end, a, b, c)
             && !(best.0 <= frac)
@@ -1108,14 +1284,17 @@ pub fn segment_intersect_vehicle(v: &Vehicle, t: &VehicleType, start: Vec3, end:
             best = (frac, p, n);
         }
     };
+
     for f in &t.chassis_faces {
         let (a, b, c) = (world[f[0]], world[f[1]], world[f[2]]);
         take(calculate_face_normal(a, b, c), a, b, c);
+
         if f.len() == 4 {
             let d = world[f[3]];
             take(calculate_face_normal(a, c, d), a, c, d);
         }
     }
+
     (1.0 > best.0).then_some(best)
 }
 
@@ -1126,30 +1305,40 @@ pub fn vehicle_vehicle_contacts(vehicles: &Table<Vehicle>, bodies: &mut RigidBod
         if vi.controllable_state == HIDDEN {
             continue;
         }
+
         let Some(ti) = types.get(vi.kind as usize) else { continue };
         let Some(mesh) = ti.mesh.as_ref() else { continue };
+
         for (j, vj) in vehicles.iter() {
             if i == j || vj.controllable_state == HIDDEN || vi.occupants[0] == j as i32 || vj.occupants[0] == i as i32 {
                 continue;
             }
+
             let (a0, a1, b0, b1) = (vi.bounds_min, vi.bounds_max, vj.bounds_min, vj.bounds_max);
+
             if b0.x > a1.x || b0.y > a1.y || b0.z > a1.z || a0.x > b1.x || a0.y > b1.y || a0.z > b1.z {
                 continue;
             }
+
             if vi.kind == VehicleKind::Truck && vj.kind == VehicleKind::Pickup {
                 continue;
             }
+
             let Some(tj) = types.get(vj.kind as usize) else { continue };
+
             for &n in &mesh.verts {
                 let end = to_world(vi, n);
                 let Some((_, hit, normal)) = segment_intersect_vehicle(vj, tj, vi.pos, end) else { continue };
                 let mut depth = ((hit.x - end.x) * normal.x + (hit.y - end.y) * normal.y) + (hit.z - end.z) * normal.z;
+
                 if !(depth <= MAX_CHASSIS_DEPTH) {
                     depth = MAX_CHASSIS_DEPTH;
                 }
+
                 let (Some(pa), Some(pb)) = (bodies.get(vi.body).map(|b| b.pos), bodies.get(vj.body).map(|b| b.pos)) else { continue };
                 let off_a = hit - pa;
                 let off_b = hit - pb;
+
                 bodies.add_body_contact(vi.body, vj.body, off_a, off_b, normal, depth, VEHICLE_FRICTION, VEHICLE_DEPTH_SCALE, VEHICLE_SOFTNESS);
             }
         }

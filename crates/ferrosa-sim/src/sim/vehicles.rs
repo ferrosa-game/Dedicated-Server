@@ -63,6 +63,7 @@ pub(crate) fn vehicle_section(
     backlog: u16,
 ) -> Vec<ServerVehicleObject> {
     priority.resize(NETWORKED_VEHICLES, 0);
+
     for (o, s) in vehicles {
         let d = camera - s.pos;
         let dist = d.length();
@@ -75,8 +76,10 @@ pub(crate) fn vehicle_section(
         }
         priority[o.vehicle_id as usize] += p;
     }
+
     let mut order: Vec<usize> = (0..vehicles.len()).collect();
     order.sort_by_key(|&i| priority[vehicles[i].0.vehicle_id as usize]);
+
     let sent: Vec<ServerVehicleObject> = order
         .into_iter()
         .rev()
@@ -97,6 +100,7 @@ pub(crate) fn vehicle_section(
             ServerVehicleObject { tier, ..o.clone() }
         })
         .collect();
+
     let cap = if backlog > BACKLOG { BACKLOGGED_SENT } else { SENT_PER_PACKET };
     sent.into_iter().take(cap).collect()
 }
@@ -245,6 +249,7 @@ impl Sim {
     /// cannot be hurt.
     pub(crate) fn vehicle_take_damage(&mut self, id: usize, amount: i32) {
         let Some(v) = self.vehicles.get_mut(id) else { return };
+        
         if v.kind == VehicleKind::Train || v.health <= 0 {
             return;
         }
@@ -253,6 +258,7 @@ impl Sim {
 
         if v.health <= 0 {
             let e = EventUpdateVehicle { vehicle_id: id as i32, kind: WRECKED, part: 0, pos: v.pos, velocity: v.vel };
+
             self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateVehicle(e) });
         }
     }
@@ -265,11 +271,13 @@ impl Sim {
                 h.vehicle = None;
             }
         }
+
         for c in &mut self.traffic.cars {
             if c.vehicle == id as i32 {
                 c.vehicle = -1;
             }
         }
+
         for (_, item) in self.items.iter_mut() {
             if let ItemState::Key { vehicle } = &mut item.state
                 && *vehicle == Some(id)
@@ -278,20 +286,25 @@ impl Sim {
                 *vehicle = None;
             }
         }
+
         let Some(v) = self.vehicles.remove(id) else { return };
         for w in &v.wheels {
             self.bodies.remove(w.body);
         }
+
         if let Some(r) = &v.rotor {
             self.bodies.remove_bond(r.point_bond);
             self.bodies.remove_bond(r.angular_bond);
             self.bodies.remove(r.body);
         }
+
         for &(bogie, turn) in &v.bogies {
             self.bodies.remove_bond(turn);
             self.bodies.remove(bogie);
         }
+
         self.bodies.remove(v.body);
+
         let e = EventUpdateVehicle { vehicle_id: id as i32, kind: DELETED, part: 0, pos: v.pos, velocity: Vec3::ZERO };
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateVehicle(e) });
     }
@@ -301,10 +314,13 @@ impl Sim {
         for id in self.vehicles.ids() {
             let Some(v) = self.vehicles.get_mut(id) else { continue };
             let t = v.despawn_time as i32;
+
             if t > NEVER_DESPAWNS {
                 continue;
             }
+
             v.despawn_time = (t - 1) as u16;
+
             if t - 1 <= 0 {
                 self.delete_vehicle(id);
             }
@@ -316,14 +332,17 @@ impl Sim {
         for id in self.items.ids() {
             self.delete_item(id);
         }
+
         for id in self.vehicles.ids() {
             self.delete_vehicle(id);
         }
+
         for id in self.humans.ids() {
             if self.humans.get(id).is_some_and(|h| h.player.is_none()) {
                 self.delete_human(id);
             }
         }
+
         self.bullets.clear();
         self.send_chat("Cleared", ferrosa_protocol::clientbound::game::events::chat::ChatType::Announce, -1, 0);
     }
@@ -334,9 +353,11 @@ impl Sim {
         for (_, v) in self.vehicles.iter() {
             let Some(hull) = self.vehicle_types.get(v.kind as usize).and_then(|t| t.mesh.as_ref()) else { continue };
             let found = self.item_grid.query(glam::IVec3::from_array(v.block_min), glam::IVec3::from_array(v.block_max));
+
             for id in found {
                 let Some(item) = self.items.get(id) else { continue };
                 let (mn, mx) = (item.aabb_min, item.aabb_max);
+
                 if mn.x > v.bounds_max.x
                     || v.bounds_min.x > mx.x
                     || mn.z > v.bounds_max.z
@@ -346,14 +367,18 @@ impl Sim {
                 {
                     continue;
                 }
+
                 let Some(item_hull) = &self.item_types[item.item_type as usize].hull else { continue };
                 let item_body = item.body;
                 let Some((ipos, irot)) = self.bodies.get(item_body).map(|b| (b.pos, b.rot)) else { continue };
                 let contacts = super::hull::collide_convex_hulls(hull, v.pos, &v.rot, item_hull, ipos, &irot);
+
                 for c in &contacts {
                     let (first, second) = if c.swapped { (item_body, v.body) } else { (v.body, item_body) };
+
                     self.bodies.add_body_contact(first, second, c.offset_a, c.offset_b, c.normal, c.depth, ITEM_FRICTION, ITEM_DEPTH_SCALE, ITEM_SOFTNESS);
                 }
+
                 if !contacts.is_empty()
                     && let Some(item) = self.items.get_mut(id)
                 {
@@ -367,10 +392,12 @@ impl Sim {
     /// bond_simulation with the wheels' constraint and drive steps in each solver pass.
     pub(crate) fn solve_bonds(&mut self) {
         use ferrosa_physics::body::SolverStep;
+
         let Sim { bodies, vehicles, .. } = self;
+
         bodies.solve_bonds_with(|b, step| match step {
-            SolverStep::BeforeBonds => crate::vehicle::physics::step_wheel_constraints(vehicles, b),
-            SolverStep::AfterBonds => crate::vehicle::physics::apply_wheel_forces(vehicles, b),
+            SolverStep::BeforeBonds => physics::step_wheel_constraints(vehicles, b),
+            SolverStep::AfterBonds => physics::apply_wheel_forces(vehicles, b),
         });
     }
 }

@@ -28,6 +28,11 @@ impl PlayerId {
     fn idx(self) -> usize {
         self.0 as usize
     }
+
+    #[inline]
+    fn i32(self) -> i32 {
+        self.0 as i32
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

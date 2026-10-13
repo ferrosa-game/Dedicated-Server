@@ -20,7 +20,6 @@ impl WireWrite for SteamAuth {
 }
 
 impl WireRead for SteamAuth {
-    /// After the packet's type byte.
     fn read(r: &mut Reader) -> Result<Self, CodecError> {
         let name = String::from_utf8_lossy(&r.text(32)?).into_owned();
         let len = r.u32()? as usize;
@@ -49,7 +48,6 @@ impl WireWrite for SteamAuthReply {
 }
 
 impl WireRead for SteamAuthReply {
-    /// After the packet's type byte.
     fn read(r: &mut Reader) -> Result<Self, CodecError> {
         let (game_auth, master_auth) = (r.u32()?, r.u32()?);
         let phone_number = if master_auth != 0 { Some(r.u32()?) } else { None };
@@ -73,7 +71,6 @@ impl WireWrite for AuthConfirm {
 }
 
 impl WireRead for AuthConfirm {
-    /// After the packet's type byte.
     fn read(r: &mut Reader) -> Result<Self, CodecError> {
         Ok(Self { game_auth: r.u32()?, master_auth: r.u32()? })
     }
@@ -98,9 +95,9 @@ impl WireWrite for AuthConfirmReply {
 }
 
 impl WireRead for AuthConfirmReply {
-    /// After the packet's type byte.
     fn read(r: &mut Reader) -> Result<Self, CodecError> {
         let accepted = r.u32()? == 1;
+
         Ok(Self { accepted, phone_number: if accepted { r.u32().ok() } else { None } })
     }
 }
@@ -132,6 +129,7 @@ impl WireWrite for ServerList {
         w.byte(0x4a);
         w.u32(self.total);
         w.u32(self.offset);
+
         for s in &self.servers {
             w.u32(u32::from(*s.ip()));
             w.u16(s.port());
@@ -140,15 +138,16 @@ impl WireWrite for ServerList {
 }
 
 impl WireRead for ServerList {
-    /// After the packet's type byte: the page's addresses, as many as are left of the total (at most 128), until the
-    /// packet runs out.
     fn read(r: &mut Reader) -> Result<Self, CodecError> {
         let (total, offset) = (r.u32()?, r.u32()?);
         let mut servers = Vec::new();
+
         for _ in 0..total.saturating_sub(offset).min(SERVER_LIST_PAGE) {
             let (Ok(ip), Ok(port)) = (r.u32(), r.u16()) else { break };
+
             servers.push(SocketAddrV4::new(Ipv4Addr::from(ip), port));
         }
+
         Ok(Self { total, offset, servers })
     }
 }

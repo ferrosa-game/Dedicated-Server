@@ -318,6 +318,7 @@ pub(crate) fn traffic_section(
 ) -> (Vec<TrafficEntry>, (i32, [i32; 4])) {
     let n = traffic.cars.len();
     client.traffic_priority.resize(n, 0);
+
     for (c, p) in traffic.cars.iter().zip(client.traffic_priority.iter_mut()) {
         let d = camera - c.pos;
         let dist = d.length();
@@ -326,13 +327,17 @@ pub(crate) fn traffic_section(
         let k = if MOVING <= speed { MOVING_WEIGHT } else { speed * 60.0 * 4.0 + 1.0 };
         *p += (((1.0 - (near / k) * PRIORITY_FALLOFF) * PRIORITY_SCALE) as i32).max(PRIORITY_MIN);
     }
+
     let mut order: Vec<usize> = (0..n).collect();
     order.sort_by_key(|&i| client.traffic_priority[i]);
+
     let mut sent: Vec<usize> = order.into_iter().rev().take(SENT_PER_PACKET).collect();
     for &i in &sent {
         client.traffic_priority[i] = 0;
     }
+
     sent.sort_unstable();
+
     let entries = sent
         .into_iter()
         .map(|i| {
@@ -340,9 +345,12 @@ pub(crate) fn traffic_section(
             TrafficEntry { index: i as u16, vehicle: c.vehicle != -1, kind_color: Some((c.kind, c.color)), pos: c.pos, yaw: c.yaw }
         })
         .collect();
+
     let count = map.intersections.len() as i32;
     let at = if count > 0 { client.signal_cursor.rem_euclid(count) } else { 0 };
     client.signal_cursor = client.signal_cursor.wrapping_add(1);
+
     let lights = traffic.signals.get(at as usize).map_or([0; 4], |s| [s.lights[0], s.lights[1], s.lights[2], s.lights[3]]);
+
     (entries, (at, lights))
 }

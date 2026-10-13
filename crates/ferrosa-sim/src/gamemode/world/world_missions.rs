@@ -87,8 +87,10 @@ fn pick_name(used: &mut Vec<bool>, take: bool) -> usize {
     if used.len() < NAME_FLAGS {
         used.resize(NAME_FLAGS, false);
     }
+
     let mut k = rand::random_range(0..32) as usize;
     let mut tries = PICK_TRIES;
+
     while used[k] {
         k = rand::random_range(0..32) as usize;
         tries -= 1;
@@ -96,9 +98,11 @@ fn pick_name(used: &mut Vec<bool>, take: bool) -> usize {
             break;
         }
     }
+
     if take {
         used[k] = true;
     }
+
     k
 }
 
@@ -107,30 +111,35 @@ fn pick_volume(vols: &[i32]) -> i32 {
     if vols.is_empty() {
         return -1;
     }
+
     vols[rand::random_range(0..vols.len() as u32) as usize]
 }
 
 /// create_world_mode_mission_string: what the INTEL file says about a mission.
 fn mission_string(file: &str, a: &str, b: &str, project: &str, high_value: bool) -> String {
-    let mut s = String::new();
+    let mut new_str = String::new();
     match rand::random_range(0..3) {
-        0 => s += "We have received reports that ",
-        1 => s += "Reports indicate that ",
+        0 => new_str += "We have received reports that ",
+        1 => new_str += "Reports indicate that ",
         _ => {}
     }
-    s += &match rand::random_range(0..3) {
+
+    new_str += &match rand::random_range(0..3) {
         0 => format!("the laboratory at {a} and {b} "),
         1 => format!("the lab at {a} and {b} "),
         _ => format!("{a} and {b} laboratory "),
     };
-    s += match rand::random_range(0..3) {
+
+    new_str += match rand::random_range(0..3) {
         0 => "acquired a disk",
         1 => "has disks containing info",
         _ => "may have disks",
     };
-    s += &format!(" the filename is {file} ");
-    s += &if high_value { format!("project {project} is high value") } else { format!("project {project} is normal value") };
-    s
+
+    new_str += &format!(" the filename is {file} ");
+    new_str += &if high_value { format!("project {project} is high value") } else { format!("project {project} is normal value") };
+
+    new_str
 }
 
 impl Sim {
@@ -138,35 +147,47 @@ impl Sim {
     /// corporation, and each lab becomes a mission spot with a volume per computer.
     pub(crate) fn init_mission_spots(&mut self) {
         self.modes.world.missions.spots.clear();
+
         if !self.rules.mission_spots {
             return;
         }
+
         for c in &mut self.corp_state {
             c.computers.clear();
         }
+
         for i in 0..self.world.map.level.buildings.len() {
             let kind = self.world.map.level.buildings[i].kind;
+
             if kind == CORPORATION_BASE {
                 let team = self.world.map.level.buildings[i].team;
+
                 for m in 0..self.world.map.level.buildings[i].computers.len() {
                     let v = self.fs.alloc_volume(COMPUTER_CAPACITY);
+
                     self.world.map.level.buildings[i].computers[m].1 = v;
                     self.fs.add_file(v, 0, "MISSION.EXE", 0);
                     self.fs.add_file(v, 0, "DECRYPT.EXE", 0);
+
                     if let Some(c) = usize::try_from(team).ok().and_then(|t| self.corp_state.get_mut(t)) {
                         c.computers.push(v);
                     }
                 }
             }
+
             if kind == LAB {
                 let spot = self.modes.world.missions.spots.len();
                 self.world.map.level.buildings[i].spot = spot as i32;
+
                 let mut volumes = Vec::new();
+
                 for m in 0..self.world.map.level.buildings[i].computers.len() {
                     let v = self.fs.alloc_volume(COMPUTER_CAPACITY);
+
                     self.world.map.level.buildings[i].computers[m].1 = v;
                     volumes.push(v);
                 }
+
                 self.modes.world.missions.spots.push(MissionSpot { building: i, used: 0, volumes });
             }
         }
@@ -179,13 +200,16 @@ impl Sim {
             if !b.contains(pos, 0.0) {
                 continue;
             }
+
             for &(p, v) in &b.computers {
                 if p != cell {
                     continue;
                 }
+
                 if let Some(i) = self.items.get_mut(id) {
                     i.volume = v;
                 }
+
                 if b.kind == CORPORATION_BASE
                     && let Some(ItemState::Computer(c)) = self.items.get_mut(id).map(|i| &mut i.state)
                 {

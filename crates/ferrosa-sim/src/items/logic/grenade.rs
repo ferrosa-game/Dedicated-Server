@@ -87,7 +87,7 @@ impl Sim {
 
         for victim in killed.into_iter().filter(|&v| v != primer) {
             if self.same_team(primer, victim) {
-                self.punish_team_kill(primer, GRENADE_SCORE);
+                self.handle_team_kill(primer, GRENADE_SCORE);
             }
 
             self.handle_criminal_rating(primer, victim, GRENADE_SCORE);

@@ -7,6 +7,7 @@ use ferrosa_protocol::clientbound::game::{
     ItemKind, ItemTail, ServerItemObject,
     events::{Event, ServerEvent, bullet_hit::EventBulletHit},
 };
+use ferrosa_world::sphere_cast;
 use glam::{IVec3, Vec3};
 use rand::RngExt;
 
@@ -16,7 +17,7 @@ pub mod sets;
 pub mod state;
 pub use ferrosa_world::item_types as types;
 
-use crate::sim::tps::timed;
+use crate::{human::inventory, sim::tps::timed};
 use crate::{
     PlayerId,
     items::{grid::ItemGrid, state::ItemState, types::ItemType},
@@ -203,31 +204,40 @@ impl Sim {
         if self.items.get(id).is_some_and(|i| i.set_origin.is_some() && i.health > 0) {
             self.return_set_item(id);
         }
+
         if self.items.get(id).is_some_and(|i| i.item_type == ItemKind::PaperWorld) {
             self.world_paper_deleted();
         }
+
         self.free_item_links(id);
+
         let parent = self.items.get(id).map_or(-1, |i| i.parent_human);
         let slot = self.items.get(id).map_or(0, |i| i.parent_slot as usize);
+
         if parent != -1
             && let Some(h) = self.humans.get_mut(parent as usize)
         {
             let mut touch = touchables!(self, Vec::new());
-            crate::human::inventory::detach_item(h, &mut self.bodies, &mut touch, id, slot);
+
+            inventory::detach_item(h, &mut self.bodies, &mut touch, id, slot);
         }
+
         while let Some(child) = self.items.get_mut(id).and_then(|i| i.children.pop()) {
             if let Some(c) = self.items.get_mut(child) {
                 c.parent_item = -1;
             }
         }
+
         if let Some(parent) = self.items.get(id).and_then(|i| usize::try_from(i.parent_item).ok()) {
             remove_link(&mut self.items, id, parent);
         }
+
         if let Some(ItemState::Key { vehicle: Some(vid) }) = self.items.get(id).map(|i| i.state.clone())
             && let Some(v) = self.vehicles.get_mut(vid)
         {
             v.despawn_time = 0;
         }
+
         if let Some(item) = self.items.remove(id) {
             self.bodies.remove(item.body);
         }
@@ -267,6 +277,7 @@ impl Sim {
             println!("[Sim] Item table full");
             return None;
         };
+
         println!("[Sim] Spawned {kind:?} #{id} at {pos:?}");
         Some(id)
     }
@@ -296,6 +307,7 @@ impl Sim {
         for (k, (gun, mag)) in GUNS.into_iter().enumerate() {
             let at = centre + right * ((first + k as f32) * GUN_SPACING);
             self.create_item(gun, at, None, view);
+
             for m in mag.into_iter().flat_map(|m| [m; 3]).enumerate() {
                 self.create_item(m.1, at + forward * (MAG_SPACING * (m.0 as f32 + 1.0)), None, view);
             }
@@ -330,7 +342,8 @@ impl Sim {
     pub(crate) fn link_to_slot(&mut self, human: usize, item: usize, slot: usize) {
         let Some(h) = self.humans.get_mut(human) else { return };
         let mut touch = touchables!(self, Vec::new());
-        crate::human::inventory::link_item_to_human(h, human, &mut self.bodies, &mut touch, item, slot);
+
+        inventory::link_item_to_human(h, human, &mut self.bodies, &mut touch, item, slot);
     }
 
     /// The rest of physics_simulation: the bonds solved and the items left over cleaned up.
@@ -352,22 +365,26 @@ impl Sim {
 
             let Some(body) = self.bodies.get_mut(item.body) else { continue };
             let from = item.pos2;
+
             if let Some(h) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, from, body.pos) {
                 let t = 0.975 * h.hit.fraction;
                 let d = body.pos - from;
                 body.pos = d * t + from;
             }
+
             item.pos2 = body.pos;
             item.vel = body.vel;
 
             let (pos, [r0, r1, r2]) = (body.pos, body.rot);
             let (mut mn, mut mx) = ([65536.0f32; 3], [-65536.0f32; 3]);
+
             for v in self.item_types[item.item_type as usize].hull.iter().flat_map(|h| &h.verts) {
                 let p = [
                     ((pos.x + v.x * r0.x) + v.y * r1.x) + r2.x * v.z,
                     ((r0.y * v.x + pos.y) + r1.y * v.y) + r2.y * v.z,
                     ((r0.z * v.x + pos.z) + r1.z * v.y) + v.z * r2.z,
                 ];
+
                 for k in 0..3 {
                     if mn[k] > p[k] {
                         mn[k] = p[k];
@@ -377,6 +394,7 @@ impl Sim {
                     }
                 }
             }
+
             item.aabb_min = Vec3::from_array(mn);
             item.aabb_max = Vec3::from_array(mx);
             item.block_min = IVec3::from_array(mn.map(|v| (v * 0.25) as i32));
@@ -386,6 +404,7 @@ impl Sim {
 
     fn rebuild_item_grid(&mut self) {
         self.item_grid.clear();
+
         for (id, item) in self.items.iter() {
             if self.item_types[item.item_type as usize].can_collide {
                 self.item_grid.insert(id, item.block_min, item.block_max);
@@ -400,57 +419,68 @@ impl Sim {
                 parent.is_some_and(|p| p.item_type == ItemKind::Briefcase || (p.parent_human != -1 && p.parent_slot > 2))
                     || (item.parent_human != -1 && !matches!(item.item_type, ItemKind::Phone | ItemKind::Radio) && item.parent_slot > 2)
             });
+
             let Some(item) = self.items.get_mut(id) else { continue };
             item.in_pocket = in_pocket;
+
             if !(-32.0 <= item.pos2.y) {
                 item.despawn_time = 0;
             }
+
             if item.health <= 0 {
                 let e = EventBulletHit { unk: 0, hit_type: 0, pos: item.pos2, normal: item.vel };
                 self.events.push(Event { tick_created: self.tick, kind: ServerEvent::BulletHit(e) });
                 item.despawn_time = 0;
             }
+
             item.physics_sim = false;
+
             if matches!(item.item_type, ItemKind::Computer | ItemKind::Arcade | ItemKind::TableTest | ItemKind::Wall) {
                 item.physics_settled = true;
             }
+
             let (body_id, item_type, parent) = (item.body, item.item_type, item.parent_human);
             let holder = (parent != -1).then(|| self.humans.get(parent as usize)).flatten();
+
             if item.parent_item != -1 {
                 item.physics_settled = false;
                 item.settled_timer = 0;
                 item.vel = Vec3::ZERO;
-                let pose = item.mount_pose;
+
                 if let Some(body) = self.bodies.get_mut(body_id) {
-                    if let Some((pos, rot)) = pose {
+                    if let Some((pos, rot)) = item.mount_pose {
                         body.pos = pos;
                         body.rot = rot;
                         item.pos2 = pos;
                     }
+
                     body.vel = Vec3::ZERO;
                     body.ang_momentum = Vec3::ZERO;
                     body.ang_vel = Vec3::ZERO;
                     body.settled = true;
                 }
+
                 continue;
             }
+
             if let Some(h) = holder.filter(|_| item.parent_slot > 1) {
-                let vel = h.bones[0].vel;
-                item.vel = vel;
+                item.vel = h.bones[0].vel;
                 item.physics_settled = false;
                 item.settled_timer = 0;
-                let pose = item.pocket_pose;
+
                 if let Some(body) = self.bodies.get_mut(body_id) {
-                    if let Some((pos, rot)) = pose {
+                    if let Some((pos, rot)) = item.pocket_pose {
                         body.pos = pos;
                         body.rot = rot;
                         item.pos2 = pos;
                     }
-                    body.vel = vel;
+
+                    body.vel = h.bones[0].vel;
                     body.ang_momentum = Vec3::ZERO;
                     body.ang_vel = Vec3::ZERO;
                     body.settled = true;
                 }
+
                 continue;
             }
             if let Some(h) = holder {
@@ -461,24 +491,31 @@ impl Sim {
                         body.ang_momentum = Vec3::ZERO;
                         body.settled = true;
                     }
+
                     continue;
                 }
+
                 item.physics_sim = true;
                 item.settled_timer = 0;
+
                 let seated = h.vehicle.is_some();
                 if let Some(body) = self.bodies.get_mut(body_id) {
                     body.settled = false;
                 }
+
                 if self.item_types[item_type as usize].can_collide {
                     self.item_update_collision_state(id);
                 }
+
                 if item_type == ItemKind::SoccerBall {
                     self.soccer_ball(id, body_id);
                 } else if !seated {
                     self.bounding_box_contacts(body_id, item_type);
                 }
+
                 continue;
             }
+
             if item.physics_settled {
                 if let Some(body) = self.bodies.get_mut(body_id) {
                     body.vel = Vec3::ZERO;
@@ -488,29 +525,34 @@ impl Sim {
                 }
             } else {
                 item.physics_sim = true;
+
                 if let Some(body) = self.bodies.get_mut(body_id) {
                     body.settled = false;
                 }
+
                 if self.item_types[item_type as usize].can_collide {
                     self.item_update_collision_state(id);
                 }
+
                 if item_type == ItemKind::SoccerBall {
                     self.soccer_ball(id, body_id);
                 } else {
                     self.bounding_box_contacts(body_id, item_type);
                 }
+
                 let Some(body) = self.bodies.get(body_id) else { continue };
                 let (v, w) = (body.vel, body.ang_vel);
                 let item = self.items.get_mut(id).unwrap();
-                let speed = v.length();
-                let spin = w.length();
-                if SETTLE_SPEED <= speed || SETTLE_SPEED <= spin {
+
+                if SETTLE_SPEED <= v.length() || SETTLE_SPEED <= w.length() {
                     item.settled_timer = 0;
                 } else {
                     let t = item.settled_timer;
+
                     if t < SETTLE_TICKS {
                         item.settled_timer = t + 1;
                     }
+
                     if t >= SETTLE_TICKS - 1 {
                         item.physics_settled = true;
                     }
@@ -629,14 +671,16 @@ impl Sim {
     /// (sphere_cast_level) with its spin damped while it touches.
     fn soccer_ball(&mut self, id: usize, body_id: usize) {
         self.soccerball_kick(id, body_id);
+
         let Some(center) = self.bodies.get(body_id).map(|b| b.pos) else { return };
         let level = &self.world.map.level;
-        let Some((p, n, dist)) = crate::world::sphere_cast::sphere_cast_level(&level.area, &level.meshes, center, BALL_RADIUS) else { return };
-        let offset = p - center;
-        self.bodies.add_world_contact(body_id, offset, n, BALL_RADIUS - dist, CONTACT_FRICTION, CONTACT_DEPTH_SCALE, CONTACT_SOFTNESS);
+
+        let Some((p, n, dist)) = sphere_cast::sphere_cast_level(&level.area, &level.meshes, center, BALL_RADIUS) else { return };
+
+        self.bodies.add_world_contact(body_id, p - center, n, BALL_RADIUS - dist, CONTACT_FRICTION, CONTACT_DEPTH_SCALE, CONTACT_SOFTNESS);
+
         if let Some(b) = self.bodies.get_mut(body_id) {
-            let l = b.ang_momentum;
-            b.ang_momentum = l * BALL_SPIN_DAMPING;
+            b.ang_momentum *= BALL_SPIN_DAMPING;
         }
     }
 
@@ -644,32 +688,23 @@ impl Sim {
     /// contact on the ball's surface facing the bone.
     fn soccerball_kick(&mut self, id: usize, ball_body: usize) {
         let Some(ball) = self.items.get(id).map(|i| i.pos2) else { return };
-        let mut contacts = Vec::new();
-        for (_, h) in self.humans.iter() {
-            for (k, bone) in h.bones.iter().enumerate() {
-                if KICK_SKIPPED_BONES.contains(&k) {
-                    continue;
-                }
-                let d = ball - bone.pos;
-                let len = d.length();
-                if !(KICK_REACH > len) {
-                    continue;
-                }
-                let (off, n) = if len != 0.0 {
-                    let inv = 1.0 / len;
-                    let u = d * inv;
-                    (u * -BALL_RADIUS, -u)
-                } else {
-                    (Vec3::splat(-0.0), Vec3::splat(-0.0))
-                };
-                let p = off + ball;
-                contacts.push((bone.body, p, n, KICK_REACH - len));
+        let Some(ball_pos) = self.bodies.get(ball_body).map(|b| b.pos) else { return };
+
+        let bones = self.humans.iter().flat_map(|(_, h)| h.bones.iter().enumerate()).filter(|(k, _)| !KICK_SKIPPED_BONES.contains(k));
+        for (_, bone) in bones {
+            let d = ball - bone.pos;
+            let len = d.length();
+
+            if !(KICK_REACH > len) {
+                continue;
             }
-        }
-        for (bone_body, p, n, depth) in contacts {
-            let (Some(a), Some(b)) = (self.bodies.get(bone_body).map(|b| b.pos), self.bodies.get(ball_body).map(|b| b.pos)) else { continue };
-            let (off_a, off_b) = (p - a, p - b);
-            self.bodies.add_body_contact(bone_body, ball_body, off_a, off_b, n, depth, KICK_FRICTION, KICK_DEPTH_SCALE, KICK_SOFTNESS);
+
+            let Some(bone_pos) = self.bodies.get(bone.body).map(|b| b.pos) else { continue };
+
+            let n = if len != 0.0 { -(d * (1.0 / len)) } else { Vec3::splat(-0.0) };
+            let p = n * BALL_RADIUS + ball;
+
+            self.bodies.add_body_contact(bone.body, ball_body, p - bone_pos, p - ball_pos, n, KICK_REACH - len, KICK_FRICTION, KICK_DEPTH_SCALE, KICK_SOFTNESS);
         }
     }
 
@@ -677,6 +712,7 @@ impl Sim {
         let bounds = self.item_types[item_type as usize].bounds;
         let Some(body) = self.bodies.get(body_id) else { return };
         let (pos, [r0, r1, r2]) = (body.pos, body.rot);
+
         for i in 0..8 {
             let map = &self.world.map;
             let q = i & 3;
@@ -684,11 +720,15 @@ impl Sim {
             let sy = if i <= 3 { -bounds.y } else { bounds.y };
             let sz = if q <= 1 { -bounds.z } else { bounds.z };
             let corner = pos + r0 * sx + r1 * sy + r2 * sz;
+
             let Some(h) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, pos, corner) else { continue };
+
             let (hp, n) = (h.hit.pos, h.hit.normal);
             let offset = hp - pos;
             let depth = (n.x * (hp.x - corner.x) + (hp.y - corner.y) * n.y) + (hp.z - corner.z) * n.z;
+
             self.bodies.add_world_contact(body_id, offset, n, depth, CONTACT_FRICTION, CONTACT_DEPTH_SCALE, CONTACT_SOFTNESS);
+
             if let Some(set) = h.set {
                 self.spawn_hit_set(set, h.block);
             }
@@ -729,11 +769,13 @@ impl Sim {
                     (_, ItemKind::Computer) => ItemTail::Computer(0),
                     _ => ItemTail::None,
                 };
+
                 let screen = match &item.state {
                     ItemState::Computer(c) => Some((c.current_line, c.top_line)),
                     _ if item.item_type == ItemKind::Computer => Some((0, 0)),
                     _ => None,
                 };
+
                 Some(ServerItemObject {
                     slot: (HUMAN_SLOTS + id) as u16,
                     item_id: id as u16,
@@ -758,19 +800,24 @@ impl Sim {
 pub fn attach_child(items: &mut Table<Item>, types: &[ItemType], parent: usize, child: usize) -> bool {
     let (Some(p), Some(c)) = (items.get(parent), items.get(child)) else { return false };
     let n = p.children.len();
+
     if n > 7 || types[c.item_type as usize].can_mount_to[p.item_type as usize] == 0 {
         return false;
     }
+
     let room = if matches!(c.item_type, ItemKind::CashRound | ItemKind::CashWorld) { n <= 4 } else { n == 0 };
     if !room {
         return false;
     }
+
     let p = items.get_mut(parent).unwrap();
     p.children.push(child);
     p.first_child = p.children[0];
+
     let c = items.get_mut(child).unwrap();
     c.parent_item = parent as i32;
     c.parent_slot = n as i32;
+
     true
 }
 
@@ -779,11 +826,13 @@ pub fn remove_link(items: &mut Table<Item>, item: usize, parent: usize) {
     if let Some(p) = items.get_mut(parent) {
         while let Some(i) = p.children.iter().position(|&c| c == item) {
             p.children.swap_remove(i);
+
             if let Some(&c) = p.children.first() {
                 p.first_child = c;
             }
         }
     }
+
     if let Some(c) = items.get_mut(item) {
         c.parent_item = -1;
     }

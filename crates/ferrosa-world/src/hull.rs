@@ -48,6 +48,7 @@ impl ConvexHull {
     /// corners, and every group given the box edges.
     pub fn from_it3(c: &It3Collision) -> Self {
         let index = |i: i32| usize::try_from(i).unwrap_or(0).min(c.verts.len().saturating_sub(1));
+
         let groups = c
             .groups
             .iter()
@@ -58,12 +59,15 @@ impl ConvexHull {
                     .map(|f| {
                         let corners: [usize; 4] = std::array::from_fn(|k| index(f.items.get(k).copied().unwrap_or(0)));
                         let normal = calculate_face_normal(c.verts[corners[1]], c.verts[corners[2]], c.verts[corners[3]]);
+
                         HullFace { verts: corners, normal }
                     })
                     .collect();
+
                 HullGroup { center: g.center, verts: g.verts.items.iter().map(|&i| index(i)).collect(), faces, edges: BOX_EDGES.to_vec() }
             })
             .collect();
+
         Self { verts: c.verts.clone(), groups }
     }
 
@@ -88,6 +92,7 @@ impl ConvexHull {
     pub fn prism(wide: f32, narrow: f32, height: f32, melon: bool) -> Self {
         let mut verts = Vec::with_capacity(PRISM_RINGS * PRISM_SIDES);
         let neg_height = -height;
+
         for ring in 0..PRISM_RINGS {
             let radius = match (melon, ring) {
                 (true, 0 | 3) => narrow,
@@ -95,6 +100,7 @@ impl ConvexHull {
                 (false, 0 | 1) => wide,
                 (false, _) => narrow,
             } as f64;
+
             let y = match ring {
                 0 => neg_height * 0.5,
                 1 if melon => neg_height * 0.375,
@@ -102,11 +108,14 @@ impl ConvexHull {
                 2 => height * 0.375,
                 _ => 0.5 * height,
             };
+
             let (mut sin, mut cos, mut angle) = (0.0f64, 1.0f64, 0.0f32);
+
             for point in 0..PRISM_SIDES {
                 if point > 0 {
                     (sin, cos) = (angle as f64).sin_cos();
                 }
+
                 verts.push(Vec3::new((cos * radius) as f32, y, (-sin * radius) as f32));
                 angle = (angle as f64 + 60.0_f64.to_radians()) as f32;
             }
@@ -116,9 +125,11 @@ impl ConvexHull {
         for ring in (0..PRISM_SIDES * 3).step_by(PRISM_SIDES) {
             for k in 0..PRISM_SIDES {
                 let next = (k + 1) % PRISM_SIDES;
+
                 faces.push([ring + PRISM_SIDES + k, ring + PRISM_SIDES + next, ring + next, ring + k]);
             }
         }
+
         faces.extend(PRISM_CAPS);
 
         let mut edges = Vec::with_capacity(42);
@@ -127,11 +138,13 @@ impl ConvexHull {
                 edges.push([ring + k, ring + PRISM_SIDES + k]);
             }
         }
+
         for ring in (0..PRISM_SIDES * PRISM_RINGS).step_by(PRISM_SIDES) {
             for k in 0..PRISM_SIDES {
                 edges.push([ring + k, ring + (k + 1) % PRISM_SIDES]);
             }
         }
+
         Self::new(verts, faces, edges)
     }
 
@@ -144,8 +157,10 @@ impl ConvexHull {
     /// capsule_intersect_hull_face_groups_max_distance: the face hit with the greatest axis distance (zero-distance hits never count).
     pub fn intersect_capsule(&self, world: &[Vec3], start: Vec3, end: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
         let mut best = (Vec3::ZERO, Vec3::ZERO, 0.0f32);
+
         for f in self.faces() {
             let [a, b, c, d] = f.verts.map(|i| world[i]);
+
             for (p, q) in [(b, c), (c, d)] {
                 if let Some(h) = capsule_intersect_triangle(start, end, a, p, q, radius)
                     && h.2 > best.2
@@ -154,6 +169,7 @@ impl ConvexHull {
                 }
             }
         }
+
         (best.2 > 0.0).then_some(best)
     }
 }
@@ -162,15 +178,20 @@ impl ConvexHull {
 fn segment_intersect_plane_two_sided(n: Vec3, p: Vec3, start: Vec3, end: Vec3) -> Option<Vec3> {
     let d_end = ((p.x - end.x) * n.x + (p.y - end.y) * n.y) + (p.z - end.z) * n.z;
     let d_start = ((p.x - start.x) * n.x + (p.y - start.y) * n.y) + (p.z - start.z) * n.z;
+
     if (d_start > 0.0 && d_end > 0.0) || (0.0 > d_start && 0.0 > d_end) {
         return None;
     }
+
     let e = end - start;
     let denom = n.dot(e);
+
     if denom == 0.0 {
         return None;
     }
+
     let t = d_start / denom;
+
     Some(e * t + start)
 }
 
@@ -178,18 +199,24 @@ fn segment_intersect_plane_two_sided(n: Vec3, p: Vec3, start: Vec3, end: Vec3) -
 fn segment_intersects_triangle_two_sided(start: Vec3, end: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
     let n = calculate_face_normal(a, b, c);
     let Some(p) = segment_intersect_plane_two_sided(n, a, start, end) else { return false };
+
     let side = |v: Vec3, w: Vec3| {
         let (pv, wv) = (p - v, w - v);
         pv.cross(wv)
     };
+
     let ab = side(a, b);
+
     if 0.0 > ((ab.x * n.x) + ab.y * n.y) + ab.z * n.z {
         return false;
     }
+
     let bc = side(b, c);
+
     if 0.0 > ((bc.x * n.x) + bc.y * n.y) + bc.z * n.z {
         return false;
     }
+
     let ca = side(c, a);
     ((ca.y * n.y) + ca.x * n.x) + ca.z * n.z >= 0.0
 }
@@ -202,23 +229,30 @@ fn segment_closest_points_interior(a0: Vec3, a1: Vec3, b0: Vec3, b1: Vec3) -> Op
     let ab = db.dot(da);
     let aa = da.length_squared();
     let det = aa * bb - ab * ab;
+
     if det == 0.0 {
         return None;
     }
+
     let w = a0 - b0;
     let wb = w.dot(db);
     let wa = w.dot(da);
     let s = (ab * wb - wa * bb) / det;
+
     if 0.0 > s || s > 1.0 {
         return None;
     }
+
     let t = (ab * s + wb) / bb;
+
     if 0.0 > t || t > 1.0 {
         return None;
     }
+
     let ca = a0 + da * s;
     let cb = db * t + b0;
     let d = cb - ca;
+
     Some((ca, cb, d.length()))
 }
 
@@ -243,9 +277,11 @@ impl ConvexHull {
     /// under the first one's normal; the nearest hit as (fraction, point, normal).
     pub fn trace_mesh(&self, world: &[Vec3], start: Vec3, end: Vec3) -> Option<(f32, Vec3, Vec3)> {
         let mut best = (1.0f32, Vec3::ZERO, Vec3::ZERO);
+
         for f in self.faces() {
             let [a, b, c, d] = f.verts.map(|i| world[i]);
             let n = calculate_face_normal(a, b, c);
+
             for (p, q) in [(b, c), (c, d)] {
                 if let Some((t, hit)) = segment_intersect_face(n, start, end, a, p, q)
                     && !(best.0 <= t)
@@ -254,6 +290,7 @@ impl ConvexHull {
                 }
             }
         }
+
         (1.0 > best.0).then_some(best)
     }
 
@@ -261,10 +298,12 @@ impl ConvexHull {
     pub fn segment_cast(&self, world: &[Vec3], rot: &RotMatrix, start: Vec3, end: Vec3) -> Option<(Vec3, Vec3)> {
         let [r0, r1, r2] = *rot;
         let mut best = (1.0f32, Vec3::ZERO, Vec3::ZERO);
+
         for f in self.faces() {
             let m = f.normal;
             let n = r1 * m.y + r0 * m.x + r2 * m.z;
             let [a, b, c, d] = f.verts.map(|i| world[i]);
+
             for (p, q) in [(b, c), (c, d)] {
                 if let Some((t, hit)) = segment_intersect_face(n, start, end, a, p, q)
                     && !(best.0 <= t)
@@ -273,6 +312,7 @@ impl ConvexHull {
                 }
             }
         }
+
         (1.0 > best.0).then_some((best.1, best.2))
     }
 }
@@ -284,25 +324,32 @@ pub fn collide_convex_hulls(a: &ConvexHull, pos_a: Vec3, rot_a: &RotMatrix, b: &
     let (wa, wb) = (a.world_verts(pos_a, rot_a), b.world_verts(pos_b, rot_b));
     let mut out = Vec::new();
     let passes = [(false, a, &wa, rot_a, b, &wb, rot_b, pos_a, pos_b), (true, b, &wb, rot_b, a, &wa, rot_a, pos_b, pos_a)];
+
     for (swapped, from, from_w, from_rot, into, into_w, into_rot, from_pos, into_pos) in passes {
         for g in &from.groups {
             let from_c = ConvexHull::world_center(g.center, from_pos, from_rot);
+
             for &i in &g.verts {
                 let v = from_w[i];
                 let Some((hp, n)) = into.segment_cast(into_w, into_rot, from_c, v) else { continue };
                 let d = hp - v;
                 let depth = n.dot(d);
+
                 out.push(HullContact { swapped, offset_a: (hp - from_pos), offset_b: (hp - into_pos), normal: n, depth });
             }
         }
     }
+
     for ga in &a.groups {
         let ca = ConvexHull::world_center(ga.center, pos_a, rot_a);
+
         for gb in &b.groups {
             let cb = ConvexHull::world_center(gb.center, pos_b, rot_b);
+
             collide_group_edges(ga, &wa, ca, gb, &wb, cb, pos_a, pos_b, &mut out);
         }
     }
+
     out
 }
 
@@ -321,6 +368,7 @@ fn collide_group_edges(ga: &HullGroup, wa: &[Vec3], ca: Vec3, gb: &HullGroup, wb
             })
         })
         .collect();
+
     let cull_b: Vec<bool> = gb
         .edges
         .iter()
@@ -331,23 +379,30 @@ fn collide_group_edges(ga: &HullGroup, wa: &[Vec3], ca: Vec3, gb: &HullGroup, wb
             })
         })
         .collect();
+
     for (i, ea) in ga.edges.iter().enumerate() {
         let (a0, a1) = (wa[ea[0]], wa[ea[1]]);
+
         for (j, eb) in gb.edges.iter().enumerate() {
             if cull_a[i] && cull_b[j] {
                 continue;
             }
+
             let (b0, b1) = (wb[eb[0]], wb[eb[1]]);
             let Some((pa, pb, dist)) = segment_closest_points_interior(a0, a1, b0, b1) else { continue };
             let d = pb - pa;
+
             if (d.z * axis.z) + (d.y * axis.y + d.x * axis.x) > 0.0 {
                 continue;
             }
+
             if !segment_intersects_triangle_two_sided(b0, b1, ca, a0, a1) || !segment_intersects_triangle_two_sided(a0, a1, cb, b0, b1) {
                 continue;
             }
+
             let n = d.normalize_or_zero();
             let mid = 0.5 * (pb + pa);
+
             out.push(HullContact { swapped: false, offset_a: (mid - pos_a), offset_b: (mid - pos_b), normal: n, depth: dist });
         }
     }

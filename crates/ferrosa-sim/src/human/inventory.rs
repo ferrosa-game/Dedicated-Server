@@ -23,11 +23,14 @@ const DISK_RADIUS: f32 = 0.5;
 /// point_segment_distance: how far `p` is from the segment `a`..`b`.
 pub fn point_segment_distance(a: Vec3, b: Vec3, p: Vec3) -> f32 {
     let e = b - a;
+
     if ((p.x - b.x) * e.x + (p.y - b.y) * e.y) + (p.z - b.z) * e.z >= 0.0 {
         let d = b - p;
         return d.length();
     }
+
     let w = p - a;
+
     let d = if 0.0 >= (e.x * w.x + e.y * w.y) + e.z * w.z {
         a - p
     } else {
@@ -35,6 +38,7 @@ pub fn point_segment_distance(a: Vec3, b: Vec3, p: Vec3) -> f32 {
         let t = -w.dot(u);
         a - (p + u * t)
     };
+
     d.length()
 }
 
@@ -42,6 +46,7 @@ pub fn point_segment_distance(a: Vec3, b: Vec3, p: Vec3) -> f32 {
 /// A hand holds one item and a pocket up to eight.
 pub fn link_item_to_human(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut Touchables, item_id: usize, slot: usize) -> bool {
     let count = h.inventory[slot].count;
+
     if count > 1 || (slot <= 1 && count == 1) {
         return false;
     }
@@ -83,6 +88,7 @@ pub fn link_item_to_human(h: &mut Human, human_id: usize, bodies: &mut RigidBodi
 /// link_item with no parent: drops the item from the human's inventory.
 pub fn unlink_item(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchables, item_id: usize) {
     let Some(item) = touch.items.get(item_id) else { return };
+
     if item.parent_human != -1 {
         detach_item(h, bodies, touch, item_id, item.parent_slot as usize);
     }
@@ -103,14 +109,18 @@ pub(crate) fn detach_item(h: &mut Human, bodies: &mut RigidBodies, touch: &mut T
             item.pos2 = at;
         }
     }
+
     let s: &mut InventorySlot = &mut h.inventory[slot];
     let mut i = 0;
+
     while i < s.count {
         if s.items[i as usize] == item_id as i32 {
             s.count -= 1;
+
             if let Some(item) = touch.items.get_mut(item_id) {
                 item.parent_human = -1;
             }
+
             s.items[i as usize] = s.items[s.count as usize];
         } else {
             i += 1;
@@ -122,39 +132,49 @@ pub(crate) fn detach_item(h: &mut Human, bodies: &mut RigidBodies, touch: &mut T
 /// the human is badly hurt, and everything carried is kept awake.
 pub fn hand_grab_and_inventory(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut Touchables, out: &mut Vec<HumanOutput>) {
     let mut probed = false;
+
     for (slot, hand) in [(0, 9), (1, 6)] {
         while h.inventory[slot].count > 0 {
             let item_id = h.inventory[slot].items[0] as usize;
             let Some(item) = touch.items.get(item_id) else { break };
             let (a, b) = (h.bones[hand].pos, item.pos2);
             let d = a - b;
+
             if !(d.length() <= HAND_DROP_DISTANCE) {
                 unlink_item(h, bodies, touch, item_id);
+
                 continue;
             }
+
             if h.health.health <= 49 {
                 unlink_item(h, bodies, touch, item_id);
             }
+
             break;
         }
+
         let empty = h.inventory[slot].count == 0;
         if !empty {
             computer_and_disk(h, bodies, touch, slot);
         }
+
         let released = h.released(Input::LeftMouse);
         if slot == 0 && released && empty {
             grab_item(h, touch);
         }
+
         if !probed && released && empty && !h.has_input(Input::ModeKey) {
             probed = true;
             let (head, [_, _, ahead]) = (h.bones[3].pos, h.bones[3].rot);
             let end = ahead * -2.5 + head;
             out.push(HumanOutput::DoorProbe { player: h.player, start: head, end, pos: h.pos });
         }
+
         if h.inventory[slot].count > 0
             && let Some(item) = touch.items.get_mut(h.inventory[slot].items[0] as usize)
         {
             let this_hand = h.has_input(Input::LeftMouse) && h.has_input(Input::Shift) == (slot == 1);
+
             if h.has_input(Input::Reload) {
                 item.input_flags |= ItemInput::Secondary.mask();
             } else if !h.has_input(Input::ModeKey) && this_hand && !h.has_input(Input::ThrowItem) {
@@ -162,10 +182,13 @@ pub fn hand_grab_and_inventory(h: &mut Human, human_id: usize, bodies: &mut Rigi
             }
         }
     }
+
     if h.pressed(Input::SwitchHands) {
         swap_hands(h, human_id, bodies, touch);
     }
+
     let mut armed = false;
+
     for slot in &h.inventory {
         for &item_id in &slot.items[..slot.count as usize] {
             if let Some(item) = touch.items.get_mut(item_id as usize) {
@@ -174,6 +197,7 @@ pub fn hand_grab_and_inventory(h: &mut Human, human_id: usize, bodies: &mut Rigi
             }
         }
     }
+
     if armed {
         h.spawn_protection = 0;
     }
@@ -185,6 +209,7 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
     let item_id = h.inventory[slot].items[0] as usize;
     let Some(item) = touch.items.get(item_id) else { return };
     let (kind, pos) = (item.item_type, item.pos2);
+
     if kind == ItemKind::Computer {
         let (p, [_, _, r2]) = (h.bones[0].pos, h.bones[0].rot);
         let end = r2 * COMPUTER_REACH + p;
@@ -192,11 +217,14 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
         if point_segment_distance(p, end, pos) > COMPUTER_HOLD || clicked {
             unlink_item(h, bodies, touch, item_id);
         }
+
         return;
     }
+
     if !kind.is_disk() || !h.released(Input::LeftMouse) {
         return;
     }
+
     let (p, [_, _, r2]) = (h.bones[3].pos, h.bones[3].rot);
     let end = r2 * DISK_REACH + p;
     let mut best = DISK_RADIUS;
@@ -205,13 +233,17 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
         if c.item_type != ItemKind::Computer || c.parent_human != -1 {
             continue;
         }
+
         let d = point_segment_distance(p, end, c.pos2);
+
         if best > d {
             best = d;
             found = Some(id);
         }
     }
+
     let Some(computer) = found.filter(|&c| touch.items.get(c).is_some_and(|c| c.children.is_empty())) else { return };
+
     unlink_item(h, bodies, touch, item_id);
     attach_child(touch.items, touch.types, computer, item_id);
 }
@@ -219,16 +251,21 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
 /// The hand swap key: the right hand's item goes to the left hand and the left hand's to the right.
 fn swap_hands(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut Touchables) {
     let (right, left) = (h.inventory[0].count, h.inventory[1].count);
+
     if right > 0 {
         let a = h.inventory[0].items[0] as usize;
+
         if left != 0 {
             let b = h.inventory[1].items[0] as usize;
+
             unlink_item(h, bodies, touch, a);
             link_item_to_human(h, human_id, bodies, touch, b, 0);
         }
+
         link_item_to_human(h, human_id, bodies, touch, a, 1);
     } else if left > 0 {
         let b = h.inventory[1].items[0] as usize;
+
         link_item_to_human(h, human_id, bodies, touch, b, 0);
     }
 }
@@ -236,6 +273,7 @@ fn swap_hands(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &
 /// Queues a player's inventory action (the action type 3 part of logic_playerinteractions).
 pub fn queue_inventory_action(h: &mut Human, a: i32, b: i32) {
     let q = h.actions_queued as usize;
+
     match a {
         3..=7 => {
             h.actions[q] = QueuedAction { kind: 2, progress: 0.0, slot: b, arg: a - 3 };
@@ -247,6 +285,7 @@ pub fn queue_inventory_action(h: &mut Human, a: i32, b: i32) {
         }
         _ => return,
     }
+
     h.actions_queued = (h.actions_queued + 1) & 7;
 }
 
@@ -329,9 +368,12 @@ fn mount(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut T
     const STEP: f32 = 1.0 / 30.0;
     const EJECT_AT: f32 = 0.875;
     const UNLOAD_PITCH: f32 = 0.875;
+
     let mut hand = h.actions[f].slot;
+
     if hand == 3 {
         let loaded = |h: &Human, touch: &Touchables, hand: usize| held(h, hand).and_then(|i| touch.items.get(i)).is_some_and(|i| !i.children.is_empty());
+
         hand = match (held(h, 0), held(h, 1)) {
             (Some(right), Some(left)) => {
                 if mounts_on(touch, left, right) {
@@ -358,17 +400,21 @@ fn mount(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut T
             }
             (None, None) => 1,
         };
+
         h.actions[f].slot = hand;
     }
+
     if hand == -1 {
         h.action_hand = -1;
         return true;
     }
+
     h.action_hand = hand;
     let hand = hand as usize;
     let other = hand ^ 1;
     let progress = STEP + h.actions[f].progress;
     h.actions[f].progress = progress;
+
     let complete = if progress < EJECT_AT {
         !can_mount(h, touch, hand)
     } else if !(progress < 1.0) {
@@ -378,34 +424,44 @@ fn mount(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut T
             (Some(mag), Some(gun)) if mounts_on(touch, mag, gun) && is_gun(touch, gun) => touch.items.get(gun).and_then(|g| g.children.last().copied()),
             _ => None,
         };
+
         if let Some(old) = swap {
             dismount(touch, old);
             h.actions[f].progress = 0.0;
         }
+
         !can_mount(h, touch, hand)
     };
+
     if !complete {
         return false;
     }
+
     h.actions[f].progress = 1.0;
+
     match (held(h, hand), held(h, other)) {
         (Some(mag), Some(gun)) if mounts_on(touch, mag, gun) => {
             let gun_type = is_gun(touch, gun);
+
             if gun_type && let Some(old) = touch.items.get(gun).and_then(|g| g.children.last().copied()) {
                 dismount(touch, old);
             }
+
             if attach_child(touch.items, touch.types, gun, mag) {
                 let slot = touch.items.get(mag).map_or(0, |m| m.parent_slot);
                 detach_item(h, bodies, touch, mag, hand);
+
                 if let Some(m) = touch.items.get_mut(mag) {
                     m.parent_slot = slot;
                 }
+
                 if gun_type {
                     let pos = touch.items.get(mag).and_then(|m| bodies.get(m.body)).map_or(Vec3::ZERO, |b| b.pos);
                     out.push(HumanOutput::Sound { sound: Sound::Reload, pos, volume: 1.0, pitch: 1.0 });
                 }
             }
         }
+
         (None, Some(gun)) => {
             let child = touch.items.get(gun).filter(|g| !g.children.is_empty()).map(|g| (g.children[0], *g.children.last().unwrap()));
             if let Some((first, last)) = child
@@ -419,6 +475,7 @@ fn mount(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut T
         }
         _ => {}
     }
+
     true
 }
 
@@ -427,6 +484,7 @@ fn mount(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut T
 fn can_move(h: &Human, touch: &Touchables, hand: i32, pocket: i32) -> bool {
     let held = &h.inventory[hand as usize];
     let in_pocket = h.inventory[(pocket + 2) as usize].count;
+
     if held.count > 0 {
         let Some(item) = touch.items.get(held.items[0] as usize) else { return false };
         touch.types[item.item_type as usize].pockets[pocket as usize] != 0 && in_pocket <= 1
@@ -524,18 +582,22 @@ fn move_item(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &m
 /// Returns whether the action is finished.
 fn drop(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchables, f: usize) -> bool {
     let mut slot = h.actions[f].slot;
+
     if slot > 1 {
         let first = (slot != 2) as i32;
         let pick = if h.inventory[first as usize].count == 0 { (slot == 2) as i32 } else { first };
+
         if h.inventory[first as usize].count == 0 && h.inventory[pick as usize].count == 0 {
             h.actions[f].slot = -1;
             return true;
         }
+
         slot = pick;
         h.actions[f].slot = slot;
     } else if slot == -1 {
         return true;
     }
+
     let tp = h.throw_pitch as f64;
     if !(tp <= -11.25_f64.to_radians()) && !(5.625_f64.to_radians() <= tp) {
         let s = &h.inventory[slot as usize];
@@ -543,8 +605,10 @@ fn drop(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchables, f: usiz
             let item = s.items[0] as usize;
             unlink_item(h, bodies, touch, item);
         }
+
         return true;
     }
+
     h.throw_pitch = if -9.140625_f64.to_radians() > tp {
         (tp + 9.140625_f64.to_radians()) as f32
     } else if tp <= 8.4375_f64.to_radians() {
@@ -552,6 +616,7 @@ fn drop(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchables, f: usiz
     } else {
         (tp - 8.4375_f64.to_radians()) as f32
     };
+
     false
 }
 
@@ -562,11 +627,14 @@ fn item_in_sight(h: &Human, touch: &Touchables, free: impl Fn(&Item) -> bool) ->
     let end = r2 * -PICKUP_REACH + p;
     let mut best = PICKUP_RADIUS;
     let mut found = None;
+
     for (id, item) in touch.items.iter() {
         if !free(item) {
             continue;
         }
+
         let d = point_segment_distance(p, end, item.pos2);
+
         if best > d {
             best = d;
             found = Some(id);
@@ -581,11 +649,13 @@ fn grab_item(h: &mut Human, touch: &mut Touchables) {
     let items = &*touch.items;
     let free = |i: &Item| i.parent_human == -1 && usize::try_from(i.parent_item).ok().and_then(|p| items.get(p)).is_none_or(|p| p.parent_human == -1);
     let Some(item_id) = item_in_sight(h, touch, free) else { return };
+
     let item = touch.items.get(item_id).unwrap();
     let kind = item.item_type;
     if let Some(parent) = usize::try_from(item.parent_item).ok().filter(|&p| touch.items.get(p).is_some_and(|p| p.item_type == ItemKind::Computer)) {
         remove_link(touch.items, item_id, parent);
     }
+
     let q = h.actions_queued as usize;
     h.actions[q] = QueuedAction { kind: if kind == ItemKind::Computer { 4 } else { 3 }, progress: 0.0, slot: 0, arg: 0 };
     h.actions_queued = (h.actions_queued + 1) & 7;
@@ -609,47 +679,62 @@ fn pickup(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut 
     if h.vehicle.is_some() {
         return;
     }
+
     let head = &h.bones[3];
     let (p, r2) = (head.pos, head.rot[2]);
     let end = r2 * -PICKUP_REACH + p;
     let mut best = PICKUP_RADIUS;
     let mut found = None;
+
     for (id, item) in touch.items.iter() {
         if item.parent_human != -1 || item.parent_item != -1 {
             continue;
         }
+
         let d = point_segment_distance(p, end, item.pos2);
+
         if best > d {
             best = d;
             found = Some(id);
         }
     }
+
     let Some(item_id) = found else {
         if let Some((vehicle, seat)) = super::seated::find_seat(h, touch) {
             h.vehicle = Some(vehicle);
             h.seat = seat;
             touch.occupied.push((vehicle, seat));
         }
+
         return;
     };
+
     let kind = touch.items.get(item_id).unwrap().item_type;
+
     if matches!(kind, ItemKind::Table | ItemKind::TableTest | ItemKind::Computer) {
         return;
     }
+
     let mut slot = h.actions[f].slot;
+
     if slot == 3 {
         let t = &touch.types[kind as usize];
         slot = (t.magazine_ammo > 0 && !t.is_gun) as i32;
+
         if matches!(kind, ItemKind::Grenade | ItemKind::Bandage | ItemKind::Briefcase | ItemKind::BriefcaseOpen | ItemKind::Phone | ItemKind::Rope) {
             slot = 0;
         }
+
         if h.inventory[slot as usize].count > 0 {
             slot ^= 1;
         }
+
         h.actions[f].slot = slot;
     }
+
     if !(0..super::INVENTORY_SLOTS as i32).contains(&slot) || h.inventory[slot as usize].count != 0 {
         return;
     }
+    
     link_item_to_human(h, human_id, bodies, touch, item_id, slot as usize);
 }

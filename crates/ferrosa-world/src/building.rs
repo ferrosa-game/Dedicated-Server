@@ -302,6 +302,7 @@ impl<'a> Buildings<'a> {
         let corp = usize::try_from(ty).ok().and_then(|i| Team::CORPORATIONS.get(i).copied());
         let o = pos - off;
         let base = usize::try_from(ty).ok().filter(|&i| i < CORPORATIONS);
+
         if let Some(k) = base {
             let b = &mut self.bases[k];
             for _ in 0..(rot & 3) {
@@ -314,8 +315,10 @@ impl<'a> Buildings<'a> {
 
         if let Some(kind) = record_kind(ty) {
             let mut record = building_record(kind, &raw, o, rot, pos);
+
             record.computers = self.computers.iter().map(|&p| (p, -1)).collect();
             record.team = base.map_or(0, |k| k as i32);
+
             self.records.push(record);
         }
 
@@ -331,38 +334,50 @@ impl<'a> Buildings<'a> {
         let cell = |v: i32| v as f32 * 4.0;
         let versus = self.game_type == VERSUS;
         let b = &mut self.bases[k];
+
         b.interior_min = Vec3::new(cell(o.x + x.0), cell(o.y), cell(o.z + z.0));
         b.interior_max = Vec3::new(cell(o.x + x.1), cell(o.y + 1), cell(o.z + z.1));
+
         let c = b.middle();
         let mut m = b.frame();
         let [r0, _, r2] = m;
         let mut p = r0 * -CAR_ROW_START + c + r2 * CAR_ROW_START;
+
         for n in 1..=CAR_SPACES {
             b.car_spaces.push((p, m));
+
             if n == 4 {
                 let axis = m[1];
                 rotate_orientation(&mut m, axis, 180.0_f32.to_radians());
+
                 p += m[2] * CAR_ROW_GAP;
             } else if n != CAR_SPACES {
                 let r0 = m[0];
+
                 p += r0 * CAR_STEP;
             }
         }
+
         let c = b.middle();
         let [r0, _, r2] = b.frame();
         let t = r0 * TABLE_ALONG + c + r2 * TABLE_ACROSS;
+
         if roundcity {
             b.table = t;
         }
+
         b.spawn = r0 * SPAWN_ALONG + t + r2 * SPAWN_ACROSS;
+
         if versus {
             let (a, bb) = (b.interior_min, b.interior_max);
+
             b.spawn = Vec3::new((a.x + bb.x) * 0.5, (a.y + VERSUS_SPAWN_LIFT) + VERSUS_SPAWN_LIFT2, (a.z + bb.z) * 0.5);
         }
     }
 
     fn setup(&self, b: &BuildingFile) -> Vec<Tile> {
         let mut special = [0u32; 1024];
+
         for (i, n) in b.special_blocks.iter().enumerate().take(1024) {
             for (k, cn) in self.custom_names.iter().enumerate() {
                 if *cn == n.as_str() {
@@ -370,7 +385,9 @@ impl<'a> Buildings<'a> {
                 }
             }
         }
+
         let mut build = [0u32; 1024];
+
         for (i, n) in b.build_blocks.iter().enumerate().take(1024) {
             for (k, gn) in self.build_blocks.iter().enumerate().take(64) {
                 if gn == n.as_str() {
@@ -378,7 +395,9 @@ impl<'a> Buildings<'a> {
                 }
             }
         }
+
         let mut isets = [0u32; 1024];
+
         for (i, n) in b.item_sets.iter().enumerate().take(1024) {
             for (k, gn) in self.item_sets.iter().enumerate() {
                 if gn == n.as_str() {
@@ -386,7 +405,9 @@ impl<'a> Buildings<'a> {
                 }
             }
         }
+
         let mut remap = [0u32; 256];
+
         for (i, n) in b.texture_names.iter().enumerate().take(256) {
             for (k, m) in self.materials.iter().enumerate() {
                 if m == n.as_str() {
@@ -394,9 +415,11 @@ impl<'a> Buildings<'a> {
                 }
             }
         }
+
         let resolve = |v: u32| {
             if v & TYPE_MASK == MESH { ((v >> 24) & 3).wrapping_add(special[(v & 1023) as usize] | MESH) } else { v }
         };
+
         b.tiles
             .iter()
             .map(|t: &BuildingFileTile| Tile {
@@ -444,7 +467,9 @@ impl<'a> Buildings<'a> {
                 }
             }
         }
+
         let portal = |v: u32| v.wrapping_sub(3) <= 12;
+
         for y in 0..h {
             for z in 0..=l {
                 for x in 0..=w {
@@ -478,6 +503,7 @@ impl<'a> Buildings<'a> {
     /// block `group` cut out of it, added if new; 0 once the atlas holds 255.
     fn atlas_layer(&mut self, material: u16, group: u32, portal: u32) -> usize {
         let entry = (material, group, portal);
+
         match self.atlas.iter().position(|&e| e == entry) {
             Some(k) => k,
             None if self.atlas.len() >= 0xff => 0,
@@ -523,11 +549,14 @@ impl<'a> Buildings<'a> {
             for z in 0..l {
                 for x in 0..w {
                     let t = self.rt(x, z, y);
+
                     if t.block == 0 {
                         continue;
                     }
+
                     let p = o + IVec3::new(x, y, z);
                     area.create_block(p.x, p.y, p.z, t.block | flags, t.block_textures, dims);
+
                     if y == off_y {
                         ground.stamp_roadmap(p.x, p.z, p.y as f32 * 4.0);
                     }
@@ -543,10 +572,13 @@ impl<'a> Buildings<'a> {
                 for x in 0..w {
                     let t = self.rt(x, z, y);
                     let v = t.interior;
+
                     if v == 0 {
                         continue;
                     }
+
                     let p = o + IVec3::new(x, y, z);
+
                     if v == 65535 {
                         let zp = self.rt(x, z + 1, y);
                         let xp = self.rt(x + 1, z, y);
@@ -556,6 +588,7 @@ impl<'a> Buildings<'a> {
                             if t.edge_z == 0 && (is_p(self.rt(x - 1, z, y).edge_x) || is_p(self.rt(x, z - 1, y).edge_z)) {
                                 key |= 2;
                             }
+
                             if xp.edge_z == 0 && (is_p(xp.edge_x) || is_p(self.rt(x + 1, z - 1, y).edge_z)) {
                                 key |= 2 << 4;
                             }
@@ -564,29 +597,35 @@ impl<'a> Buildings<'a> {
                         if zp.edge_x == 0 {
                             if xp.edge_z == 0 {
                                 let d = self.rt(x + 1, z + 1, y);
+
                                 if is_p(d.edge_x) || is_p(d.edge_z) {
                                     key |= 2 << 8;
                                 }
                             }
+
                             if t.edge_z == 0 && (is_p(self.rt(x - 1, z + 1, y).edge_x) || is_p(zp.edge_z)) {
                                 key |= 2 << 12;
                             }
                         }
 
                         let id = self.mesh_id(tables, key);
+
                         if area.layer1(p.x, p.y, p.z) == 0 {
                             area.place_with_footprint(p.x, p.y, p.z, id | flags | MESH, dims, t.textures);
                         }
                     } else if (v as i32) < 0 {
                         area.place_with_footprint(p.x, p.y, p.z, flags | v, dims, t.textures);
+
                         if let Some(k) = base {
                             let id = v & 65535;
                             let c = |n: i32| n as f32 * 4.0;
+
                             if tables.is_safe(id) {
                                 let b = &mut self.bases[k];
                                 b.vault_min = Vec3::new(c(p.x) + 0.25, c(p.y) + 0.125, c(p.z) + 0.25);
                                 b.vault_max = Vec3::new(c(p.x + 1) - 0.25, c(p.y + 1) - 0.125, c(p.z + 1) - 0.25);
                             }
+
                             if tables.is_base_table(id) {
                                 self.bases[k].table = Vec3::new(c(p.x) + 2.0, c(p.y) + 2.0, c(p.z) + 2.0);
                             }
@@ -595,6 +634,7 @@ impl<'a> Buildings<'a> {
 
                     if corp.is_some() && self.game_type != 7 {
                         let id = v & 65535;
+
                         if id >= garage[0] && id <= garage[3] {
                             let dir = (id.wrapping_sub(garage[0]) + 2) & 3;
                             let mut second = p;
@@ -607,6 +647,7 @@ impl<'a> Buildings<'a> {
                             for d in [p, second] {
                                 area.set_object(d.x, d.y, d.z, dir << 10 | 6);
                             }
+
                             if let Some(k) = base {
                                 self.bases[k].door = Some(([p, second], dir));
                             }
@@ -620,9 +661,11 @@ impl<'a> Buildings<'a> {
             for z in 0..l {
                 for x in 0..w {
                     let v = self.rt(x, z, y).item_set;
+
                     if v != 0 {
                         let p = o + IVec3::new(x, y, z);
                         area.set_item_set(p.x, p.y, p.z, v);
+
                         let computers = area.item_sets.set(v).map_or(0, |s| s.entries.iter().filter(|e| e.kind == ItemKind::Computer as i32).count());
                         self.computers.extend(std::iter::repeat_n(p, computers));
                     }
@@ -633,6 +676,7 @@ impl<'a> Buildings<'a> {
 
     fn mesh_id(&mut self, tables: &mut BlockTable, key: u32) -> u32 {
         let key = key & ((1 << 24) - 1);
+
         if let Some(&id) = self.mesh_cache.get(&key) {
             return id;
         }
@@ -679,15 +723,19 @@ pub fn assign_streets(records: &mut [BuildingRecord], streets: &crate::streets::
         let p = r2 * REACH + b.pos;
         let mut best = 65536.0f32;
         let mut near = 0;
+
         for (k, i) in streets.intersections.iter().enumerate() {
             let (dx, dy, dz) = (i.pos.x as f32 * 4.0 - p.x, i.pos.y as f32 * 4.0 - p.y, i.pos.z as f32 * 4.0 - p.z);
             let d = ((dy * dy + dx * dx) + dz * dz).sqrt();
+
             if best > d {
                 best = d;
                 near = k;
             }
         }
+
         let s = streets.intersections.get(near).map_or([-1; 4], |i| i.streets);
+
         b.streets = (if s[0] != -1 { s[0] } else { s[2] }, if s[1] != -1 { s[1] } else { s[3] });
     }
 }
@@ -723,10 +771,13 @@ fn placement(raw: &BuildingFile, city: IVec3, rot: u32) -> (Vec3, RotMatrix) {
         let [r0, _, r2] = m;
         pos = pos + r0 * a4 + r2 * c4;
         let axis = m[1];
+
         rotate_orientation(&mut m, axis, 90.0_f32.to_radians());
+
         (ox, oz) = (oz, ox);
         let (mx, mz) = (cell(-ox), cell(!oz));
         let [r0, _, r2] = m;
+
         pos = r0 * mx + pos + r2 * mz;
     }
 
@@ -744,6 +795,7 @@ fn building_record(kind: i32, raw: &BuildingFile, o: IVec3, rot: u32, city: IVec
     let (x, z) = interior_span(raw, rot);
     let cell = |v: i32| v as f32 * 4.0;
     let (pos, m) = placement(raw, city, rot);
+
     let shop = match kind {
         CLOTHING_STORE => CLOTHING_STOCK.iter().map(|&(k, price)| ShopEntry { kind: k, price, extra: 0 }).collect(),
         BURGER_SHOP => vec![ShopEntry { kind: 0, price: BURGER_PRICE, extra: 0 }],

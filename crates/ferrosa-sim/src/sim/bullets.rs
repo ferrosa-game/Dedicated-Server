@@ -80,10 +80,12 @@ enum Target {
 fn fly(b: &mut Bullet) -> (Vec3, Vec3) {
     b.prev = b.pos;
     b.vel.y -= b.gravity;
+
     let v = b.vel;
     let speed = ((v.y * v.y + v.x * v.x) + v.z * v.z).sqrt();
     let drag = BULLET_DATA.get(b.kind as usize).map_or(0.0, |d| d.1);
     let dir = if speed != 0.0 { v * (1.0 / speed) } else { Vec3::ZERO };
+
     b.vel = dir * ((-speed * speed) * drag) + v;
     b.pos = b.vel + b.pos;
     (b.prev, b.pos)
@@ -94,6 +96,7 @@ impl Sim {
     fn bullet_hit_vehicle(&mut self, i: usize, vid: usize, hit: VehicleHit) {
         let b = self.bullets[i].clone();
         self.bullets[i].time = 0;
+
         let v = b.vel;
         let speed = v.length();
         let damage = ((b.mass * (speed * VEHICLE_DAMAGE_SCALE)) * TICKS_PER_SECOND_F32 - DAMAGE_FLOOR) as i32;
@@ -104,16 +107,21 @@ impl Sim {
         let event = match hit.part {
             VehiclePart::Wheel(k) => {
                 let Some(w) = vehicle.wheels.get_mut(k) else { return };
+
                 if w.health <= 0 {
                     return;
                 }
+
                 w.health -= damage;
+
                 if w.health > 0 {
                     return;
                 }
+
                 w.drive |= 1;
                 w.radius *= TYRE_BURST_RADIUS;
                 w.popped = 1;
+
                 ServerEvent::UpdateVehicle(update(TYRE_BURST, k))
             }
             _ if vehicle.kind == VehicleKind::Train => return,
@@ -121,15 +129,19 @@ impl Sim {
                 if let Some(w) = vehicle.broken_windows.get_mut(k) {
                     *w = true;
                 }
+
                 ServerEvent::UpdateVehicle(update(WINDOW_BROKEN, k))
             }
             VehiclePart::Body(_) => {
                 let e = EventBulletHit { unk: 0, hit_type: HIT_VEHICLE, pos: hit.pos, normal: hit.normal };
+
                 self.events.push(Event { tick_created: self.tick, kind: ServerEvent::BulletHit(e) });
                 self.vehicle_take_damage(vid, damage);
+
                 return;
             }
         };
+
         self.events.push(Event { tick_created: self.tick, kind: event });
     }
 
@@ -140,12 +152,14 @@ impl Sim {
             let (from, to) = fly(&mut self.bullets[i]);
             let (best, target, found) = self.bullet_target(from, to, self.bullets[i].player);
             let map = &self.world.map;
+
             if let Some(level) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, from, to)
                 && best > level.hit.fraction
             {
                 self.bullet_hit_level(i, level);
                 continue;
             }
+
             match target {
                 Some(Target::Vehicle(vid, hit)) => self.bullet_hit_vehicle(i, vid, hit),
                 Some(Target::Item(id)) => self.bullet_hit_item(i, id, &found),
@@ -164,21 +178,26 @@ impl Sim {
 
         for (id, h) in self.humans.iter() {
             let Some(hit) = trace_ray_human(h, from, to, 0.0) else { continue };
+
             if !(best > hit.fraction) {
                 continue;
             }
+
             if h.player == shooter && matches!(hit.bone, BoneId::ForearmLeft | BoneId::HandLeft | BoneId::ForearmRight | BoneId::HandRight) {
                 continue;
             }
+
             if h.player.and_then(|p| self.players.get(p.idx())).is_some_and(|p| p.god_mode) {
                 continue;
             }
+
             best = hit.fraction;
             target = Some(Target::Human(id, hit));
         }
 
         for (vid, v) in self.vehicles.iter() {
             let Some(t) = self.vehicle_types.get(v.kind as usize) else { continue };
+
             if let Some(hit) = trace_vehicle_parts(v, t, from, to, true)
                 && !(best <= hit.fraction)
             {
@@ -191,12 +210,15 @@ impl Sim {
             let (p, q) = ((0.25 * a) as i32, (0.25 * b) as i32);
             if a <= b { (p, q) } else { (q, p) }
         };
+
         let ((x0, x1), (y0, y1), (z0, z1)) = (block(from.x, to.x), block(from.y, to.y), block(from.z, to.z));
         let found = self.item_grid.query(IVec3::new(x0, y0, z0), IVec3::new(x1, y1, z1));
+
         for &id in &found {
             let Some(item) = self.items.get(id) else { continue };
             let Some(hull) = &self.item_types[item.item_type as usize].hull else { continue };
             let Some(world) = self.bodies.get(item.body).map(|b| hull.world_verts(b.pos, &b.rot)) else { continue };
+
             if let Some((fraction, _, _)) = hull.trace_mesh(&world, from, to)
                 && !(best <= fraction)
             {

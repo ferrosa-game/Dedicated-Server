@@ -64,6 +64,10 @@ impl SrkPlayerData {
         buf[..n].copy_from_slice(&src[..n]);
         buf
     }
+
+    pub fn name(&self) -> String {
+        String::from_utf8_lossy(self.player_name.split(|&b| b == 0).next().unwrap_or(&[])).into_owned()
+    }
 }
 
 impl SrkData {

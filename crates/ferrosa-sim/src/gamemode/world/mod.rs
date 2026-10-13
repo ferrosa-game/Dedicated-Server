@@ -233,18 +233,24 @@ impl Sim {
         if count <= 0 {
             return;
         }
+
         let mut taken = [false; MAX_PATROL_SPOTS];
+
         for _ in 0..count {
             let mut pick = rand::random_range(0..n as i32);
             let mut tries = SPOT_TRIES;
+
             while taken[pick as usize] {
                 pick = rand::random_range(0..n as i32);
                 tries -= 1;
+
                 if tries == 0 {
                     break;
                 }
             }
+
             taken[pick as usize] = true;
+
             let spot = &spots[pick as usize];
             let yaw = match spot.facing {
                 1 => 90.0_f32.to_radians(),
@@ -252,6 +258,7 @@ impl Sim {
                 3 => -90.0_f32.to_radians(),
                 _ => 0.0,
             };
+
             if let Some(id) = self.create_npc(kind, spot.pos, yaw)
                 && let Some(npc) = self.npcs[id].as_mut()
             {
@@ -305,6 +312,7 @@ impl Sim {
     /// world_create_train: a train (colour 1) 2 above each of the track's train spawns, turned to its heading.
     pub(crate) fn world_create_train(&mut self) {
         let spawns = self.world.map.level.area.track.spawns.clone();
+
         for (i, (p, angle)) in spawns.into_iter().enumerate() {
             let mut rot = ferrosa_physics::rotation::IDENTITY;
 
@@ -386,10 +394,13 @@ impl Sim {
         for k in 0..CORPORATIONS {
             for slot in 0..missions::MISSION_SLOTS {
                 let m = self.corp_state[k].missions[slot];
+
                 if !m.active || m.done || m.deadline != clock {
                     continue;
                 }
+
                 self.despawn_missions_by_id(m.id);
+
                 if !self.corp_state[k].missions[slot].done {
                     self.settle_mission_result(k, slot, false, 0);
                 }
@@ -405,6 +416,7 @@ impl Sim {
                 if !m.active {
                     continue;
                 }
+
                 if let Some(item) = usize::try_from(m.item).ok().and_then(|i| self.items.get_mut(i))
                     && item.despawn_time > 0
                 {
@@ -541,10 +553,12 @@ impl Sim {
     /// The memos at the spawn, topped back up to 8.
     fn place_world_memos(&mut self) {
         let s = self.map_spawn();
+
         while self.modes.world.state.memos < MEMOS {
             let pos = Vec3::new(s.x - MEMO_WEST, s.y, MEMO_SOUTH + s.z);
             let Some(id) = self.create_item(ItemKind::PaperWorld, pos, None, IDENTITY) else { break };
             let paper = self.modes.world.state.newspaper.clone();
+
             self.write_memo(id, &paper);
             self.modes.world.state.memos += 1;
         }

@@ -68,5 +68,6 @@ pub fn point_in_triangle_oriented(p: Vec3, n: Vec3, a: Vec3, b: Vec3, c: Vec3) -
 
 pub fn segment_intersect_face(n: Vec3, start: Vec3, end: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Option<(f32, Vec3)> {
     let (t, p) = segment_intersect_plane_one_sided(n, a, start, end)?;
+
     point_in_triangle_oriented(p, n, a, b, c).then_some((t, p))
 }

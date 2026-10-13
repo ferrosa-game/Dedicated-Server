@@ -22,15 +22,14 @@ impl WireWrite for TicketRequest {
 }
 
 impl WireRead for TicketRequest {
-    /// After the packet's type byte.
     fn read(r: &mut Reader) -> Result<Self, CodecError> {
         let (game_auth, master_auth) = (r.u32()?, r.u32()?);
         let ip = Ipv4Addr::from(r.u32()?);
+
         Ok(Self { game_auth, master_auth, server: SocketAddrV4::new(ip, r.u16()?) })
     }
 }
 
-/// Packet 0x4b from the masterserver to the client: the ticket the server it asked to join will take.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Ticket {
     pub ticket: u32,
@@ -44,7 +43,6 @@ impl WireWrite for Ticket {
 }
 
 impl WireRead for Ticket {
-    /// After the packet's type byte.
     fn read(r: &mut Reader) -> Result<Self, CodecError> {
         Ok(Self { ticket: r.u32()? })
     }

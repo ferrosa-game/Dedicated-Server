@@ -1,7 +1,7 @@
 use ferrosa_protocol::clientbound::game::ItemKind;
 use glam::Vec3;
 
-use crate::sim::Sim;
+use crate::{items, sim::{Sim, economy}};
 
 const ROUND_CORPS: usize = 3;
 /// A world clock day, and the latest deadline a mission can have.
@@ -55,28 +55,35 @@ impl Sim {
     /// day) shuffled, then dealt out in groups to transactions, two-team deals and acquisitions.
     pub(crate) fn generate_round_missions(&mut self) {
         self.missions.average_players = 0;
-        for c in &mut self.corp_state[..ROUND_CORPS] {
-            c.spent = 0;
+        for corp_state in &mut self.corp_state[..ROUND_CORPS] {
+            corp_state.spent = 0;
         }
+
         let day_start = self.world_time % CLOCK_DAY == 0;
         let (mut list, mut total) = (Vec::new(), 0);
+
         for k in 0..ROUND_CORPS {
             let players = self.corp_state[k].player_count;
             if players <= 0 {
                 continue;
             }
+
             let active = self.corp_active_mission_count(k);
+
             if active <= 0 || (active == 1 && day_start) {
                 list.push(k as i32);
                 total += players;
                 self.missions.average_players = total;
             }
         }
+
         if list.is_empty() {
             self.missions.average_players = 1;
             return;
         }
+
         self.missions.average_players = (total / list.len() as i32).max(1);
+
         let n = list.len() as i32;
         if n > 1 {
             for _ in 0..SHUFFLES {
@@ -85,12 +92,15 @@ impl Sim {
                 list.swap(a, b);
             }
         }
+
         while !list.is_empty() {
             let size = self.deal_round_missions(&list);
             self.stats.missions += 1;
+
             if list.len() as i32 - size <= 0 {
                 break;
             }
+
             list.drain(..size as usize);
         }
     }
@@ -98,6 +108,7 @@ impl Sim {
     /// One deal of generate_round_missions for the head of `list`; the number of corporations it took.
     fn deal_round_missions(&mut self, list: &[i32]) -> i32 {
         let n = list.len() as i32;
+
         let couple_first = if n <= 1 {
             false
         } else if rand::random_ratio(3, 4) {
@@ -107,27 +118,31 @@ impl Sim {
                 self.generate_twoteam_missions(&list[..3]);
                 return 3;
             }
+
             true
         } else if rand::random::<bool>() || n <= 3 {
-            let many = n > 2;
-            if rand::random_ratio(1, 4) && many {
+            if rand::random_ratio(1, 4) && n > 2 {
                 return self.couple_or_single(list);
             }
+
             return self.chase_or_single(list, n);
         } else {
             if rand::random_ratio(1, 4) {
                 return self.couple_or_single(list);
             }
+
             let size = if rand::random_ratio(1, 4) { 1 } else { 3 };
             self.create_mission_acquisition(&list[..size]);
             return size as i32;
         };
+
         if rand::random_ratio(1, 4) && couple_first { self.couple_or_single(list) } else { self.chase_or_single(list, n) }
     }
 
     /// A transaction for two, three or all of `list`, or a two-team deal for three.
     fn deal_transaction(&mut self, list: &[i32]) -> i32 {
         let n = list.len() as i32;
+
         let size = if !rand::random::<bool>() && n > 3 {
             if rand::random_ratio(1, 16) { 2 } else { 0 }
         } else if rand::random_ratio(1, 16) {
@@ -137,21 +152,25 @@ impl Sim {
         } else {
             n
         };
+
         if size != 0 {
             self.generate_transaction_missions(&list[..size as usize]);
             return size;
         }
+
         if rand::random_ratio(3, 4) {
             self.generate_transaction_missions(&list[..3]);
         } else {
             self.generate_twoteam_missions(&list[..3]);
         }
+
         3
     }
 
     /// An acquisition for `size` corporations, or one in four times (with more than one to pick from) for the first.
     fn chase_or_single(&mut self, list: &[i32], size: i32) -> i32 {
         let size = if rand::random_ratio(3, 4) || list.len() <= 1 { size } else { 1 };
+
         self.create_mission_acquisition(&list[..size as usize]);
         size
     }
@@ -159,6 +178,7 @@ impl Sim {
     /// An acquisition for the first two corporations, or one in four times the first alone.
     fn couple_or_single(&mut self, list: &[i32]) -> i32 {
         let size = if rand::random_ratio(3, 4) { 2 } else { 1 };
+
         self.create_mission_acquisition(&list[..size as usize]);
         size
     }
@@ -166,6 +186,7 @@ impl Sim {
     /// Takes the next disk colour, black to red and over again.
     fn next_disk(&mut self) -> i32 {
         let old = self.missions.disk_index;
+
         self.missions.disk_index = if old + 1 > DISK_KINDS - 1 { 0 } else { old + 1 };
         old
     }
@@ -178,6 +199,7 @@ impl Sim {
     fn table_start(&self, k: usize) -> (ferrosa_physics::rotation::RotMatrix, Vec3) {
         let base = &self.world.map.level.bases[k];
         let rot = base.frame();
+
         (rot, step(base.table, rot[0], ITEM_STEP))
     }
 
@@ -185,12 +207,14 @@ impl Sim {
     /// the corporation's spending.
     fn lay_out_cash(&mut self, k: usize, rot: ferrosa_physics::rotation::RotMatrix, mut p: Vec3, count: i32) {
         let r = rot[0];
+
         for j in 0..count {
             if j & 3 == 0 {
                 p = step(p, r, CASE_STEP);
                 self.create_item(ItemKind::Briefcase, p, None, rot);
                 p = step(p, r, CASE_STEP);
             }
+
             self.create_item(ItemKind::CashRound, p, None, rot);
             self.corp_state[k].spent -= CASH_VALUE;
             p = step(p, r, ITEM_STEP);
@@ -231,6 +255,7 @@ impl Sim {
         let colour = self.next_disk();
         let disk = ItemKind::try_from((ItemKind::DiskBlack as i32 + colour) as u8).unwrap();
         let location = if rand::random_ratio(3, 4) { rand::random_range(0..8) } else { NO_LOCATION };
+
         let values: Vec<i32> = (0..n)
             .map(|i| {
                 if i == 0 {
@@ -249,30 +274,36 @@ impl Sim {
         for (i, &c) in list.iter().enumerate() {
             let k = c as usize;
             let (rot, p) = self.table_start(k);
+
             if i == 0 {
                 if location == NO_LOCATION {
                     self.missions.last_disks[0] = self.lay_out_disk(k, disk, values[0], rot, p);
                 } else {
                     let p = crate::sim::missions::MISSION_SPOTS[location as usize];
                     let id = self.create_item(disk, p, None, rot);
+
                     self.corp_state[k].spent -= values[0];
                     self.missions.last_disks[0] = id.map_or(-1, |i| i as i32);
+
                     if let Some(case) = self.create_item(ItemKind::Briefcase, p, None, rot)
                         && let Some(id) = id
                     {
                         self.items.get_mut(case).unwrap().item_type = ItemKind::BriefcaseOpen;
-                        super::items::attach_child(&mut self.items, &self.item_types, case, id);
+                        items::attach_child(&mut self.items, &self.item_types, case, id);
                         self.items.get_mut(case).unwrap().item_type = ItemKind::Briefcase;
                     }
                 }
             } else if i <= funded {
                 let mut count = rand::random_range(0..3) + 2;
+
                 if colour == GOLD {
                     count += rand::random_range(0..3) + 2;
                 }
+
                 self.lay_out_cash(k, rot, p, count);
             }
         }
+
         let item = self.missions.last_disks[0];
         let disk_type = self.item_kind(item);
 
@@ -306,6 +337,7 @@ impl Sim {
         let deadline = self.deadline(TRANSACTION_TIME);
         let colour = self.next_disk();
         let disk = ItemKind::try_from((ItemKind::DiskBlack as i32 + colour) as u8).unwrap();
+
         let values: Vec<i32> = (0..n)
             .map(|i| {
                 if i <= 1 {
@@ -317,21 +349,27 @@ impl Sim {
                 (if colour == GOLD { v * 4 } else { v }) * 2
             })
             .collect();
+
         for (i, &c) in list.iter().enumerate() {
             let k = c as usize;
             let (rot, p) = self.table_start(k);
+
             if i <= 1 {
                 self.missions.last_disks[i] = self.lay_out_disk(k, disk, values[i], rot, p);
             } else if i == 2 {
                 let mut count = rand::random_range(0..5) + 4;
+
                 if colour == GOLD {
                     count += rand::random_range(0..3) + 2;
                 }
+
                 self.lay_out_cash(k, rot, p, count);
             }
         }
+
         let [item, item2] = self.missions.last_disks;
         let disk_type = self.item_kind(item);
+
         for (i, &c) in list.iter().enumerate() {
             let k = c as usize;
             let Some(slot) = self.open_mission(k) else { continue };
@@ -342,6 +380,7 @@ impl Sim {
             m.disk_type = disk_type;
             m.value = values[i];
             m.deadline = deadline;
+
             if i <= 1 {
                 m.kind = 7;
                 m.team1 = list[2];
@@ -350,12 +389,15 @@ impl Sim {
                 if i == 2 {
                     m.kind = 8;
                 }
+
                 m.team1 = list[0];
                 m.team2 = list[1];
                 m.provided_cash = if i == 2 { -spent } else { 0 };
             }
+
             self.push_mission_event(k, slot);
         }
+
         self.missions.counter += 1;
     }
 
@@ -364,19 +406,23 @@ impl Sim {
     fn create_mission_acquisition(&mut self, list: &[i32]) {
         let deadline = self.deadline(ACQUISITION_TIME);
         let colour = self.next_disk();
+
         if !self.world.map.streets.streets.is_empty() {
             let disk = ItemKind::try_from((ItemKind::DiskBlack as i32 + colour) as u8).unwrap();
             self.create_round_traffic_car(disk, deadline);
         }
+
         let item = self.missions.last_disks[0];
         let disk_type = self.item_kind(item);
         for &c in list {
             let k = c as usize;
             let Some(slot) = self.open_mission(k) else { continue };
             let mut value = rand::random_range(0..5) * VALUE_STEP + BASE_VALUE;
+
             if colour == GOLD {
                 value <<= 2;
             }
+
             let location = self.missions.target_location;
             let m = &mut self.corp_state[k].missions[slot];
             m.kind = 1;
@@ -387,8 +433,10 @@ impl Sim {
             m.provided_cash = 0;
             m.location = location;
             m.rate = value as f32 * RATE_SCALE;
+
             self.push_mission_event(k, slot);
         }
+
         self.missions.counter += 1;
     }
 
@@ -406,7 +454,9 @@ impl Sim {
         } else {
             [1; ROUND_CORPS]
         };
+
         let weekly = self.modes.round.cfg.weekly;
+
         for k in 0..ROUND_CORPS {
             let base = &self.world.map.level.bases[k];
             let (lo, hi) = (base.interior_min, base.interior_max);
@@ -414,19 +464,25 @@ impl Sim {
             let pos = |id: i32| usize::try_from(id).ok().and_then(|i| self.items.get(i)).map(|i| i.pos2);
             let mut earnings = self.corp_state[k].spent;
             earnings += self.items.iter().filter(|(_, i)| i.item_type == ItemKind::CashRound && inside(i.pos2)).count() as i32 * CASH_VALUE;
+
             for m in self.corp_state[k].missions.iter().filter(|m| m.active && m.item != -1) {
                 if !pos(m.item).is_some_and(inside) {
                     continue;
                 }
+
                 if (7..=9).contains(&m.kind) && m.item2 != -1 && !pos(m.item2).is_some_and(inside) {
                     continue;
                 }
+
                 earnings += m.value;
             }
+
             let team = ferrosa_protocol::Team::CORPORATIONS[k];
+
             for (_, p) in self.players.iter_mut().filter(|(_, p)| p.team == team) {
                 let share = earnings / divisors[k];
                 p.money += share + ROUND_WAGE;
+
                 if weekly
                     && p.account_id != u32::MAX
                     && let Some(a) = self.saved_accounts.get_player_data(p.account_id)
@@ -434,20 +490,25 @@ impl Sim {
                     a.money = (a.money as i32 + share) as u32;
                 }
             }
+
             self.corp_state[k].funds = earnings;
             let corp = &mut self.corporations[k];
             corp.price *= earnings as f32 / EARNINGS_SCALE / EARNINGS_SCALE2 + 1.0;
+
             if PRICE_FLOOR > corp.price {
                 corp.price = PRICE_FLOOR;
             } else if !weekly && corp.price >= PRICE_SPLIT {
                 corp.price *= SPLIT_RATIO;
+
                 for (_, p) in self.players.iter_mut().filter(|(_, p)| p.team == team) {
                     p.stocks *= SPLIT_SHARES;
                 }
             }
         }
-        let e = crate::sim::economy::stock_event(&self.corporations, self.tick);
+
+        let e = economy::stock_event(&self.corporations, self.tick);
         self.events.push(e);
+
         for (_, p) in self.players.iter() {
             let e = p.make_update_round_event(self.tick);
             self.events.push(e);

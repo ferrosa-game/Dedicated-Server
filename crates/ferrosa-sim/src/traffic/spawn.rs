@@ -38,25 +38,31 @@ fn car_kind(roll: u32) -> VehicleKind {
 pub fn create_traffic(traffic: &mut Traffic, map: &Map, types: &[VehicleType], parked_cars: bool, count: u32) {
     let streets = &map.streets;
     let n = streets.streets.len() as i32;
+
     for _ in 0..count {
         let slot = rand::random_range(0..2);
         let mut street = rand::random_range(0..n);
+
         if traffic.roundcity {
             while street == HIDDEN_STREET || street == LOOP_STREET {
                 street = rand::random_range(0..n);
             }
         }
+
         let mut lane = rand::random_range(0..2);
         let st = &streets.streets[street as usize];
+
         let flat_three =
             parked_cars && streets.intersections[st.intersections[0]].pos.y == streets.intersections[st.intersections[1]].pos.y && st.left_lanes == 3;
         if flat_three {
             lane = rand::random_range(0..3);
         }
+
         let kind = car_kind(rand::random_range(0..16));
         let byte = rand::random_range(0..256);
         let color = rand::random_range(0..COLORS);
         let id = create_traffic_car(traffic, map, types, kind, color, street, slot, lane, byte as f32 * PROGRESS_STEP);
+
         if lane == PARKING_LANE {
             traffic.cars[id].is_bot = PARKED;
         }
@@ -81,13 +87,17 @@ pub fn create_traffic_car(
     let st = &streets.streets[street as usize];
     let n = st.lanes.len() as i32;
     let mut k = (n >> 1) - lane - 1;
+
     if k < 0 {
         k = 0;
     }
+
     if n <= k {
         k = n - 1;
     }
+
     let mut dir = st.dir;
+
     let (from, dx, dz) = if slot == 0 {
         let l = st.lanes[(n - k - 1) as usize];
         (l.start, l.end.x - l.start.x, l.end.z - l.start.z)
@@ -96,12 +106,15 @@ pub fn create_traffic_car(
         let l = st.lanes[k as usize];
         (l.end, l.start.x - l.end.x, l.start.z - l.end.z)
     };
+
     let len = (dz * dz + (dx * dx + 0.0)).sqrt();
     let p = progress * len;
     let mut yaw = if st.north_south != 0 { -90.0_f32.to_radians() } else { -180.0_f32.to_radians() };
+
     if slot == 0 {
         yaw = (yaw as f64 + SPAWN_PI) as f32;
     }
+
     let pos = dir * p + from;
     let ends = st.intersections.map(|i| streets.intersections[i].world_pos.y);
     let top = maxss(ends[1], maxss(ends[0], pos.y)) + TRACE_LIFT;
@@ -113,6 +126,7 @@ pub fn create_traffic_car(
     let left = st.left_lanes;
     let car_lane = if slot != 0 { left - 1 - lane } else { lane + left };
     let id = traffic.cars.len();
+
     let mut car = TrafficCar {
         kind,
         human: -1,
@@ -167,5 +181,6 @@ pub fn create_traffic_car(
     }
 
     traffic.generations[id] += 1;
+
     id
 }

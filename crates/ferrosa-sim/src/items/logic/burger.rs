@@ -13,8 +13,7 @@ impl Sim {
         h.eat_cooldown = 300;
         h.max_stamina = (h.max_stamina + 16).min(255);
 
-        let item = self.items.get_mut(id).unwrap();
-        if let ItemState::Burger { bites_left } = &mut item.state {
+        if let ItemState::Burger { ref mut bites_left } = self.items.get_mut(id).unwrap().state {
             *bites_left -= 1;
 
             if *bites_left <= 0 {

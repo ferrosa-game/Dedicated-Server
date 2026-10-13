@@ -30,6 +30,7 @@ impl PlayerVoice {
 
     pub(crate) fn push(&mut self, index: u8, frame: VoiceFrame) {
         let slot = (index % 64) as usize;
+
         self.volume_level = frame.volume;
         self.frames[slot] = Some(frame);
         self.current = index.wrapping_add(1) % 64;
@@ -40,6 +41,7 @@ impl PlayerVoice {
 
         std::array::from_fn(|i| {
             let idx = start.wrapping_add(i as u8) % 64;
+
             self.frames[idx as usize].clone().unwrap_or_else(|| VoiceFrame { index: idx, size: 0, volume: 0, data: Vec::new() })
         })
     }

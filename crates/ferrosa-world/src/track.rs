@@ -93,9 +93,11 @@ fn side_of(d: Vec3) -> Option<Vec3> {
     let a = AXIS;
     let s = n.cross(a);
     let ls = s.length();
+
     if ls == 0.0 {
         return None;
     }
+
     let inv = 1.0 / ls;
     Some(s * inv)
 }
@@ -119,11 +121,13 @@ impl Track {
         let (mut angle, mut ydir) = (0.0f32, 0.0f32);
         let mut end = e;
         let mut prev = 0usize;
+
         for k in 0..TRACK_PIECES {
             let len = if (23..=40).contains(&k) || (75..=92).contains(&k) { LONG } else { STRAIGHT };
             let start = end;
             d0 = d1;
             let mut generic = true;
+
             match k {
                 23 | 41 | 75 => angle = TURN,
                 27 | 45 | 79 => angle = 0.0,
@@ -155,9 +159,11 @@ impl Track {
                 }
                 _ => {}
             }
+
             if generic {
                 d1 = rotate_vector_about_axis(d1, AXIS, angle);
                 d1.y = ydir;
+
                 match k {
                     19 => t.spawns.push((end, SPAWN_SOUTH)),
                     49 | 69 => t.spawns.push((end, SPAWN_EAST)),
@@ -165,8 +171,10 @@ impl Track {
                     _ => {}
                 }
             }
+
             let h = 0.5 * len;
             end = Vec3::new((h * d0.x + start.x) + h * d1.x, (h * d0.y + start.y) + ydir * h, h * d1.z + (h * d0.z + start.z));
+
             if angle != 0.0 {
                 let a = AXIS;
                 let c0 = d0.cross(a);
@@ -174,21 +182,26 @@ impl Track {
                 let (k0, k1) = if angle > 0.0 { (ARC, -ARC) } else { (-ARC, ARC) };
                 end = c1 * k1 + (start + c0 * k0);
             }
+
             let id = t.tube(TUBE, start, end, d0, d1, TUBE_RADIUS);
             t.meshes[id].prev = prev as i32;
             t.meshes[prev].next = id as i32;
             prev = id;
         }
+
         t.meshes[0].prev = prev as i32;
         t.meshes[prev].next = 0;
+
         for _ in 0..2 {
             for m in 0..t.meshes.len() {
                 let (p, n) = (t.meshes[m].prev as usize, t.meshes[m].next as usize);
                 let a = minss((t.meshes[p].weight + 1.0) * 0.5, t.meshes[m].weight);
                 let b = (t.meshes[n].weight + 1.0) * 0.5;
+
                 t.meshes[m].weight = minss(b, a);
             }
         }
+
         t.ramps();
         t
     }
@@ -199,35 +212,45 @@ impl Track {
         self.quad(QUAD, c, 0.0, 0.0);
         let mut mid = (c[2] + c[3]) * 0.5;
         let mut a = 0.0f32;
+
         for k in 0..RAMP_PIECES {
             let old = a;
+
             if k <= 4 || (10..=13).contains(&k) || k == 17 {
                 a = ((a as f64) + RAMP_TURN) as f32;
             } else if k == 5 || k == 6 {
                 a = ((a as f64) - RAMP_TURN) as f32;
             }
+
             c[0] = c[3];
             c[1] = c[2];
+
             let half = 0.5 * a + 0.5 * old;
             let (s, co) = (half as f64).sin_cos();
             mid = Vec3::new((s as f32) * RAMP_RADIUS + mid.x, 0.0 + mid.y, (co as f32) * RAMP_RADIUS + mid.z);
+
             let (s2, c2) = (a as f64).sin_cos();
             let (s2, c2) = (s2 as f32, c2 as f32);
             c[2] = Vec3::new(RAMP_HALF_WIDTH * c2 + mid.x, 0.0 + mid.y, mid.z - RAMP_HALF_WIDTH * s2);
             c[3] = Vec3::new(c2 * -RAMP_HALF_WIDTH + mid.x, mid.y, s2 * RAMP_HALF_WIDTH + mid.z);
+
             if k <= 3 || (10..=12).contains(&k) {
                 c[3].y += 16.0;
             }
+
             if k == 5 {
                 c[2].y += 16.0;
             }
+
             if k == 17 {
                 c[3].y += 8.0;
             }
+
             if k == 19 {
                 c[2].y += 4.0;
                 c[3].y += 4.0;
             }
+
             self.quad(QUAD, c, 0.0, 0.0);
         }
     }
@@ -237,20 +260,25 @@ impl Track {
     fn tube(&mut self, kind: i32, s: Vec3, e: Vec3, d0: Vec3, d1: Vec3, radius: f32) -> usize {
         let mut m = TrackMesh { kind, ..Default::default() };
         m.center = (e + s) * 0.5;
+
         let dot = d0.dot(d1);
         let sq = dot * dot;
         m.weight = sq * sq;
+
         let (dx, dy, dz) = (e.x - s.x, e.y - s.y, e.z - s.z);
         let l = ((dx * dx + dy * dy) + dz * dz).sqrt();
         let t3 = l / 3.0;
         let p1 = t3 * d0 + s;
         let m3 = (-l) / 3.0;
         let p2 = m3 * d1 + e;
+
         let dir = |t: f32| {
             let u = 1.0 - t;
             d0 * u + d1 * t
         };
+
         let (mut t, mut p) = (0.0f32, s);
+
         for ring in 1..=TUBE_RINGS {
             let sd = side_of(dir(t)).unwrap_or(Vec3::ZERO);
             let a = (-radius) * 0.5;
@@ -258,40 +286,55 @@ impl Track {
             let b = radius * 0.5;
             let v2 = sd * b + p;
             m.verts.extend([Vec3::new(v0.x, v0.y + RAIL_LIFT, v0.z), v0, v2, Vec3::new(v2.x, v2.y + RAIL_LIFT, v2.z)]);
+
             t += RING_STEP;
+
             if ring == TUBE_RINGS {
                 break;
             }
+
             p = if ring == TUBE_RINGS - 1 { e } else { bezier3(s, p1, p2, e, 1.0 - t, t) };
         }
+
         let (mut t, mut p) = (0.0f32, s);
+
         for ring in 1..=TUBE_RINGS {
             let d = dir(t);
+
             let quad = match side_of(d) {
                 None => [p, 0.0 + p, p + 0.0, p],
                 Some(sd) => [BED_OUTER * sd + p, sd + sd + p, p + sd, BED_INNER * sd + p],
             };
+
             m.verts.extend([quad[0], quad[1], Vec3::new(quad[2].x, quad[2].y - BED_DROP, quad[2].z), Vec3::new(quad[3].x, quad[3].y - BED_DROP, quad[3].z)]);
+
             t += RING_STEP;
+
             if ring == TUBE_RINGS {
                 break;
             }
+
             p = if ring == TUBE_RINGS - 1 { e } else { bezier3(s, p1, p2, e, 1.0 - t, t) };
         }
+
         let rails = (0..15).flat_map(|k| {
             let a = 1 + 4 * k;
             [[a, a + 4, a + 5], [a, a + 5, a + 1]]
         });
+
         m.tris.extend(rails);
         m.pieces[4] = m.tris.len() as i32;
         m.pieces[1] = m.tris.len() as i32;
+
         let bed = (0..15).flat_map(|k| {
             let a = 4 * k;
             [[a, a + 4, a + 5], [a, a + 5, a + 1], [a + 2, a + 6, a + 7], [a + 2, a + 7, a + 3]]
         });
+
         m.tris.extend(bed);
         m.pieces[5] = m.tris.len() as i32;
         m.pieces[2] = m.tris.len() as i32;
+
         let walls = (0..15).flat_map(|k| {
             let d = 64 + 4 * k;
             [
@@ -305,6 +348,7 @@ impl Track {
                 [d + 2, d + 7, d + 3],
             ]
         });
+
         m.tris.extend(walls);
         m.pieces[6] = m.tris.len() as i32;
         self.add(m)
@@ -316,9 +360,11 @@ impl Track {
     fn quad(&mut self, kind: i32, c: [Vec3; 4], e0: f32, e1: f32) -> usize {
         let mut m = TrackMesh { kind, ..Default::default() };
         m.center = (c[0] + c[1] + c[2] + c[3]) * 0.25;
+
         let perp01 = {
             let (dx, dz) = (c[0].x - c[1].x, c[0].z - c[1].z);
             let l = ((dz * dz + 0.0) + dx * dx).sqrt();
+
             if l == 0.0 {
                 Vec3::ZERO
             } else {
@@ -326,14 +372,17 @@ impl Track {
                 Vec3::new(dz * inv, inv * 0.0, (-dx) * inv)
             }
         };
+
         let e1d = e1 / 3.0;
         let t03 = horizontal(c[3].x - c[0].x, c[3].z - c[0].z) / 3.0;
         let r1p0 = Vec3::new(perp01.x * t03 + c[0].x, (t03 * perp01.y + c[0].y) + e1d, perp01.z * t03 + c[0].z);
         let t12 = horizontal(c[2].x - c[1].x, c[2].z - c[1].z) / 3.0;
         let r1p3 = Vec3::new(perp01.x * t12 + c[1].x, (t12 * perp01.y + c[1].y) + e1d, perp01.z * t12 + c[1].z);
+
         let perp23 = {
             let (dx, dz) = (c[3].x - c[2].x, c[3].z - c[2].z);
             let l = ((dz * dz + 0.0) + dx * dx).sqrt();
+
             if l == 0.0 {
                 Vec3::ZERO
             } else {
@@ -341,12 +390,14 @@ impl Track {
                 Vec3::new((-dz) * inv, inv * 0.0, dx * inv)
             }
         };
+
         let e0d = e0 / 3.0;
         let t30 = horizontal(c[0].x - c[3].x, c[0].z - c[3].z) / 3.0;
         let r2p0 = Vec3::new(perp23.x * t30 + c[3].x, (t30 * perp23.y + c[3].y) - e0d, perp23.z * t30 + c[3].z);
         let t21 = horizontal(c[1].x - c[2].x, c[1].z - c[2].z) / 3.0;
         let r2p3 = Vec3::new(perp23.x * t21 + c[2].x, (t21 * perp23.y + c[2].y) - e0d, perp23.z * t21 + c[2].z);
         let ends = [(c[0], c[1]), (r1p0, r1p3), (r2p0, r2p3), (c[3], c[2])];
+
         let g: Vec<[Vec3; 4]> = ends
             .iter()
             .map(|&(p0, p3)| {
@@ -355,27 +406,37 @@ impl Track {
                 [p0, p1, p2, p3]
             })
             .collect();
+
         let mut v = 0.0f32;
+
         for _ in 0..PATCH_STEPS {
             let w = 1.0 - v;
             let cols: Vec<Vec3> = (0..4).map(|k| bern3(g[0][k], g[1][k], g[2][k], g[3][k], w, v)).collect();
             let mut u = 0.0f32;
+
             for i in 0..PATCH_STEPS {
                 let p = bern3(cols[0], cols[1], cols[2], cols[3], 1.0 - u, u);
                 let y = if i == 0 || i == PATCH_STEPS - 1 { PATCH_EDGE_HEIGHT } else { p.y };
+
                 m.verts.push(Vec3::new(p.x, y, p.z));
+
                 u += PATCH_STEP;
             }
+
             v += PATCH_STEP;
         }
+
         for row in 0..16 {
             for col in 0..16 {
                 let a = row * 17 + col;
+
                 m.tris.push([a, a + 1, a + 18]);
                 m.tris.push([a, a + 18, a + 17]);
             }
         }
+
         m.pieces[6] = m.tris.len() as i32;
+
         self.add(m)
     }
 
@@ -383,19 +444,24 @@ impl Track {
     /// the grid cells its bounds cover.
     fn add(&mut self, mut m: TrackMesh) -> usize {
         let (mut mn, mut mx) = ([BOX_INIT; 3], [-BOX_INIT; 3]);
+
         for v in &m.verts {
             let v = v.to_array();
+
             for k in 0..3 {
                 if mn[k] > v[k] {
                     mn[k] = v[k];
                 }
+
                 if v[k] > mx[k] {
                     mx[k] = v[k];
                 }
             }
         }
+
         m.box_min = Vec3::from_array(mn);
         m.box_max = Vec3::from_array(mx);
+
         let vert = |i: i32| m.verts[i as usize];
         m.normals = m.tris.iter().map(|t| calculate_face_normal(vert(t[0]), vert(t[1]), vert(t[2]))).collect();
         m.tri_boxes = m
@@ -417,24 +483,31 @@ impl Track {
                 [Vec3::from_array(lo), Vec3::from_array(hi)]
             })
             .collect();
+
         let id = self.meshes.len();
         let (x0, z0) = (cvtt(mn[0] * CELL_SCALE), cvtt(mn[2] * CELL_SCALE));
         let (x1, z1) = (cvtt(mx[0] * CELL_SCALE), cvtt(mx[2] * CELL_SCALE));
+
         for z in z0..=z1 {
             if z as u32 > 63 {
                 continue;
             }
+
             for x in x0..=x1 {
                 if x as u32 > 63 {
                     continue;
                 }
+
                 let cell = &mut self.grid[z as usize * GRID_CELLS + x as usize];
+
                 if cell.len() < CELL_MESHES {
                     cell.push(id as i32);
                 }
             }
         }
+
         self.meshes.push(m);
+
         id
     }
 }
@@ -460,20 +533,25 @@ impl Track {
     /// the bounds cover (a mesh in several cells is taken once per cell) whose bounds meet them.
     pub fn collect(&self, min: Vec3, max: Vec3, parts: u32) -> Vec<TrackTriangle> {
         let mut out = Vec::new();
+
         if self.meshes.is_empty() {
             return out;
         }
+
         let (x0, x1) = (cvtt(min.x * CELL_SCALE), cvtt(max.x * CELL_SCALE));
         let (z0, z1) = (cvtt(min.z * CELL_SCALE), cvtt(max.z * CELL_SCALE));
         let mut candidates = Vec::new();
+
         for z in z0..=z1 {
             if z as u32 > 63 {
                 continue;
             }
+
             for x in x0..=x1 {
                 if x as u32 > 63 {
                     continue;
                 }
+
                 for &m in &self.grid[z as usize * GRID_CELLS + x as usize] {
                     if candidates.len() < MAX_CANDIDATES {
                         candidates.push(m);
@@ -481,17 +559,21 @@ impl Track {
                 }
             }
         }
+
         for m in candidates {
             let mesh = &self.meshes[m as usize];
+
             if !boxes_overlap(mesh.box_min, mesh.box_max, min, max) {
                 continue;
             }
+
             for piece in 0..3 {
                 if parts & (1 << piece) != 0 {
                     mesh.collect_piece(piece, min, max, &mut out);
                 }
             }
         }
+
         out
     }
 }
@@ -516,13 +598,16 @@ impl TrackMesh {
 /// segment_intersect_mesh: the nearest triangle the segment enters, as (fraction, point, normal).
 pub fn segment_intersect_triangles(tris: &[TrackTriangle], start: Vec3, end: Vec3) -> Option<(f32, Vec3, Vec3)> {
     let mut best = (1.0f32, Vec3::ZERO, Vec3::ZERO);
+
     for &[a, b, c] in tris {
         let n = calculate_face_normal(a, b, c);
+
         if let Some((t, p)) = crate::collide::segment_intersect_face(n, start, end, a, b, c)
             && !(best.0 <= t)
         {
             best = (t, p, n);
         }
     }
+    
     (1.0 > best.0).then_some(best)
 }

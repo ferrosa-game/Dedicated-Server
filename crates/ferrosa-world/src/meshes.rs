@@ -56,22 +56,29 @@ impl BlockMeshes {
     fn custom_block(&mut self, id: u32, f: &BlockFile) {
         let b = &mut self.b;
         b.reset();
+
         for bx in &f.boxes {
             let p: [Vec3; 8] = std::array::from_fn(|i| bx.pos[i]);
             b.add_box(&p, bx.texture[0], bx.side_flag);
         }
+
         for sf in &f.block_surface {
             for (i, v) in sf.vertex_data.iter().flatten().enumerate() {
                 b.ctrl[i] = v.pos;
                 b.uv_ctrl[i] = glam::Vec2::new(v.tex_coord.first().copied().unwrap_or(0.0), v.tex_coord.get(1).copied().unwrap_or(0.0));
             }
+
             let mut flags = sf.texture;
+
             if sf.project_texture != 0 {
                 flags |= dir_flag(calculate_face_normal(b.ctrl[0], b.ctrl[3], b.ctrl[15]));
             }
+
             b.append_bezier(sf.order_y as i32, Degree::from_i32(sf.order_x as i32), sf.tess_y as i32, Degree::from_i32(sf.tess_x as i32), flags);
         }
+
         let (w, h, d) = (f.size.x as i32, f.size.y as i32, f.size.z as i32);
+
         let mut faces = |on: u32, dir: i32, outer: i32, inner: i32, at: &dyn Fn(f32, f32) -> Vec3| {
             if on != 0 {
                 for o in 0..outer {
@@ -81,13 +88,16 @@ impl BlockMeshes {
                 }
             }
         };
+
         let (wf, hf, df) = (w as f32, h as f32, d as f32);
+
         faces(f.floor, 0, d, w, &|o, i| Vec3::new(i, 0.0, o));
         faces(f.ceiling, 5, d, w, &|o, i| Vec3::new(i, hf - 1.0, o));
         faces(f.wall_pz, 3, h, w, &|o, i| Vec3::new(i, o, df - 1.0));
         faces(f.wall_nx, 4, h, d, &|o, i| Vec3::new(0.0, o, i));
         faces(f.wall_px, 1, h, w, &|o, i| Vec3::new(i, o, 0.0));
         faces(f.wall_nz, 2, h, d, &|o, i| Vec3::new(wf - 1.0, o, i));
+
         self.store_turns(id, IVec3::new(w, h, d));
     }
 
@@ -96,6 +106,7 @@ impl BlockMeshes {
 
         let b = &mut self.b;
         b.reset();
+
         for (i, p) in [
             (0, [0.0, 0.0, 0.0]),
             (3, [1.0, 0.0, 0.0]),
@@ -108,6 +119,7 @@ impl BlockMeshes {
         ] {
             b.ctrl[i] = Vec3::from(p);
         }
+
         b.set_uv_corners([0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]);
         b.append_bezier(1, LINEAR, 8, Some(Degree::Cubic), FACE_DOWN);
         self.store_turns(CURB_RAMP, one);
@@ -115,34 +127,44 @@ impl BlockMeshes {
         for i in 0..16u32 {
             let b = &mut self.b;
             b.reset();
+
             let mut quad = |p0, p3, p15, p12, flags| {
                 b.set_corners(p0, p3, p15, p12);
+
                 if flags == 5 {
                     b.set_uv_corners([0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]);
                 } else {
                     b.set_uv_corners([0.0, Q], [1.0, Q], [1.0, 0.0], [0.0, 0.0]);
                 }
+
                 b.append_bezier(1, LINEAR, 1, LINEAR, flags);
             };
+
             quad([0.0, Q, 0.0], [1.0, Q, 0.0], [1.0, Q, 1.0], [0.0, Q, 1.0], 5);
+
             if i & 1 != 0 {
                 quad([1.0, Q, 0.0], [0.0, Q, 0.0], [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], 0);
             }
+
             if i & 8 != 0 {
                 quad([0.0, Q, 0.0], [0.0, Q, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 0.0], 0);
             }
+
             if i & 4 != 0 {
                 quad([0.0, Q, 1.0], [1.0, Q, 1.0], [1.0, 0.0, 1.0], [0.0, 0.0, 1.0], 0);
             }
+
             if i & 2 != 0 {
                 quad([1.0, Q, 1.0], [1.0, Q, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 1.0], 0);
             }
+
             self.store(i);
         }
 
         let mut height = 0.0f32;
         for w in 4..=12i32 {
             height = 1.0 / w as f32;
+
             let corners = |row: i32, lo: f32, hi: f32| {
                 [
                     if row <= 1 { lo } else { hi },
@@ -151,32 +173,41 @@ impl BlockMeshes {
                     if row == 0 || row == 3 { lo } else { hi },
                 ]
             };
+
             for row in 0..4i32 {
                 let mut y = 0.0f32;
+
                 for k in 0..w {
                     let y0 = y + Q;
                     let y1 = height + y0;
                     let top = corners(row, y0, y1);
+
                     let p: [Vec3; 8] = std::array::from_fn(|i| {
                         let u = CUBE_CORNERS[i];
                         let ty = top[i & 3];
                         Vec3::new(u.x, if i < 4 { ty - Q } else { ty }, u.z)
                     });
+
                     self.b.reset();
                     self.b.add_box(&p, 0, 62);
                     self.store(slope_id(w, true, row, k).unwrap());
+
                     y += height;
                 }
             }
+
             for row in 0..4i32 {
                 let mut y = 0.0f32;
+
                 for k in 0..w {
                     let y1 = height + y;
                     let [c0, c1, c2, c3] = corners(row, y, y1);
+
                     self.b.reset();
                     self.b.set_corners([0.0, c0, 0.0], [1.0, c1, 0.0], [1.0, c2, 1.0], [0.0, c3, 1.0]);
                     self.b.append_bezier(1, LINEAR, 1, LINEAR, 0);
                     self.store(slope_id(w, false, row, k).unwrap());
+
                     y = y1;
                 }
             }
@@ -184,6 +215,7 @@ impl BlockMeshes {
 
         for i in 0..4u32 {
             let h = |up: bool| if up { 1.0 } else { 0.0 };
+
             self.b.reset();
             self.b.set_corners(
                 [0.0, h(i == 0 || i == 3), 0.0],
@@ -191,12 +223,14 @@ impl BlockMeshes {
                 [1.0, h(i.wrapping_sub(1) <= 1), 1.0],
                 [0.0, h(i.wrapping_sub(2) <= 1), 1.0],
             );
+
             self.b.append_bezier(1, LINEAR, 1, LINEAR, 0);
             self.store(tables.edge_cap(i));
         }
 
         let ones = [1i32; 6];
         let z = Vec3::ZERO;
+
         self.b.reset();
         self.b.box_geometry(0, 34, &ones, z, Vec3::new(1.0, height, 1.0));
         self.b.box_geometry(0, 42, &ones, z, Vec3::new(1.0, 0.3125, Q));
@@ -222,6 +256,7 @@ impl BlockMeshes {
         let portal = |m: i32| ((m - 3) as u32 <= 12).then(|| portals.get(group, (m - 3) as usize));
         let b = &mut self.b;
         b.reset();
+
         for (i, &m) in modes.iter().enumerate() {
             if let Some(p) = portal(m)
                 && (p.ty == 0 || i <= 1)
@@ -229,31 +264,39 @@ impl BlockMeshes {
                 b.portal_windows(i as i32, p);
             }
         }
+
         let mut mask = floor as u32;
+
         for (i, &m) in modes.iter().enumerate() {
             if m > 0 && m != 2 {
                 mask |= 2 << i;
             }
         }
+
         if top {
             if floor {
                 b.inset_face(0, mask | 32);
             }
+
             b.inset_face(5, mask | 32);
         } else if floor {
             b.inset_face(0, mask);
         }
+
         for (i, &m) in modes.iter().enumerate() {
             if m == 1 {
                 b.face_by_direction(i as i32 + 1, Vec3::ZERO);
             }
+
             if let Some(p) = portal(m) {
                 b.portal_frame(i as i32, p);
             }
+
             if m == 2 {
                 b.edge_face_pair(i as i32, Q, Q);
             }
         }
+
         self.store(id);
     }
 }
@@ -280,25 +323,31 @@ impl PortalGroups {
 
     fn parse(b: &[u8]) -> Vec<Portal> {
         let mut o = 0usize;
+
         let mut word = || {
             let v = b.get(o..o + 4).map_or([0; 4], |s| s.try_into().unwrap());
             o += 4;
             v
         };
+
         if i32::from_le_bytes(word()) != 1 {
             return Vec::new();
         }
+
         let list = |word: &mut dyn FnMut() -> [u8; 4]| {
             let n = i32::from_le_bytes(word());
             (0..n.max(0)).map(|_| (i32::from_le_bytes(word()), std::array::from_fn(|_| f32::from_le_bytes(word())))).collect::<Vec<_>>()
         };
+
         (0..16)
             .map(|_| {
                 let ty = i32::from_le_bytes(word());
                 let rect = std::array::from_fn(|_| f32::from_le_bytes(word()));
+
                 for _ in 0..i32::from_le_bytes(word()).max(0) * 3 {
                     word();
                 }
+
                 let windows = list(&mut word).into_iter().map(|(_, r)| r).collect();
                 let beams = list(&mut word);
                 Portal { ty, rect, windows, beams }

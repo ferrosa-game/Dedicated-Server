@@ -201,31 +201,40 @@ pub(crate) fn simulate_human(
 fn walk_and_collide(h: &mut Human, bodies: &mut RigidBodies, map: &mut Map, touch: &mut Touchables, nearby: &[usize], out: &mut Vec<HumanOutput>) {
     let alive = h.health.vitality > 0;
     let standing = alive && h.health.health > 49;
+
     if alive && h.movement_state == 0 && h.has_input(Input::Jump) && h.locomotion.jump_charge <= 31 {
         h.locomotion.jump_charge += 1;
     }
+
     for bone in h.bones.iter_mut() {
         bone.ground_contact = 0;
     }
+
     if standing && h.movement_state != 2 {
         let surface = Surface { map, vehicles: touch.vehicles, vehicle_types: touch.vehicle_types, nearby };
         update_foot_ground_constraint(h, bodies, &surface, 0);
         update_foot_ground_constraint(h, bodies, &surface, 1);
     }
+
     let feet_down = h.locomotion.feet[0].mode == FOOT_PLANTED
         && h.locomotion.feet[1].mode == FOOT_PLANTED
         && h.bones[BoneId::FootLeft as usize].ground_contact != 0
         && h.bones[BoneId::FootRight as usize].ground_contact != 0;
+
     if h.movement_state != 3 && h.locomotion.jump_charge > 0 && !h.has_input(Input::Jump) && feet_down {
         start_step(h, 1);
     }
+
     bone_world_contacts(h, bodies, map, out);
+
     if h.last_vehicle_cooldown > 0 {
         h.last_vehicle_cooldown -= 1;
     } else {
         h.last_vehicle = -1;
     }
+
     vehicle_contacts(h, bodies, touch, out);
+
     h.pos = h.bones[0].pos;
 }
 

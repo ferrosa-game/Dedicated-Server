@@ -307,7 +307,9 @@ impl Sim {
     pub(crate) fn push_mission_text(&mut self, k: usize, slot: usize) {
         let mut text = self.corp_state[k].missions[slot].result_text(slot).into_bytes();
         let lines = (text.len() + 1) / TEXT_LINE + 1;
+
         text.resize(lines * TEXT_LINE, 0);
+
         for (line, chunk) in text.chunks(TEXT_LINE).enumerate() {
             let e = EventMissionText { corporation: k as i32, mission: slot as i32, line: line as i32, text: chunk.to_vec() };
             self.events.push(Event { tick_created: self.tick, kind: ServerEvent::MissionText(e) });
@@ -323,6 +325,7 @@ impl Sim {
             c: m.deadline / 60 + ((m.location + 1) << 16),
             d: m.provided_cash,
         };
+
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateCorporation(e) });
     }
 }
@@ -360,6 +363,7 @@ impl Sim {
     pub(crate) fn settle_mission_result(&mut self, k: usize, slot: usize, success: bool, cash: i32) {
         let m = self.corp_state[k].missions[slot];
         let tenth = cash / 10;
+
         let rating = match m.kind {
             0 | 1 => (if success { m.value / 10 } else { FAILED_RATING }) + tenth,
             2 => {
@@ -376,17 +380,22 @@ impl Sim {
             }
             _ => tenth - m.provided_cash / 10 + if success { m.value / 10 } else { 0 },
         };
+
         let team = Team::CORPORATIONS[k];
+
         for (_, p) in self.players.iter_mut().filter(|(_, p)| p.team == team) {
             if rating > 0 {
                 p.money += rating * RATING_MONEY;
             }
             p.corp_rating += rating;
         }
+
         let expired = self.world_time >= m.deadline;
         let m = &mut self.corp_state[k].missions[slot];
+
         m.result = Some((expired, rating));
         m.done = true;
+
         self.push_mission_text(k, slot);
     }
 }
