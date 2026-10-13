@@ -88,7 +88,6 @@ In sandbox mode, or as an admin, there are test commands as well:
 | `ferrosa-map` | Parsers for the game's files (maps, vehicle bodies, item sets, accounts). |
 | `ferrosa-protocol` | The client/server packet formats. |
 | `ferrosa-net` | The UDP connection layer and the master server. |
-| `ferrosa-math` | Shared math types. |
 
 ## The future
 
@@ -96,8 +95,8 @@ We intend to add WASM into the server, so that way plugins can create custom gam
 
 ## AI Disclosure
 
-Im gonna be frank, I did *not* want to port all of that physics code by hand, AI has gotten to a point where it can right competent code, so I entrusted it with the work, making sure it verified the output of the physics functions via GDB with the real binary.
+Im gonna be frank, I did *not* want to port all of that weirdly decompiled physics code by hand, AI has gotten to a point where it can write competent code, so I entrusted it with the work, making sure it verified the output of the physics functions via GDB with the real binary.
 
 If you dont like this, dont use it. I dont really know what to tell you.
 
-"Vibecoding" is something I do not partake in, I have audited all of this code myself, and am actively cleaning it up and removing useless code as I see fit. If you see something that should be changed, or that is bad, pipe up! 
+"Vibecoding" is something I do not partake in, I have audited all of this code myself, and am actively cleaning it up and removing useless code as I see fit. If you see something that should be changed, or that is bad, pipe up! As this project goes further the code will change and I intend to eliminate code written entirely by AI. But as it is just me with a limited schedule im doing the best I can.
