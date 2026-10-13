@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let srk = SrkData::load(Path::new("server.srk")).unwrap();
     let server_listing = ServerListing {
         build: 38,
-        address: [4, 43, 217, 32],
+        address: [0, 0, 0, 0],
         gamemode: mode.client_mode(),
         max_players: config.max_players,
         password_protected: !config.server_password.is_empty(),

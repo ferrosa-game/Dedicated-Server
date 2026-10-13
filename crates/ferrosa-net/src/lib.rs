@@ -135,13 +135,23 @@ impl Edge {
         }
     }
 
+    fn advertised_address(&self) -> [u8; 4] {
+        match self.server_ip.map(|a| a.ip()) {
+            Some(IpAddr::V4(ip)) => {
+                let [a, b, c, d] = ip.octets();
+                [d, c, b, a]
+            }
+            _ => self.listing.address,
+        }
+    }
+
     fn reply_server_info(&self, src: SocketAddr, req: InfoRequest) {
         let res = ServerInfo {
             timestamp: req.timestamp,
             gamemode: self.listing.gamemode,
             current_players: self.sessions.len() as u8,
             max_players: self.listing.max_players,
-            address: self.listing.address,
+            address: self.advertised_address(),
             port: self.listing.port,
             password_protected: self.listing.password_protected,
             build: self.listing.build,
