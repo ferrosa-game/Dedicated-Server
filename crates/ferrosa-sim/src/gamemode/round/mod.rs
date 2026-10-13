@@ -202,10 +202,13 @@ impl Sim {
     fn round_intermission(&mut self) {
         let mut on_teams = 0;
         let mut all_ready = true;
-        for pid in self.players.iter().map(|(_, p)| p.player_id).collect::<Vec<_>>() {
+
+        for pid in self.players.iter().filter(|(_, p)| !p.is_bot).map(|(_, p)| p.player_id).collect::<Vec<_>>() {
             let Some(p) = self.players.get(pid.idx()) else { continue };
+            
             on_teams += round_corp(p.team).is_some() as i32;
             all_ready &= p.is_ready;
+
             if self.game_timer < ROUND_START
                 && p.human.is_none()
                 && let Some(k) = round_corp(p.team)
@@ -213,7 +216,9 @@ impl Sim {
                 self.round_spawn(pid, k);
             }
         }
+
         let timer = self.game_timer;
+
         if on_teams == 0 {
             if self.round_max_time != timer {
                 self.game_timer = timer - 1;
@@ -223,17 +228,22 @@ impl Sim {
                 }
                 return self.intermission_countdown(false);
             }
+
             self.close_round_doors();
             self.game_timer = timer - 1;
+
             if (5402..=IDLE_TIME).contains(&timer) {
                 self.game_timer = IDLE_TIME;
                 return;
             }
+
             return self.intermission_countdown(false);
         }
+
         if self.round_max_time == timer {
             self.close_round_doors();
         }
+
         self.game_timer = timer - 1;
         self.intermission_countdown(all_ready);
     }
