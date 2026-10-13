@@ -42,6 +42,7 @@ impl Edge {
         let mut buf = [0u8; 2048];
         let mut keepalive = tokio::time::interval(Duration::from_secs(16));
         let mut evict = tokio::time::interval(Duration::from_secs(10));
+
         loop {
             tokio::select! {
                 r = self.socket.recv_from(&mut buf) => {
@@ -57,6 +58,7 @@ impl Edge {
         let Some((type_byte, body)) = parse_frame(data) else {
             return;
         };
+
         match ferrosa_protocol::decode_packet(type_byte, body) {
             Ok(msg) => self.route(msg, src),
             Err(e) => eprintln!("[Net] dropped packet from {src}: {e:?}"),

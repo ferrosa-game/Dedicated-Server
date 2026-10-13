@@ -137,10 +137,6 @@ const NAME_LEN: usize = 31;
 /// The name as an account stores it: at most 31 bytes.
 /// An account on the Steam ban list is banned for this long.
 const STEAM_BAN_TIME: u32 = 100000000;
-/// A name taken at join is kept for this many world saves.
-const NAME_LOCK: i32 = 5;
-/// A banned account dropped from the server keeps its name for this many world saves.
-pub(crate) const BANNED_NAME_LOCK: i32 = 2;
 
 fn account_name_bytes(name: &str) -> [u8; 32] {
     let mut buf = [0u8; 32];
@@ -298,11 +294,7 @@ impl Sim {
         if self.admin.steam_bans.contains(&a.steam_id) {
             a.ban_time = STEAM_BAN_TIME;
         }
-        let lock = self.account_name_locks.entry(auth.account_id).or_insert(0);
-        if *lock == 0 {
-            a.player_name = account_name_bytes(&auth.player_name);
-            *lock = NAME_LOCK;
-        }
+        a.player_name = account_name_bytes(&auth.player_name);
         a.clone()
     }
 

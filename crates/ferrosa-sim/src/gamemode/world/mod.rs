@@ -496,11 +496,6 @@ impl Sim {
                 a.play_time += PLAY_TIME_STEP;
             }
         }
-        for lock in self.account_name_locks.values_mut() {
-            if *lock > 0 {
-                *lock -= 1;
-            }
-        }
         self.save_stats();
         self.events.push(economy::stock_event(&self.corporations, self.tick));
     }

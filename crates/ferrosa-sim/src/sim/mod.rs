@@ -156,9 +156,6 @@ pub struct Sim {
     pub(crate) world_time: i32,
     /// Per account, the spawn timer kept while its player is away (not saved to disk).
     pub(crate) account_spawn_timers: HashMap<u32, i32>,
-    /// Each account's name lock (memory only): while above 0 the account's name is forced on the
-    /// player at join; it counts down every world save.
-    pub(crate) account_name_locks: HashMap<u32, i32>,
     /// The walkie-talkies on each channel (rebuilt by logic_item, read by calculate_voice).
     pub(crate) radio_channels: Vec<Vec<usize>>,
     pub(crate) traffic: crate::traffic::Traffic,
@@ -227,7 +224,6 @@ impl Sim {
             vehicle_types: crate::vehicle::types::vehicle_types(Path::new("data")),
             world_time: economy::WORLD_TIME_START,
             account_spawn_timers: HashMap::new(),
-            account_name_locks: HashMap::new(),
             radio_channels: vec![Vec::new(); voice::RADIO_CHANNELS],
             traffic: crate::traffic::Traffic::default(),
             tick_stats: tps::TickStats::default(),

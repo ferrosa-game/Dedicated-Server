@@ -405,9 +405,6 @@ impl Sim {
                 .and_then(|p| self.saved_accounts.players.iter().find(|a| a.account_id == p.account_id))
                 .is_some_and(|a| a.ban_time > 0);
 
-            if banned && let Some(p) = self.players.get(c.player_id.idx()) {
-                self.account_name_locks.insert(p.account_id, super::economy::BANNED_NAME_LOCK);
-            }
             if banned || c.timeout >= TIMEOUT || self.players.get(c.player_id.idx()).is_none() {
                 self.on_leave(conn);
             }
