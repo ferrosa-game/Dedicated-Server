@@ -331,7 +331,7 @@ pub(crate) fn traffic_section(
         .into_iter()
         .map(|i| {
             let c = &traffic.cars[i];
-            TrafficEntry { index: i as u16, vehicle: c.vehicle != -1, kind: c.kind, color: c.color, pos: c.pos, yaw: c.yaw }
+            TrafficEntry { index: i as u16, vehicle: c.vehicle != -1, kind_color: Some((c.kind, c.color)), pos: c.pos, yaw: c.yaw }
         })
         .collect();
     let count = map.intersections.len() as i32;

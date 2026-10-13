@@ -156,6 +156,8 @@ impl Edge {
             password_protected: self.listing.password_protected,
             build: self.listing.build,
             server_name: self.listing.server_name.clone(),
+            id: 80085,
+            sub_version: 4,
         };
 
         let _ = self.out_tx.send((ferrosa_protocol::frame_packet(res), src));

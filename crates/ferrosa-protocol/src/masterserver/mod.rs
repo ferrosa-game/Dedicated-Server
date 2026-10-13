@@ -1,6 +1,8 @@
 use crate::codec::{Reader, WireRead};
 
 pub mod server_addr;
+pub mod sign_in;
+pub mod ticket;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AuthPacket {

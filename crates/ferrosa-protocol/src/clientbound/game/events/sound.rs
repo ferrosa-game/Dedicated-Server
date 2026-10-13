@@ -36,6 +36,25 @@ pub enum Sound {
     Floppy = 50,
 }
 
+impl TryFrom<u32> for Sound {
+    type Error = crate::codec::CodecError;
+
+    fn try_from(v: u32) -> Result<Self, Self::Error> {
+        Ok(match v {
+            20 => Self::CarCrash,
+            22 => Self::BodyHit,
+            27 => Self::PhoneRing,
+            28..=37 => Self::PHONE_KEYS[v as usize - 28],
+            38 => Self::PhoneBusy,
+            39 => Self::Reload,
+            41 => Self::GearShift,
+            49 => Self::Modem,
+            50 => Self::Floppy,
+            _ => return Err(crate::codec::CodecError::BadEnum(v)),
+        })
+    }
+}
+
 impl Sound {
     pub const PHONE_KEYS: [Sound; 10] = [
         Sound::PhoneKey0,

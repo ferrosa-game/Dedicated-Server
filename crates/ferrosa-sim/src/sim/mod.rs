@@ -98,7 +98,7 @@ struct TickCtx<'a> {
     world: &'a World,
     events: &'a EventRing,
     humans: Vec<ferrosa_protocol::clientbound::game::ServerHumanObject>,
-    own_humans: HashMap<usize, ferrosa_protocol::clientbound::game::OwnHumanData>,
+    own_humans: HashMap<usize, (ferrosa_protocol::clientbound::game::OwnHumanData, [Vec<i32>; 7])>,
     heads: HashMap<usize, (Vec3, bool)>,
     items: Vec<ferrosa_protocol::clientbound::game::ServerItemObject>,
     vehicles: Vec<(ferrosa_protocol::clientbound::game::ServerVehicleObject, vehicles::VehicleSight)>,
@@ -269,10 +269,10 @@ impl Sim {
                 let player = self.players.get_mut(client.player_id.idx()).unwrap();
 
                 client.last_sdl_tick = g.sdl_tick;
-                client.client_packet_count = g.packet_count_maybe;
+                client.client_packet_count = g.packet_count;
                 client.event_cursor = g.received_events as u16;
-                client.pack_ack = g.unk & 0x7ff;
-                client.link_ack = g.unk1;
+                client.pack_ack = g.pack_ack & 0x7ff;
+                client.link_ack = g.link_ack;
                 client.spectating = (g.spectating_human_id != NO_HUMAN).then_some(g.spectating_human_id as usize);
 
                 player.process_game_packet(g);
@@ -594,11 +594,13 @@ impl Sim {
             menu_buttons: player.menu_buttons.clone(),
             gamestate: ctx.gamestate,
             game_timer: ctx.game_timer,
+            game_timer_extra: 0,
             corp_round: ctx.corp_round,
             team_counts: ctx.team_counts,
             ready_states: ctx.ready_states,
             follow_pos: Vec3::new(0.0, 0.0, 0.0),
-            own_human: ctx.own_humans.get(&player_id.idx()).cloned(),
+            own_human: ctx.own_humans.get(&player_id.idx()).map(|(h, _)| h.clone()),
+            display_inventory: ctx.own_humans.get(&player_id.idx()).map_or_else(Default::default, |(_, inv)| inv.clone()),
             humans: ctx.humans.clone(),
             items: ctx.items.iter().filter(|i| packed_items.contains(&i.slot)).cloned().collect(),
             vehicles,

@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use glam::{IVec3, Vec3};
 use ferrosa_map::file_types::{csx::CityFileCSX, sbc::CityFileSBC, sbl::BlockFile};
+use glam::{IVec3, Vec3};
 
 use crate::{
     area::{AreaGrid, MESH},
@@ -29,6 +29,9 @@ pub struct Level {
     /// Where in test.csx each of its textures' image starts, and the image's and material image's sizes (the
     /// materials after the four built in).
     pub texture_data: Vec<(u64, u32, u32)>,
+    /// The window atlas's layers: the material each shows, and the window rectangle (x, width, y, height in the
+    /// face) cut out of it.
+    pub atlas: Vec<(u16, [f32; 4])>,
 }
 
 fn list_names(dir: &Path, ext: &str) -> Vec<String> {
@@ -173,8 +176,9 @@ pub fn build_level(
 
     instantiate_sectors(city, &types, &mut area, ground, &dims);
 
+    let atlas = buildings.atlas.iter().map(|&(m, g, p)| (m, portals.get(g as usize, p as usize).rect)).collect();
     let bases = std::mem::take(&mut buildings.bases);
     let buildings = buildings.records;
     let texture_data = csx.textures().map(|(_, t, offset)| (offset, t.texture_size, t.material_size)).collect();
-    Level { area, tables, meshes, buildings, bases, materials, texture_data }
+    Level { area, tables, meshes, buildings, bases, materials, texture_data, atlas }
 }

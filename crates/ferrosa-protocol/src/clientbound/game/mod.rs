@@ -4,10 +4,11 @@ use serde::{Deserialize, Serialize};
 use crate::{
     CharacterCustomization,
     clientbound::game::events::Event,
-    codec::{WireWrite, Writer},
+    codec::{CodecError, WireWrite, Writer},
     serverbound::game::voice::VoiceFrame,
 };
 
+pub mod decode;
 pub mod events;
 
 #[repr(u8)]
@@ -149,6 +150,37 @@ pub enum MenuType {
     WorldCorpRequistion = 25,
 }
 
+impl TryFrom<u32> for MenuType {
+    type Error = CodecError;
+
+    fn try_from(v: u32) -> Result<Self, CodecError> {
+        Ok(match v {
+            0 => Self::Empty,
+            1 => Self::EnterCity,
+            2 => Self::Lobby,
+            3 => Self::EmptyBase,
+            9 => Self::WorldCarShop,
+            10 => Self::WorldStore,
+            11 => Self::WorldStoreDone,
+            12 => Self::WorldBank,
+            13 => Self::WorldBank2,
+            14 => Self::RoundCorpWeapons,
+            15 => Self::RoundCorpAmmo,
+            16 => Self::RoundCorpEquip,
+            17 => Self::RoundCorpVehicle,
+            18 => Self::RoundCorpStock,
+            19 => Self::WorldEmptyCorp,
+            20 => Self::WorldCorpApplication,
+            21 => Self::WorldCorpTabs,
+            22 => Self::WorldCorpHiring,
+            23 => Self::WorldCorpFiring,
+            24 => Self::WorldCorpTeam,
+            25 => Self::WorldCorpRequistion,
+            _ => return Err(CodecError::BadEnum(v)),
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Default, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum GameState {
@@ -158,6 +190,21 @@ pub enum GameState {
     InGame = 2,
     Restarting = 3,
     Paused = 4,
+}
+
+impl TryFrom<u32> for GameState {
+    type Error = CodecError;
+
+    fn try_from(v: u32) -> Result<Self, CodecError> {
+        Ok(match v {
+            0 => Self::Idle,
+            1 => Self::Intermission,
+            2 => Self::InGame,
+            3 => Self::Restarting,
+            4 => Self::Paused,
+            _ => return Err(CodecError::BadEnum(v)),
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -196,12 +243,18 @@ pub struct ServerItemObject {
     pub item_type: ItemKind,
     pub pos: Vec3,
     pub rot: [f32; 4],
+    /// The type (above), parents and a computer's lines, sent when the client is to take them afresh.
+    pub header: Option<ItemHeader>,
+    pub tail: ItemTail,
+}
+
+/// object_decode_item: an item's parents and slot, and a computer's current and top screen lines (5 bits each).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ItemHeader {
     pub parent_item: i32,
     pub parent_human: i32,
     pub parent_slot: i32,
-    /// A computer's current and top screen lines (5 bits each), sent with the item's status.
     pub screen: Option<(i32, i32)>,
-    pub tail: ItemTail,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -219,14 +272,16 @@ pub enum ItemTail {
 impl ServerItemObject {
     fn write_body(&self, w: &mut Writer) {
         w.bits(1, 1);
-        w.bits(1, 1);
-        w.bits(self.item_type as i32, 8);
-        w.bits(self.parent_item, 10);
-        w.bits(self.parent_human, 10);
-        w.bits(self.parent_slot, 4);
-        if let Some((current, top)) = self.screen {
-            w.bits(current, 5);
-            w.bits(top, 5);
+        w.bits(self.header.is_some() as i32, 1);
+        if let Some(h) = &self.header {
+            w.bits(self.item_type as i32, 8);
+            w.bits(h.parent_item, 10);
+            w.bits(h.parent_human, 10);
+            w.bits(h.parent_slot, 4);
+            if let Some((current, top)) = h.screen {
+                w.bits(current, 5);
+                w.bits(top, 5);
+            }
         }
         w.bits(0, 8);
 
@@ -326,8 +381,8 @@ pub struct TrafficEntry {
     pub index: u16,
     /// Whether the car is a real vehicle right now.
     pub vehicle: bool,
-    pub kind: VehicleKind,
-    pub color: i32,
+    /// Its type and colour, when sent.
+    pub kind_color: Option<(VehicleKind, i32)>,
     pub pos: Vec3,
     pub yaw: f32,
 }
@@ -337,9 +392,11 @@ impl TrafficEntry {
         w.bits(1, 1);
         w.bits(0, 8);
         w.bits(self.vehicle as i32, 1);
-        w.bits(1, 1);
-        w.bits(self.kind as i32, 6);
-        w.bits(self.color, 4);
+        w.bits(self.kind_color.is_some() as i32, 1);
+        if let Some((kind, color)) = self.kind_color {
+            w.bits(kind as i32, 6);
+            w.bits(color, 4);
+        }
         let p = self.pos;
         for v in [(p.x + 4096.0) * 4096.0, (p.y + 0.0) * 4096.0, (p.z + 4096.0) * 4096.0] {
             write_absolute(w, v as i32, 28);
@@ -353,10 +410,8 @@ impl TrafficEntry {
 pub struct ServerHumanObject {
     pub slot: u16,
     pub human_id: u16,
-    pub player_id: i32,
-    pub customization: CharacterCustomization,
-    /// How wanted the human's player is: 0 not at all, 1 for a criminal rating of 1 to 99, 2 from 100.
-    pub wanted: i32,
+    /// Its player and look, sent when the client is to take them afresh.
+    pub appearance: Option<HumanAppearance>,
     pub vehicle: i32,
     pub vehicle_seat: i32,
     pub alive: bool,
@@ -366,23 +421,34 @@ pub struct ServerHumanObject {
     pub bones: [[f32; 4]; 15],
 }
 
+/// read_human_appearance: a human's player, look and how wanted its player is (0 not at all, 1 for a criminal
+/// rating of 1 to 99, 2 from 100).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HumanAppearance {
+    pub player_id: i32,
+    pub customization: CharacterCustomization,
+    pub wanted: i32,
+}
+
 impl ServerHumanObject {
     fn write_body(&self, w: &mut Writer) {
         w.bits(1, 1);
-        w.bits(1, 1);
-        let c = &self.customization;
-        w.bits(self.player_id, 8);
-        w.bits(c.gender as i32, 1);
-        w.bits(c.head as i32, 5);
-        w.bits(c.skin as i32, 3);
-        w.bits(c.hair_style as i32, 4);
-        w.bits(c.eye_color as i32, 3);
-        w.bits(c.hair_color as i32, 4);
-        w.bits(c.model as i32, 5);
-        w.bits(c.suit_color as i32, 4);
-        w.bits(c.tie_color as i32, 4);
-        w.bits(c.necklace as i32, 4);
-        w.bits(self.wanted, 2);
+        w.bits(self.appearance.is_some() as i32, 1);
+        if let Some(a) = &self.appearance {
+            let c = &a.customization;
+            w.bits(a.player_id, 8);
+            w.bits(c.gender as i32, 1);
+            w.bits(c.head as i32, 5);
+            w.bits(c.skin as i32, 3);
+            w.bits(c.hair_style as i32, 4);
+            w.bits(c.eye_color as i32, 3);
+            w.bits(c.hair_color as i32, 4);
+            w.bits(c.model as i32, 5);
+            w.bits(c.suit_color as i32, 4);
+            w.bits(c.tie_color as i32, 4);
+            w.bits(c.necklace as i32, 4);
+            w.bits(a.wanted, 2);
+        }
 
         w.bits(0, 8);
         w.bits(self.vehicle, 8);
@@ -458,8 +524,6 @@ pub struct OwnHumanData {
     pub stamina: i32,
     pub max_stamina: i32,
     pub head_vel: Vec3,
-    /// The inventory display: per slot (hands, then pockets) the item types, with ammo and attachment flags.
-    pub inventory: [Vec<i32>; 7],
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -499,9 +563,13 @@ pub struct ServerGamePacket {
     /// Whether the player sees the round manager page.
     pub manager_tab: bool,
     pub menu_buttons: Vec<MenuButton>,
+    /// The inventory display: per slot (hands, then pockets) the item types, with ammo and attachment flags.
+    pub display_inventory: [Vec<i32>; 7],
     pub gamestate: GameState,
-    /// The game timer, and per round corporation its round funds and a second value shown between rounds.
+    /// The game timer and the 16 bits after it (data_1d2d34c4), and per round corporation its round funds and a
+    /// second value shown between rounds.
     pub game_timer: i32,
+    pub game_timer_extra: i32,
     pub corp_round: [(i32, i32); 3],
     /// Players on each of the first five corporation teams.
     pub team_counts: [i32; 5],
@@ -555,7 +623,7 @@ impl WireWrite for ServerGamePacket {
         }
 
         w.bits(self.game_timer, 24);
-        w.bits(0, 16);
+        w.bits(self.game_timer_extra, 16);
         w.bits(self.sun_time, 30);
 
         for n in self.team_counts {
@@ -615,8 +683,7 @@ impl WireWrite for ServerGamePacket {
         w.bits(0, 6);
         w.bits(0, 8);
 
-        for k in 0..7 {
-            let slot = self.own_human.as_ref().map_or(&[][..], |h| &h.inventory[k][..]);
+        for slot in &self.display_inventory {
             w.bits(slot.len() as i32, 4);
             for &t in slot {
                 w.bits(t, 16);

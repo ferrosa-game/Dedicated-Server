@@ -28,12 +28,15 @@ pub mod level;
 pub mod map;
 pub mod mesh;
 pub mod meshes;
+pub mod skeleton;
 pub mod roads;
 pub mod sphere;
 pub mod sphere_cast;
 pub mod streets;
 pub mod trace;
 pub mod track;
+pub mod vehicle_body;
+pub mod vehicle_types;
 
 pub struct World {
     sun_angle: u16,

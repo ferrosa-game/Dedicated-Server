@@ -1,4 +1,4 @@
-use crate::codec::{Reader, WireRead};
+use crate::codec::{Reader, WireRead, WireWrite, Writer};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AvatarInfo {
@@ -33,6 +33,33 @@ pub struct JoinRequest {
     pub password: String,
     pub phone_number: u32,
     pub protocol_version: u8,
+}
+
+impl AvatarInfo {
+    /// The 32-bit look the client sends: gender, head, skin, hair colour, hair style and eyes.
+    pub fn to_avatar_info(&self) -> u32 {
+        self.gender as u32
+            | (self.head as u32) << 1
+            | (self.skin_color as u32) << 5
+            | (self.hair_color as u32) << 8
+            | (self.hair as u32) << 12
+            | (self.eye_color as u32) << 16
+    }
+}
+
+impl WireWrite for JoinRequest {
+    /// client_recv_packet's join request: the type byte (2) and the request.
+    fn write(&self, w: &mut Writer) {
+        w.byte(2);
+        w.bits(self.version as i32, 8);
+        w.u32(self.account_id);
+        w.u32(self.auth_ticket);
+        w.string(&self.player_name, 32);
+        w.u32(self.avatar_info.to_avatar_info());
+        w.string(&self.password, 32);
+        w.bits(self.protocol_version as i32, 8);
+        w.u32(self.phone_number);
+    }
 }
 
 impl WireRead for JoinRequest {

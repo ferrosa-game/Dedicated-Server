@@ -740,10 +740,12 @@ impl Sim {
                     item_type: item.item_type,
                     pos: body.pos,
                     rot,
-                    parent_item: item.parent_item,
-                    parent_human: item.parent_human,
-                    parent_slot: item.parent_slot,
-                    screen,
+                    header: Some(ferrosa_protocol::clientbound::game::ItemHeader {
+                        parent_item: item.parent_item,
+                        parent_human: item.parent_human,
+                        parent_slot: item.parent_slot,
+                        screen,
+                    }),
                     tail,
                 })
             })

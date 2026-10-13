@@ -1,4 +1,4 @@
-use crate::codec::{CodecError, Reader};
+use crate::codec::{CodecError, Reader, WireWrite, Writer};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VoiceData {
@@ -12,6 +12,19 @@ pub struct VoiceFrame {
     pub size: u16,
     pub volume: u8,
     pub data: Vec<u8>,
+}
+
+impl WireWrite for VoiceData {
+    /// client_send's voice: six frames, then whether the client is silent.
+    fn write(&self, w: &mut Writer) {
+        for f in &self.frames {
+            w.bits(f.index as i32, 6);
+            w.bits(f.size as i32, 11);
+            w.bits(f.volume as i32, 2);
+            w.bytes(&f.data[..(f.size as usize).min(f.data.len())]);
+        }
+        w.bits(self.is_silenced as i32, 1);
+    }
 }
 
 pub fn decode_voice_data(reader: &mut Reader) -> Result<VoiceData, CodecError> {

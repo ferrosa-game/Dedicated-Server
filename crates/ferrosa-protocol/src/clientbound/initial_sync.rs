@@ -1,4 +1,7 @@
-use crate::{GameMode, codec::WireWrite};
+use crate::{
+    GameMode,
+    codec::{CodecError, Reader, WireRead, WireWrite},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct InitialSync {
@@ -26,5 +29,20 @@ impl WireWrite for InitialSync {
         if self.gamemode == GameMode::Versus {
             w.byte(self.versus_movedelay.unwrap_or(0))
         }
+    }
+}
+
+impl WireRead for InitialSync {
+    /// After the packet's type byte.
+    fn read(r: &mut Reader) -> Result<Self, CodecError> {
+        let round_number = r.u32()?;
+        let gamemode = GameMode::try_from(r.bits(4)?)?;
+        let weekly_enabled = r.bits(4)? != 0;
+        let weekday = r.bits(8)? as u8;
+        let map_name = String::from_utf8_lossy(&r.text(32)?).into_owned();
+        let sun_angle = r.u16()?;
+        let sun_axial_tilt = r.u16()?;
+        let versus_movedelay = if gamemode == GameMode::Versus { Some(r.bits(8)? as u8) } else { None };
+        Ok(Self { round_number, gamemode, map_name, weekly_enabled, weekday, sun_angle, sun_axial_tilt, versus_movedelay })
     }
 }

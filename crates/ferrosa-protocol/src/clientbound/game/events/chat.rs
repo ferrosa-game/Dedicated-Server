@@ -7,7 +7,26 @@ pub enum ChatType {
     ItemSpeak = 2,
     EliminatorAnnouncement = 3,
     AdminChat = 4,
+    /// Copied into the game's notice line (game_timer +0xc) rather than shown as a message.
+    Notice = 5,
     PrivateMessage = 6,
+}
+
+impl TryFrom<u32> for ChatType {
+    type Error = crate::codec::CodecError;
+
+    fn try_from(v: u32) -> Result<Self, Self::Error> {
+        Ok(match v {
+            0 => Self::Announce,
+            1 => Self::Chat,
+            2 => Self::ItemSpeak,
+            3 => Self::EliminatorAnnouncement,
+            4 => Self::AdminChat,
+            5 => Self::Notice,
+            6 => Self::PrivateMessage,
+            _ => return Err(crate::codec::CodecError::BadEnum(v)),
+        })
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

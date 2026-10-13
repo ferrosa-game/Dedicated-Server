@@ -24,6 +24,24 @@ pub enum GameMode {
     None = 8,
 }
 
+impl TryFrom<u32> for GameMode {
+    type Error = CodecError;
+
+    fn try_from(v: u32) -> Result<Self, CodecError> {
+        Ok(match v {
+            1 => Self::Driving,
+            2 => Self::Racing,
+            3 => Self::Round,
+            4 => Self::World,
+            5 => Self::Eliminator,
+            6 => Self::CoOp,
+            7 => Self::Versus,
+            8 => Self::None,
+            _ => return Err(CodecError::BadEnum(v)),
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Team {
@@ -37,6 +55,24 @@ pub enum Team {
     Mission = 7,
 
     Spectator = 17,
+}
+
+impl TryFrom<i32> for Team {
+    type Error = CodecError;
+
+    fn try_from(v: i32) -> Result<Self, CodecError> {
+        Ok(match v {
+            0 => Self::Goldmen,
+            1 => Self::Monsota,
+            2 => Self::OXS,
+            3 => Self::Nexaco,
+            4 => Self::Pentacom,
+            5 => Self::Prodocon,
+            7 => Self::Mission,
+            17 => Self::Spectator,
+            _ => return Err(CodecError::BadEnum(v as u32)),
+        })
+    }
 }
 
 impl Team {
@@ -72,6 +108,16 @@ pub enum ServerboundPacket {
     LeaveGame,
     MasterServerPing(ServerAddress),
     GamePacket(Box<ClientGamePacket>),
+}
+
+/// Packet 7: the client leaving the game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LeaveGame;
+
+impl WireWrite for LeaveGame {
+    fn write(&self, w: &mut Writer) {
+        w.byte(7);
+    }
 }
 
 pub fn parse_frame(data: &[u8]) -> Option<(u8, &[u8])> {

@@ -4,7 +4,7 @@ use ferrosa_physics::{
     rotation::{IDENTITY, rot_matrix_to_quaternion},
 };
 use ferrosa_protocol::clientbound::game::{
-    ItemKind, OwnHumanData, ServerHumanObject,
+    HumanAppearance, ItemKind, OwnHumanData, ServerHumanObject,
     events::{Event, ServerEvent, bullet_hit::EventBulletHit, bullet_hole::EventBulletHole, sound::EventSound},
 };
 
@@ -250,9 +250,11 @@ impl Sim {
                 ServerHumanObject {
                     slot: id as u16,
                     human_id: id as u16,
-                    player_id: h.player.map_or(-1, |p| p.0 as i32),
-                    customization: h.customization,
-                    wanted: h.player.and_then(|p| self.players.get(p.idx())).map_or(0, |p| wanted_group(p.crim_rating)),
+                    appearance: Some(HumanAppearance {
+                        player_id: h.player.map_or(-1, |p| p.0 as i32),
+                        customization: h.customization,
+                        wanted: h.player.and_then(|p| self.players.get(p.idx())).map_or(0, |p| wanted_group(p.crim_rating)),
+                    }),
                     vehicle: h.vehicle.map_or(-1, |v| v as i32),
                     vehicle_seat: h.seat as i32,
                     alive: h.health.vitality > 0,
@@ -265,8 +267,9 @@ impl Sim {
             .collect()
     }
 
-    /// The own-human block of each player's game packet (written by server_send while the player has a human).
-    pub(crate) fn own_human_data(&self) -> std::collections::HashMap<usize, OwnHumanData> {
+    /// The own-human block of each player's game packet (written by server_send while the player has a human), with
+    /// its inventory display.
+    pub(crate) fn own_human_data(&self) -> std::collections::HashMap<usize, (OwnHumanData, [Vec<i32>; 7])> {
         self.players
             .iter()
             .filter_map(|(idx, p)| {
@@ -274,7 +277,7 @@ impl Sim {
                 let h = self.humans.get(id)?;
                 Some((
                     idx,
-                    OwnHumanData {
+                    (OwnHumanData {
                         human_id: id as i32,
                         view_yaw: h.view_yaw,
                         view_pitch: h.view_pitch,
@@ -292,7 +295,8 @@ impl Sim {
                         stamina: h.stamina,
                         max_stamina: h.max_stamina,
                         head_vel:h.bones[3].vel,
-                        inventory: std::array::from_fn(|k| {
+                    },
+                        std::array::from_fn(|k| {
                             let slot = &h.inventory[k];
                             slot.items[..slot.count as usize]
                                 .iter()
@@ -316,7 +320,7 @@ impl Sim {
                                 })
                                 .collect()
                         }),
-                    },
+                    ),
                 ))
             })
             .collect()

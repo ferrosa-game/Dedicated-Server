@@ -1,7 +1,7 @@
 use glam::Vec3;
 use ferrosa_map::file_types::sbv::VehicleBodyFile;
 
-use crate::sim::hull::ConvexHull;
+use crate::hull::ConvexHull;
 
 const MAX_MESH_EDGES: usize = 256;
 
@@ -23,7 +23,7 @@ fn register_unique_pair(edges: &mut Vec<[usize; 2]>, a: usize, b: usize) {
 
 impl VehicleBody {
     /// load_sbv: reads `path`; None if it cannot be read.
-    pub(crate) fn load(path: &std::path::Path) -> Option<Self> {
+    pub fn load(path: &std::path::Path) -> Option<Self> {
         let mut file = VehicleBodyFile::load(path).ok()?;
         let positions: Vec<Vec3> = file.nodes.iter().map(|n| n.pos).collect();
 

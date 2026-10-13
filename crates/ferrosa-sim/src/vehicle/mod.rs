@@ -1,8 +1,7 @@
 //! Vehicles: the type table built from the body files and the vehicles in the world.
 
 pub mod physics;
-pub mod sbv;
-pub mod types;
+pub use ferrosa_world::vehicle_types as types;
 
 use glam::Vec3;
 use ferrosa_physics::{
@@ -11,6 +10,7 @@ use ferrosa_physics::{
     bond::{Bond, ItemAngular, ItemPoint},
 };
 
+use ferrosa_protocol::clientbound::game::VehicleKind;
 use types::VehicleType;
 
 pub const MAX_VEHICLES: usize = 512;
@@ -313,4 +313,18 @@ pub fn spawn_vehicle(
         train_reverse: 0,
         rotor,
     })
+}
+
+/// The type a dealership or round corporation stocks: mostly town cars, hatchbacks, minivans and vans, now and then a
+/// beamer, rarely a turbo and very rarely a Turbo S.
+pub fn random_stock_vehicle() -> VehicleKind {
+    match rand::random_range(0..16) {
+        0..=1 => VehicleKind::Van,
+        2..=5 => VehicleKind::TownCar,
+        6..=9 => VehicleKind::Hatchback,
+        10..=12 => VehicleKind::Minivan,
+        13..=14 => VehicleKind::Beamer,
+        _ if rand::random_ratio(1, 16) => VehicleKind::TurboS,
+        _ => VehicleKind::Turbo,
+    }
 }

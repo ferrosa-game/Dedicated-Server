@@ -1,4 +1,4 @@
-use crate::codec::{CodecError, Reader};
+use crate::codec::{CodecError, Reader, WireWrite, Writer};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GameAction {
@@ -49,6 +49,52 @@ pub struct AdminAction {
     pub kind: u8,
     pub a: u32,
     pub b: u32,
+}
+
+impl WireWrite for GameAction {
+    /// client_send's action: its type in 4 bits, then what that type carries.
+    fn write(&self, w: &mut Writer) {
+        match self {
+            GameAction::Menu(a) => {
+                w.bits(0, 4);
+                w.bits(
+                    match a.menu {
+                        Menu::Lobby => 2,
+                        Menu::Other(m) => m as i32,
+                    },
+                    8,
+                );
+                w.u32(a.button);
+                let mut text = a.c.clone();
+                text.resize(16, 0);
+                w.bytes(&text);
+            }
+            GameAction::Chat(a) => {
+                let bytes = &a.message.as_bytes()[..a.message.len().min(63)];
+                w.bits(1, 4);
+                w.bits(bytes.len() as i32, 6);
+                w.bytes(bytes);
+                w.bits(a.volume as i32, 4);
+            }
+            GameAction::Item(a) => {
+                w.bits(2, 4);
+                w.bits(a.a as i32, 16);
+                w.bits(a.b as i32, 16);
+            }
+            GameAction::Inventory(a) => {
+                w.bits(3, 4);
+                w.bits(a.a as i32, 16);
+                w.bits(a.b as i32, 16);
+                w.bits(a.c as i32, 16);
+            }
+            GameAction::Admin(a) => {
+                w.bits(a.kind as i32, 4);
+                w.u32(a.a);
+                w.u32(a.b);
+            }
+            GameAction::Unknown => w.bits(15, 4),
+        }
+    }
 }
 
 pub fn read_actions(r: &mut Reader, num_actions: u32) -> Result<Vec<GameAction>, CodecError> {

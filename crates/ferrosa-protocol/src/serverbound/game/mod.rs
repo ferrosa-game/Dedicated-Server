@@ -5,7 +5,7 @@ pub mod actions;
 pub mod voice;
 
 use crate::{
-    codec::{Reader, WireRead},
+    codec::{Reader, WireRead, WireWrite, Writer},
     serverbound::game::{
         actions::{GameAction, read_actions},
         voice::{VoiceData, decode_voice_data},
@@ -66,10 +66,12 @@ pub struct ClientGamePacket {
     pub voice_data: VoiceData,
 
     pub spectating_human_id: u8, // 8 bits
-    pub unk: u16,                // 11 bits
-    pub unk1: u8,                // 8 bits
-    pub packet_count_maybe: u32, // 4 bytes
-    pub sdl_tick: u32,           // 4 bytes
+    /// The pack ring entries the client has applied up to (11 bits), and the line links it has up to (8 bits).
+    pub pack_ack: u16,
+    pub link_ack: u8,
+    /// The client's packet count, and when it sent this one.
+    pub packet_count: u32,
+    pub sdl_tick: u32,
 }
 
 impl WireRead for ClientGamePacket {
@@ -104,9 +106,9 @@ impl WireRead for ClientGamePacket {
         let voice_data = decode_voice_data(r)?;
 
         let spectating_human_id = r.bits(8)?;
-        let unk = r.bits(11)?;
-        let unk1 = r.bits(8)?;
-        let packet_count_maybe = r.u32()?;
+        let pack_ack = r.bits(11)?;
+        let link_ack = r.bits(8)?;
+        let packet_count = r.u32()?;
         let sdl_tick = r.u32()?;
 
         Ok(Self {
@@ -133,10 +135,52 @@ impl WireRead for ClientGamePacket {
             actions,
             voice_data,
             spectating_human_id: spectating_human_id as u8,
-            unk: unk as u16,
-            unk1: unk1 as u8,
-            packet_count_maybe,
+            pack_ack: pack_ack as u16,
+            link_ack: link_ack as u8,
+            packet_count,
             sdl_tick,
         })
+    }
+}
+
+impl WireWrite for ClientGamePacket {
+    /// client_send: the type byte (4) and the packet.
+    fn write(&self, w: &mut Writer) {
+        w.byte(4);
+        w.u32(self.round_num);
+        for v in [
+            self.gear_x,
+            self.left_right,
+            self.gear_y,
+            self.forward_back,
+            self.view_yaw_delta,
+            self.view_pitch,
+            self.free_look_yaw,
+            self.free_look_pitch,
+            self.view_yaw,
+            self.unknown,
+            self.view_pitch_delta,
+        ] {
+            w.fixed_float(v, 24);
+        }
+        w.u32(self.input_flags);
+        w.bits(self.input_type as i32, 8);
+        w.bits(self.zoom_level as i32, 4);
+        w.bits(self.received_events as i32, 16);
+        w.u32(self.num_sent_objects);
+        w.f32(self.camera_pos.x);
+        w.f32(self.camera_pos.y);
+        w.f32(self.camera_pos.z);
+        w.bits(self.packet_action_count as i32, 4);
+        w.bits(self.total_actions as i32, 8);
+        for a in &self.actions {
+            a.write(w);
+        }
+        self.voice_data.write(w);
+        w.bits(self.spectating_human_id as i32, 8);
+        w.bits(self.pack_ack as i32, 11);
+        w.bits(self.link_ack as i32, 8);
+        w.u32(self.packet_count);
+        w.u32(self.sdl_tick);
     }
 }

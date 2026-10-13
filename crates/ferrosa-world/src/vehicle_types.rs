@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use ferrosa_map::file_types::tst::TstFile;
 use ferrosa_protocol::clientbound::game::VehicleKind;
 
-use super::sbv::VehicleBody;
+use crate::vehicle_body::VehicleBody;
 
 pub const VEHICLE_TYPES: usize = 17;
 const COPLANAR: f32 = 1.0 / 65536.0;
@@ -92,7 +92,7 @@ pub struct VehicleType {
     /// The body file's render vertices, which the vehicle's bounds cover.
     pub render_verts: Vec<Vec3>,
     /// The collision mesh over the chassis points, which the chassis sweeps against the level.
-    pub mesh: Option<crate::sim::hull::ConvexHull>,
+    pub mesh: Option<crate::hull::ConvexHull>,
     /// The body file's faces over the chassis points, three or four corners each, which
     /// humans collide with.
     pub chassis_faces: Vec<Vec<usize>>,
@@ -764,20 +764,6 @@ impl VehicleType {
     }
 }
 
-/// The type a dealership or round corporation stocks: mostly town cars, hatchbacks, minivans and vans, now and then a
-/// beamer, rarely a turbo and very rarely a Turbo S.
-pub fn random_stock_vehicle() -> VehicleKind {
-    match rand::random_range(0..16) {
-        0..=1 => VehicleKind::Van,
-        2..=5 => VehicleKind::TownCar,
-        6..=9 => VehicleKind::Hatchback,
-        10..=12 => VehicleKind::Minivan,
-        13..=14 => VehicleKind::Beamer,
-        _ if rand::random_ratio(1, 16) => VehicleKind::TurboS,
-        _ => VehicleKind::Turbo,
-    }
-}
-
 /// The vehicle type table (load_towncar and friends): the body file cars and the types built in code.
 pub fn vehicle_types(data: &std::path::Path) -> Vec<VehicleType> {
     let mut types = vec![VehicleType::default(); VEHICLE_TYPES];
@@ -799,4 +785,13 @@ pub fn vehicle_types(data: &std::path::Path) -> Vec<VehicleType> {
         types[VehicleKind::Train as usize] = t;
     }
     types
+}
+
+/// The body file (data/<name>.sbv) load_sbv reads into a type's body slot, for the types built from one.
+pub fn body_file(kind: VehicleKind) -> Option<&'static str> {
+    match kind {
+        VehicleKind::Helicopter => Some("park5"),
+        VehicleKind::Train => Some("train04"),
+        _ => SBV_TYPES.iter().find(|s| s.kind == kind).map(|s| s.file),
+    }
 }

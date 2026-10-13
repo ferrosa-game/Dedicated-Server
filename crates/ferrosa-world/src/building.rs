@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use glam::{IVec3, Vec3};
 use ferrosa_map::file_types::{
     csx::CityFileCSX,
     sbb::{BuildingFile, BuildingFileTile},
@@ -10,6 +9,7 @@ use ferrosa_physics::{
     rotation::{IDENTITY, rotate_orientation},
 };
 use ferrosa_protocol::{Team, clientbound::game::ItemKind};
+use glam::{IVec3, Vec3};
 
 use crate::{
     area::{AreaGrid, BlockDims, CUBE, FOOTPRINT, MESH, TYPE_MASK},
@@ -28,7 +28,6 @@ struct Tile {
     edge_z: u32,
     floor: u32,
     top: u32,
-    faces: u8,
     item_set: u32,
     /// The interior block's materials (building_setup_build's remapped interior texture indices).
     textures: [u8; 8],
@@ -254,6 +253,8 @@ pub struct Buildings<'a> {
     game_type: u32,
     /// The level's material names (load_level's texture list), which a building's texture names resolve against.
     materials: Vec<String>,
+    /// The window atlas's layers (data_38ac24c4): a material, and the build block and portal whose window is cut out.
+    pub atlas: Vec<(u16, u32, u32)>,
 }
 
 impl<'a> Buildings<'a> {
@@ -271,6 +272,7 @@ impl<'a> Buildings<'a> {
             bases: vec![CorporationBase::default(); CORPORATIONS],
             game_type,
             materials,
+            atlas: Vec::new(),
         }
     }
 
@@ -405,7 +407,6 @@ impl<'a> Buildings<'a> {
                 edge_z: t.edge_z,
                 floor: t.floor,
                 top: 0,
-                faces: t.texture_indices.iter().enumerate().fold(0, |m, (i, &w)| if w & 32768 == 0 { m | 1 << i } else { m }),
                 item_set: if t.item_set == 0 { 0 } else { (t.item_set & (3 << 24)) | isets[(t.item_set & 1023) as usize] | (1 << 30) },
                 textures: t.interior_texture_indices.map(|w| remap[(w & 255) as usize] as u8),
                 block_textures: t.texture_indices.map(|w| (w & 0xff00) | remap[(w & 255) as usize] as u16),
@@ -464,10 +465,25 @@ impl<'a> Buildings<'a> {
                     for (d, e) in checks.into_iter().enumerate() {
                         if portal(e) {
                             let f = d + 1;
-                            self.runtime[idx].faces ^= 1 << f;
+                            let layer = self.atlas_layer(self.runtime[idx].block_textures[f], t.build, e - 3);
+                            self.runtime[idx].block_textures[f] = layer as u16 | 0x8000;
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// texture_array_add_unique_layer: the atlas layer showing `material` with the window of portal `portal` of build
+    /// block `group` cut out of it, added if new; 0 once the atlas holds 255.
+    fn atlas_layer(&mut self, material: u16, group: u32, portal: u32) -> usize {
+        let entry = (material, group, portal);
+        match self.atlas.iter().position(|&e| e == entry) {
+            Some(k) => k,
+            None if self.atlas.len() >= 0xff => 0,
+            None => {
+                self.atlas.push(entry);
+                self.atlas.len() - 1
             }
         }
     }

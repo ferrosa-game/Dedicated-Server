@@ -84,7 +84,7 @@ impl Sim {
             }
         }
         for o in self.modes.round.vehicle_stock.iter_mut().filter(|o| !o.active) {
-            let kind = crate::vehicle::types::random_stock_vehicle();
+            let kind = crate::vehicle::random_stock_vehicle();
             let price = self.vehicle_types.get(kind as usize).map_or(0, |t| t.price);
             let color = rand::random_range(0..VEHICLE_COLORS);
             *o = VehicleOffer { active: true, kind, color, price };
