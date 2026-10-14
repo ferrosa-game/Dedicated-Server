@@ -205,6 +205,7 @@ impl BlockMeshes {
 
                     self.b.reset();
                     self.b.set_corners([0.0, c0, 0.0], [1.0, c1, 0.0], [1.0, c2, 1.0], [0.0, c3, 1.0]);
+                    self.b.set_uv_corners([0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]);
                     self.b.append_bezier(1, LINEAR, 1, LINEAR, 0);
                     self.store(slope_id(w, false, row, k).unwrap());
 
@@ -223,6 +224,7 @@ impl BlockMeshes {
                 [1.0, h(i.wrapping_sub(1) <= 1), 1.0],
                 [0.0, h(i.wrapping_sub(2) <= 1), 1.0],
             );
+            self.b.set_uv_corners([0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]);
 
             self.b.append_bezier(1, LINEAR, 1, LINEAR, 0);
             self.store(tables.edge_cap(i));

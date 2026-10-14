@@ -167,18 +167,21 @@ impl Sim {
     }
 
     /// The vehicle part of build_objectpacket: each vehicle's position, orientation, steering, wheels and engine, and
-    /// what its priority for each connection is worked out from.
+    /// what its priority for each connection is worked out from. A helicopter's rotor angles ride in its first two
+    /// wheel slots' heights, where the binary keeps them (+0x3988, +0x3a34).
     pub(crate) fn vehicle_objects(&self) -> Vec<(ServerVehicleObject, VehicleSight)> {
         self.vehicles
             .iter()
             .filter(|(id, v)| *id < NETWORKED_VEHICLES && v.controllable_state != HIDDEN_STATE)
             .map(|(id, v)| {
                 let steer = ((v.steer as f64 / 180.0_f64.to_radians() * BYTE) as i32).clamp(-255, 255);
-                let wheels = std::array::from_fn(|k| {
-                    v.wheels
+                let wheels = std::array::from_fn(|k| match v.rotor.as_ref().and_then(|r| r.angles.get(k)) {
+                    Some(&angle) => [to_byte(angle, 0), 0, 0],
+                    None => v
+                        .wheels
                         .get(k)
                         .filter(|_| k < NETWORKED_WHEELS)
-                        .map_or([0; 3], |w| [to_byte(w.visual_height, 0), to_byte(w.spin, -255), to_byte(w.skid, 0)])
+                        .map_or([0; 3], |w| [to_byte(w.visual_height, 0), to_byte(w.spin, -255), to_byte(w.skid, 0)]),
                 });
                 let object = ServerVehicleObject {
                     vehicle_id: id as u16,

@@ -413,6 +413,7 @@ impl Sim {
 
         for conn in self.connection_order() {
             let Some(c) = self.clients.get(&conn) else { continue };
+
             let banned = self
                 .players
                 .get(c.player_id.idx())
@@ -420,6 +421,10 @@ impl Sim {
                 .is_some_and(|a| a.ban_time > 0);
 
             if banned || c.timeout >= TIMEOUT || self.players.get(c.player_id.idx()).is_none() {
+                if let Some(player) = self.players.get(c.player_id.idx()) {
+                    println!("[Sim] {} timed out...", player.username);
+                }
+
                 self.on_leave(conn);
             }
         }
