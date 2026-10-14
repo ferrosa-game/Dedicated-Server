@@ -32,7 +32,8 @@ impl Sim {
             println!("[Sim] Admin {} is joining!", j.auth_packet.player_name);
         }
 
-        if self.players.len() >= self.max_players as usize && !admin {
+        let people = self.players.iter().filter(|(_, p)| !p.is_bot).count();
+        if people >= self.max_players as usize && !admin {
             return self.kick(conn, src, "Server is full");
         }
 

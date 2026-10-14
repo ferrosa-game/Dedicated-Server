@@ -20,7 +20,6 @@ use crate::{fragment::Reassembler, masterserver::MasterServer};
 pub mod fragment;
 pub mod masterserver;
 
-/// The biggest datagram read (recvpacket's buffer).
 const RECV_BUFFER: usize = 0x10000;
 
 pub struct ServerListing {
@@ -81,7 +80,6 @@ impl Edge {
         }
     }
 
-    /// A datagram: a whole packet, or a fragment of one from a client in the game, put back together first.
     fn on_datagram(&mut self, data: &[u8], src: SocketAddr) {
         if !data.starts_with(b"7DFF") {
             return self.on_packet(data, src);

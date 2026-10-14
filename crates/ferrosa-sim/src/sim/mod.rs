@@ -475,11 +475,14 @@ impl Sim {
         }
     }
 
+    /// The intermission's ready bits: only the first 32 player slots', as the binary sends.
     fn calculate_ready_states(players: &mut crate::player::PlayerTable) -> [bool; 32] {
         let mut ready_vec = [false; 32];
 
         for (idx, player) in players.iter_mut() {
-            ready_vec[idx] = player.is_ready;
+            if let Some(ready) = ready_vec.get_mut(idx) {
+                *ready = player.is_ready;
+            }
         }
 
         ready_vec
