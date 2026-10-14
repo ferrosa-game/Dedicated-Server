@@ -15,9 +15,13 @@ use ferrosa_protocol::{
 use ferrosa_sim::{ConnId, Inbound, Outbound, SimJoinMsg, SimMsg};
 use tokio::{net::UdpSocket, sync::mpsc};
 
-use crate::masterserver::MasterServer;
+use crate::{fragment::Reassembler, masterserver::MasterServer};
 
+pub mod fragment;
 pub mod masterserver;
+
+/// The biggest datagram read (recvpacket's buffer).
+const RECV_BUFFER: usize = 0x10000;
 
 pub struct ServerListing {
     pub build: u8,
@@ -38,6 +42,7 @@ pub struct Edge {
     drop_rx: mpsc::UnboundedReceiver<ConnId>,
     masterserver: MasterServer,
     sessions: HashMap<SocketAddr, ConnId>,
+    fragments: Reassembler,
     next_conn: u32,
     listing: ServerListing,
     server_ip: Option<SocketAddr>,
@@ -52,11 +57,11 @@ impl Edge {
         masterserver: MasterServer,
         listing: ServerListing,
     ) -> Self {
-        Self { socket, in_tx, out_tx, drop_rx, masterserver, sessions: Default::default(), next_conn: 0, listing, server_ip: None }
+        Self { socket, in_tx, out_tx, drop_rx, masterserver, sessions: Default::default(), fragments: Reassembler::default(), next_conn: 0, listing, server_ip: None }
     }
 
     pub async fn run(mut self) {
-        let mut buf = [0u8; 2048];
+        let mut buf = vec![0u8; RECV_BUFFER];
         let mut keepalive = tokio::time::interval(Duration::from_secs(16));
         let mut evict = tokio::time::interval(Duration::from_secs(10));
 
@@ -67,12 +72,31 @@ impl Edge {
                 }
                 Some(conn) = self.drop_rx.recv() => self.sessions.retain(|_, c| *c != conn),
                 _ = keepalive.tick() => self.masterserver.keepalive(),
-                _ = evict.tick() => self.masterserver.evict_stale(Duration::from_secs(10)),
+                _ = evict.tick() => {
+                    self.masterserver.evict_stale(Duration::from_secs(10));
+                    let sessions = &self.sessions;
+                    self.fragments.retain(|a| sessions.contains_key(a));
+                }
             }
         }
     }
 
+    /// A datagram: a whole packet, or a fragment of one from a client in the game, put back together first.
     fn on_datagram(&mut self, data: &[u8], src: SocketAddr) {
+        if !data.starts_with(b"7DFF") {
+            return self.on_packet(data, src);
+        }
+
+        if !self.sessions.contains_key(&src) {
+            return;
+        }
+
+        if let Some(whole) = self.fragments.add(src, data) {
+            self.on_packet(&whole, src);
+        }
+    }
+
+    fn on_packet(&mut self, data: &[u8], src: SocketAddr) {
         let Some((type_byte, body)) = parse_frame(data) else {
             return;
         };
@@ -176,5 +200,20 @@ impl Edge {
         };
 
         let _ = self.out_tx.send((ferrosa_protocol::frame_packet(res), src));
+    }
+}
+
+/// Sends what the sim and the master server hand over, each packet over 1200 bytes as "7DFF" fragments under the
+/// next packet id (send_packet_to_server).
+pub async fn send_all(socket: Arc<UdpSocket>, mut out_rx: mpsc::UnboundedReceiver<(Vec<u8>, SocketAddr)>) {
+    let mut id = 0u16;
+    while let Some((buf, addr)) = out_rx.recv().await {
+        let datagrams = fragment::split(&buf, id);
+        if datagrams.len() > 1 {
+            id = id.wrapping_add(1);
+        }
+        for d in datagrams {
+            let _ = socket.send_to(&d, addr).await;
+        }
     }
 }

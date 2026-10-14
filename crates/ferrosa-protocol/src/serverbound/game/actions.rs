@@ -73,7 +73,9 @@ impl WireWrite for GameAction {
                 let bytes = &a.message.as_bytes()[..a.message.len().min(63)];
                 w.bits(1, 4);
                 w.bits(bytes.len() as i32, 6);
-                w.bytes(bytes);
+                for &b in bytes {
+                    w.byte(b);
+                }
                 w.bits(a.volume as i32, 4);
             }
             GameAction::Item(a) => {

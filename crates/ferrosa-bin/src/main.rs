@@ -20,20 +20,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let (in_tx, in_rx) = mpsc::unbounded_channel::<Inbound>();
-    let (out_tx, mut out_rx) = mpsc::unbounded_channel::<(Vec<u8>, SocketAddr)>();
+    let (out_tx, out_rx) = mpsc::unbounded_channel::<(Vec<u8>, SocketAddr)>();
     let (drop_tx, drop_rx) = mpsc::unbounded_channel::<ConnId>();
 
     let socket = Arc::new(UdpSocket::bind(("0.0.0.0", config.port)).await?);
     println!("[Net] listening on {}", socket.local_addr()?);
 
-    {
-        let socket = socket.clone();
-        tokio::spawn(async move {
-            while let Some((buf, addr)) = out_rx.recv().await {
-                let _ = socket.send_to(&buf, addr).await;
-            }
-        });
-    }
+    tokio::spawn(ferrosa_net::send_all(socket.clone(), out_rx));
 
     let masterserver = MasterServer::connect(&config.master_server_url, config.master_server_ip.as_deref(), out_tx.clone()).await?;
 
