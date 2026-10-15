@@ -9,9 +9,9 @@ pub struct ItemModelVertex {
     #[br(parse_with = br_vec3)]
     pub pos: Vec3,
     #[br(if(version >= 3))]
-    pub vertex1: f32,
+    pub u: f32,
     #[br(if(version >= 3))]
-    pub vertex2: f32,
+    pub v: f32,
     pub padding: u32,
 }
 
@@ -22,16 +22,15 @@ pub struct ItemModelFace {
     #[br(count = num_vertices)]
     pub vertex_ids: Vec<u32>,
 
+    _unk: u32,
     #[br(if(version > 1))]
-    _unk3: u32,
-    #[br(if(version < 1))]
-    _unk4: u64,
+    pub skip: u32,
 }
 
 #[derive(BinRead)]
-#[br(little)]
+#[br(little, magic = b"CMod")]
 pub struct ItemModel {
-    pub magic: u32,
+    #[br(assert((1..=3).contains(&version)))]
     pub version: u32,
 
     pub vertex_count: u32,

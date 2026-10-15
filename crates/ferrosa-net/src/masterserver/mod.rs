@@ -1,9 +1,8 @@
 mod auth;
-mod discovery;
 
 pub use auth::AuthStore;
-pub use discovery::MsError;
-use ferrosa_protocol::masterserver::AuthPacket;
+pub use ferrosa_protocol::masterserver::discovery::MsError;
+use ferrosa_protocol::masterserver::{AuthPacket, discovery};
 use ferrosa_sim::Outbound;
 
 use std::{net::SocketAddr, time::Duration};

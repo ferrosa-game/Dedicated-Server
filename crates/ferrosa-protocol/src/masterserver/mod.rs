@@ -1,5 +1,6 @@
 use crate::codec::{Reader, WireRead};
 
+pub mod discovery;
 pub mod server_addr;
 pub mod sign_in;
 pub mod ticket;
