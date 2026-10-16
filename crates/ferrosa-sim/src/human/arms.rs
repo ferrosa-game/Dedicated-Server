@@ -26,8 +26,6 @@ fn hash_noise(n: i32) -> f32 {
     1.0 - (k as f32) * 9.313226e-10
 }
 
-/// calculate_spread_vector: a random direction scaled to between `base` and `base + scale`, drawn from the shared
-/// noise sequence `seed`.
 pub fn calculate_spread_vector(seed: &mut i32, scale: f32, base: f32) -> Vec3 {
     let n = *seed;
     let v = [hash_noise(n), hash_noise(n.wrapping_add(1)), hash_noise(n.wrapping_add(2))];
@@ -262,6 +260,15 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
             scale = 0.9375;
         }
 
+        let reaching = hold.is_none() && h.vehicle.is_none() && h.has_input(Input::Grab);
+        let pulling = reaching && h.has_input(Input::RightMouse);
+
+        if reaching {
+            angle = (90.0_f64.to_radians() - (h.view_pitch + h.free_look_pitch) as f64) as f32;
+
+            scale = if pulling { 0.4 } else { 1.0 };
+        }
+
         let a = angle as f64;
 
         let (y, z) = if h.vehicle.is_some() {
@@ -272,10 +279,11 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
 
         let brace = hold.is_none().then(|| briefcase_side(h, bodies, touch, k, -aim, aim_poses.map(|p| p[2]))).flatten();
         let grab = &h.grabs[1 - k];
+
         let mut target = match (hold, brace) {
             (Some((m, v)), _) => 0.0625 * m[1] + v - BONES[first].joint,
             (None, Some(p)) => p - BONES[first].joint,
-            (None, None) if grab.holding => {
+            (None, None) if grab.holding && !pulling => {
                 let ([r0, r1, r2], d) = (h.bones[2].rot, grab.spot - h.bones[2].pos);
                 Vec3::new(r0.dot(d), r1.dot(d), r2.dot(d)) - BONES[first].joint
             }
