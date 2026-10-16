@@ -105,22 +105,29 @@ fn orthonormalize(m: &mut RotMatrix, scale: f32) {
 fn place_pelvis(h: &Human, bodies: &mut RigidBodies, v: &Vehicle, scale: f32) {
     let ([r0, r1, r2], pos) = (v.rot, v.pos);
     let s = v.seats[h.seat];
+
     let mut p = pos + s.x * r0;
+
     if h.seat_exit > 0 {
         let k = (s.x * h.seat_exit as f32) / 15.0;
         p += k * r0;
     }
+
     let (sy, sz) = (0.25 + s.y, s.z);
     let p = p + sy * r1 + sz * r2;
     let w = bodies.get(v.body).map_or(Vec3::ZERO, |b| b.ang_vel);
     let Some(b) = bodies.get_mut(h.bones[0].body) else { return };
+
     b.pos = p;
     b.vel = v.vel;
     b.rot = v.rot;
+
     if h.seat_exit > 0 {
         orthonormalize(&mut b.rot, scale);
     }
+
     b.ang_vel = w;
+
     let i = b.inertia;
     let [r0, r1, r2] = b.rot;
     let s0 = r0.dot(w) * i.x;
@@ -128,6 +135,7 @@ fn place_pelvis(h: &Human, bodies: &mut RigidBodies, v: &Vehicle, scale: f32) {
     let s1 = r1.dot(w) * i.y;
     let l = r1 * s1 + l;
     let s2 = w.dot(r2) * i.z;
+
     b.ang_momentum = l + r2 * s2;
 }
 

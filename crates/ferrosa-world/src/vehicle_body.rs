@@ -76,6 +76,7 @@ pub fn numbered(glb: &Glb, root: usize, prefix: &str) -> Result<Vec<usize>, Stri
         .into_iter()
         .filter_map(|n| glb.name(n).strip_prefix(prefix)?.strip_prefix('.')?.split('.').next()?.parse().ok().map(|k| (k, n)))
         .collect();
+    
     found.sort_unstable();
 
     match found.iter().enumerate().find(|&(i, &(k, _))| i != k) {
@@ -150,6 +151,7 @@ impl VehicleBody {
             Some(n) => mesh_faces(glb, n)?,
             None => visible_faces(glb, root)?,
         };
+
         let trace_faces = trace_faces.iter().map(|f| f.to_vec()).collect();
 
         let windows = numbered(glb, root, "window")?

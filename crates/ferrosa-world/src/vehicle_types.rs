@@ -17,7 +17,6 @@ const DRIVEN_WHEELS: [usize; 2] = [2, 3];
 const REV_LIMIT_DEGREES: f32 = 600.0;
 const MAX_RPM: f64 = 7000.0;
 
-/// A point mass of the chassis: its rest position and share of the chassis mass.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ChassisNode {
     pub pos: Vec3,
@@ -27,7 +26,6 @@ pub struct ChassisNode {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct WheelDef {
     pub state: i32,
-    /// Where it hangs in the model (its `wheel.NN`).
     pub mount: Vec3,
     pub mass: f32,
     pub radius: f32,
@@ -36,7 +34,6 @@ pub struct WheelDef {
     pub spring: f32,
     pub damping: f32,
     pub travel_damping: f32,
-    /// The wheel's drive configuration, the second argument of vehicletype_attach_wheels_sized.
     pub drive: i32,
     /// Its mount around the centre of mass.
     pub mass_offset: Vec3,
@@ -49,7 +46,6 @@ pub struct VehicleType {
     pub controllable_state: i32,
     pub name: String,
     pub price: i32,
-    /// The chassis body's mass.
     pub mass: f32,
     /// The chassis' mass points: the collision hull's corners, heavier below the floor (the model's `floor` height).
     pub nodes: Vec<ChassisNode>,
@@ -58,7 +54,6 @@ pub struct VehicleType {
     /// The engine's power as a multiple of 213.
     pub engine_power: f32,
     pub wheels: Vec<WheelDef>,
-    /// The distance between the left and right wheels and between the front and rear wheels.
     pub track: f32,
     pub wheelbase: f32,
     pub seats: Vec<Vec3>,
