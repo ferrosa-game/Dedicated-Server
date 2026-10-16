@@ -219,7 +219,7 @@ impl Sim {
 
     pub(crate) fn on_chat_action(&mut self, player_id: PlayerId, action: ChatAction) {
         if action.message.trim() == "/tps" {
-            return self.tps_command();
+            return self.tps_command(player_id);
         }
 
         let player = self.players.get(player_id.idx()).unwrap();

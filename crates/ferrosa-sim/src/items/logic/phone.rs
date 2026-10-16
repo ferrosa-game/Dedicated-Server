@@ -3,7 +3,7 @@ use ferrosa_protocol::clientbound::game::{
     events::{Event, ServerEvent, phone_sound::EventPhoneSound, sound::Sound, update_phone::EventUpdatePhone},
 };
 
-use crate::{input::ItemInput, sim::Sim, time::game_minutes};
+use crate::{input::ItemInput, sim::Sim, time::{game_minutes, game_seconds}};
 
 const PHONE_BUSY_TICKS: i32 = 359;
 const PHONE_RING_TICKS: i32 = 767;
@@ -96,7 +96,7 @@ impl Sim {
 
                 let timer = p.ring_timer;
 
-                if tick.is_multiple_of(game_minutes(1) as u32) {
+                if tick.is_multiple_of(game_seconds(1) as u32) {
                     self.phone_sound(Sound::PhoneBusy, id, 1.0);
                 }
 
@@ -166,7 +166,7 @@ impl Sim {
             } else {
                 let o = other.unwrap();
 
-                if tick.is_multiple_of(game_minutes(2) as u32) {
+                if tick.is_multiple_of(game_seconds(2) as u32) {
                     self.phone_sound(Sound::PhoneRing, o, 1.0);
                     self.phone_sound(Sound::PhoneRing, id, 0.5);
                 }

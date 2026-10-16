@@ -5,6 +5,8 @@ use std::{
 
 use ferrosa_protocol::clientbound::game::events::chat::ChatType;
 
+use crate::PlayerId;
+
 use super::Sim;
 
 /// The ticks /tps averages over (about two seconds).
@@ -111,13 +113,12 @@ impl PhaseTimes {
 }
 
 impl Sim {
-    /// Test command (/tps): the measured tick rate against the 62.5 the 16 ms tick aims for, and how long ticks take.
-    pub(crate) fn tps_command(&mut self) {
+    pub(crate) fn tps_command(&mut self, player: PlayerId) {
         let msg = match self.tick_stats.summary() {
             Some((tps, mean, max)) => format!("TPS {tps:.1} / {:.1}, tick {mean:.2} ms avg, {max:.2} ms max", 1000.0 / super::TICK_MS as f64),
             None => "TPS: not enough ticks yet".to_string(),
         };
 
-        self.send_chat(&msg, ChatType::Announce, -1, 0);
+        self.send_chat(&msg, ChatType::PrivateMessage, player.idx() as i32, 0);
     }
 }
