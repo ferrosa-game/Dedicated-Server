@@ -19,7 +19,7 @@ jobs:
             name: ferrosa-dedicated-linux-x64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            name: ferrosa-dedicated-windows-x64.exe
+            name: ferrosa-dedicated-windows-x64
           - os: macos-latest
             target: aarch64-apple-darwin
             name: ferrosa-dedicated-macos-arm64
@@ -33,14 +33,20 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Rename
+      - name: Package
         shell: bash
         run: |
           bin="ferrosa-bin"
           [ "${{ matrix.os }}" = "windows-latest" ] && bin="$bin.exe"
-          cp "target/${{ matrix.target }}/release/$bin" "${{ matrix.name }}"
+
+          staging="${{ matrix.name }}"
+          mkdir "$staging"
+          cp "target/${{ matrix.target }}/release/$bin" "$staging/"
+          cp -r data "$staging/"
+
+          cd "$staging" && 7z a "../$staging.zip" .
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.name }}
+          files: ${{ matrix.name }}.zip

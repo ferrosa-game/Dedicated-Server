@@ -19,7 +19,10 @@ approx_constant = "allow"
 tokio = { version = "1.53.3", features = ["full"] }
 serde = { version = "1.0.229", features = [ "derive" ] }
 rayon = "1.12.0"
-glam = { version = "0.34.1", features = ["serde"] }
+# THIS IS KEPT OUT OF DATE FOR A REASON
+# the client relies on crates present here, so we use this version of glam to match the
+# version bevy uses, the game engine behind the client.
+glam = { version = "0.33.12", features = ["serde"] }
 serde_json = "1.0.154"
 gltf = { version = "1.4.1", default-features = false, features = ["names", "extras", "utils", "KHR_materials_unlit", "KHR_texture_transform"] }
 binrw = "0.15.0"
