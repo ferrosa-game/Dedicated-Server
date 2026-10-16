@@ -55,7 +55,6 @@ pub struct Wheel {
     pub vel: Vec3,
     /// How far the wheel has travelled along the chassis' up axis (-1 to 1) for the clients.
     pub visual_height: f32,
-    pub vertical_offset: f32,
     /// The suspension: how hard the wheel is pulled to its mount, how much of the relative velocity is
     /// damped and the extra damping along the chassis' up axis.
     pub spring: f32,
@@ -70,6 +69,11 @@ pub struct Vehicle {
     pub kind: ferrosa_protocol::clientbound::game::VehicleKind,
     /// The type's flag (controllableState); a vehicle in state 3 is not sent to clients.
     pub controllable_state: i32,
+    /// The type's train flag and engine curve.
+    pub train: bool,
+    pub rev_limit: f32,
+    pub max_rpm: f64,
+    pub torque_curve: types::TorqueCurve,
     pub health: i32,
     pub last_driver: i32,
     pub color: i32,
@@ -218,7 +222,6 @@ pub fn spawn_vehicle(
                 mass: w.mass,
                 radius: w.radius,
                 world_pos,
-                vertical_offset: w.vertical_offset,
                 spring: w.spring,
                 damping: w.damping,
                 travel_damping: w.travel_damping,
@@ -229,7 +232,7 @@ pub fn spawn_vehicle(
 
     let mut bogies = Vec::new();
 
-    if kind == VehicleKind::Train {
+    if t.train {
         let [_, r1, r2] = rot;
         let ends = [(centre - r1 + r2 * -6.0, Vec3::new(0.0, -1.0, -6.0)), (-1.25 * r1 + centre + r2 * 6.0, Vec3::new(0.0, -1.0, 6.0))];
 
@@ -242,7 +245,7 @@ pub fn spawn_vehicle(
         }
     }
 
-    let rotor = if kind == ferrosa_protocol::clientbound::game::VehicleKind::Helicopter {
+    let rotor = if t.rotor {
         let [_, r1, _] = rot;
         let at = r1 * ROTOR_HEIGHT + centre;
         let rotor_body = bodies.create(RigidBodyType::Vehicle, at, rot, vel, ROTOR_INERTIA, ROTOR_MASS)?;
@@ -258,11 +261,15 @@ pub fn spawn_vehicle(
         None
     };
 
-    let driven = if kind == ferrosa_protocol::clientbound::game::VehicleKind::Hatchback { vec![0, 1] } else { vec![2, 3] };
+    let driven = t.driven_wheels.clone();
     let vel = vel.unwrap_or(Vec3::ZERO);
 
     vehicles.insert(Vehicle {
         kind,
+        train: t.train,
+        rev_limit: t.rev_limit,
+        max_rpm: t.max_rpm,
+        torque_curve: t.torque_curve,
         controllable_state: t.controllable_state,
         health: FULL_HEALTH,
         last_driver: -1,

@@ -1,4 +1,4 @@
-use ferrosa_physics::rotation::{IDENTITY, rot_matrix_to_quaternion, rotate_orientation};
+use ferrosa_physics::{body::SolverStep, rotation::{IDENTITY, rot_matrix_to_quaternion, rotate_orientation}};
 use ferrosa_protocol::clientbound::game::{
     ServerVehicleObject, VehicleKind,
     events::{Event, ServerEvent, chat::ChatType, update_vehicle::EventUpdateVehicle, update_vehicle_type_color::EventUpdateVehicleTypeColor},
@@ -199,7 +199,7 @@ impl Sim {
                         pos: v.pos,
                         steer_control: v.steer_control,
                         vel: v.vel,
-                        train: v.kind == ferrosa_protocol::clientbound::game::VehicleKind::Train,
+                        train: v.train,
                     },
                 )
             })
@@ -253,7 +253,7 @@ impl Sim {
     pub(crate) fn vehicle_take_damage(&mut self, id: usize, amount: i32) {
         let Some(v) = self.vehicles.get_mut(id) else { return };
         
-        if v.kind == VehicleKind::Train || v.health <= 0 {
+        if v.train || v.health <= 0 {
             return;
         }
 
@@ -347,11 +347,9 @@ impl Sim {
         }
 
         self.bullets.clear();
-        self.send_chat("Cleared", ferrosa_protocol::clientbound::game::events::chat::ChatType::Announce, -1, 0);
+        self.send_chat("Cleared", ChatType::Announce, -1, 0);
     }
 
-    /// The item pass at the end of vehicleSimulation: the chassis hull of each vehicle against the hulls of the items
-    /// in its blocks whose bounds overlap it, waking the items it touches.
     fn vehicle_item_contacts(&mut self) {
         for (_, v) in self.vehicles.iter() {
             let Some(hull) = self.vehicle_types.get(v.kind as usize).and_then(|t| t.mesh.as_ref()) else { continue };
@@ -392,10 +390,7 @@ impl Sim {
         }
     }
 
-    /// bond_simulation with the wheels' constraint and drive steps in each solver pass.
     pub(crate) fn solve_bonds(&mut self) {
-        use ferrosa_physics::body::SolverStep;
-
         let Sim { bodies, vehicles, .. } = self;
 
         bodies.solve_bonds_with(|b, step| match step {

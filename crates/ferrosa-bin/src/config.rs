@@ -63,11 +63,3 @@ impl ConfigMain {
         std::fs::write("config.toml", toml::to_string_pretty(self).unwrap())
     }
 }
-
-pub fn init_config_dirs() {
-    let folder = format!("{}/Sub Rosa", dirs_next::document_dir().unwrap().to_str().unwrap());
-
-    if !std::path::Path::new(&folder).exists() {
-        std::fs::create_dir_all(&folder).expect("Failed to create config directory");
-    }
-}

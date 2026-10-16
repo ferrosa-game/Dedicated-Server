@@ -11,6 +11,7 @@ ferrosa-physics.workspace = true
 
 rayon.workspace = true
 glam.workspace = true
+serde.workspace = true
 
 [lints]
 workspace = true

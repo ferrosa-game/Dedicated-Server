@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::{
     io::{Cursor, Read},
     path::Path,
@@ -12,7 +13,7 @@ const MESH_VERSION: i32 = 2;
 const PARTS_VERSION: i32 = 1;
 
 /// A vertex of a test shape mesh and the number stored beside it.
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone, Copy)]
 #[brw(little)]
 pub struct TstVertex {
     #[br(parse_with = br_vec3)]
@@ -21,7 +22,7 @@ pub struct TstVertex {
 }
 
 /// A corner of a test shape face: a vertex and its texture coordinates.
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone, Copy)]
 #[brw(little)]
 pub struct TstCorner {
     pub vertex: i32,
@@ -29,7 +30,7 @@ pub struct TstCorner {
 }
 
 /// A face of up to four corners.
-#[derive(BinRead, Debug, Clone)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone)]
 #[brw(little)]
 pub struct TstFace {
     pub count: u32,
@@ -39,7 +40,7 @@ pub struct TstFace {
 }
 
 /// A mesh block (tst_read_heli, version 2).
-#[derive(BinRead, Debug, Clone)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone)]
 #[brw(little)]
 pub struct TstMesh {
     /// Read and never used.
@@ -53,7 +54,7 @@ pub struct TstMesh {
 }
 
 /// A parts block (tst_read_van, version 1): groups of up to four points.
-#[derive(BinRead, Debug, Clone)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone)]
 #[brw(little)]
 pub struct TstParts {
     pub part_count: u32,
@@ -63,7 +64,7 @@ pub struct TstParts {
 
 /// A test shape file (data/<name>.tst, read by load_tst): a mesh block, a parts block and, for Van2, a second mesh
 /// block. Each block starts with its version and a block of the wrong version is left unread after it.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TstFile {
     pub mesh: Option<TstMesh>,
     pub parts: Option<TstParts>,

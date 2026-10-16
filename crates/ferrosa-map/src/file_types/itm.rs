@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::{io::Cursor, path::Path};
 
 use super::LoaderError;
@@ -5,8 +6,7 @@ use crate::br_vec3;
 use binrw::BinRead;
 use glam::Vec3;
 
-/// A marked point of the item (0 the muzzle, 1 the right hand, 2 the left hand, 4 the second hand's grip).
-#[derive(BinRead, Debug, Clone)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone)]
 #[brw(little)]
 pub struct ItmPoint {
     pub kind: i32,
@@ -14,8 +14,7 @@ pub struct ItmPoint {
     pub pos: Vec3,
 }
 
-/// A render vertex and its texture coordinate.
-#[derive(BinRead, Debug, Clone)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone)]
 #[brw(little)]
 pub struct ItmVertex {
     #[br(parse_with = br_vec3)]
@@ -23,8 +22,7 @@ pub struct ItmVertex {
     pub uv: [f32; 2],
 }
 
-/// A render face: three or four vertex indices.
-#[derive(BinRead, Debug, Clone)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone)]
 #[brw(little)]
 pub struct ItmFace {
     pub count: u32,
@@ -32,8 +30,7 @@ pub struct ItmFace {
     pub indices: Vec<i32>,
 }
 
-/// An item model file (data/*.itm, load_item_file): its centre, inertia, marked points and render mesh.
-#[derive(BinRead, Debug, Clone)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone)]
 #[brw(little)]
 pub struct ItmFile {
     pub version: i32,

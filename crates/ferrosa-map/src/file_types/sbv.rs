@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::{io::Cursor, path::Path};
 
 use crate::br_vec3;
@@ -6,7 +7,7 @@ use glam::Vec3;
 
 use super::LoaderError;
 
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone, Copy)]
 #[brw(little)]
 pub struct SbvNode {
     #[br(parse_with = br_vec3)]
@@ -14,7 +15,7 @@ pub struct SbvNode {
     pub weight: f32,
 }
 
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone, Copy)]
 #[brw(little)]
 pub struct SbvEdge {
     pub kind: i32,
@@ -22,7 +23,7 @@ pub struct SbvEdge {
     pub b: i32,
 }
 
-#[derive(BinRead, Debug, Clone)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone)]
 #[brw(little)]
 pub struct SbvFace {
     pub count: u32,
@@ -30,7 +31,7 @@ pub struct SbvFace {
     pub indices: Vec<i32>,
 }
 
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone, Copy)]
 #[brw(little)]
 #[br(import(version: u32))]
 pub struct SbvSubshapeNode {
@@ -39,7 +40,7 @@ pub struct SbvSubshapeNode {
     pub weights: [f32; 4],
 }
 
-#[derive(BinRead, Debug, Clone)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone)]
 #[brw(little)]
 #[br(import(version: u32))]
 pub struct SbvSubshape {
@@ -52,7 +53,7 @@ pub struct SbvSubshape {
     pub quad: [i32; 4],
 }
 
-#[derive(BinRead, Debug, Clone)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone)]
 #[brw(little)]
 pub struct SbvPart {
     pub count: u32,
@@ -60,7 +61,7 @@ pub struct SbvPart {
     pub points: Vec<Vec3>,
 }
 
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone, Copy)]
 #[brw(little)]
 pub struct SbvWheel {
     pub kind: i32,
@@ -69,7 +70,7 @@ pub struct SbvWheel {
     pub aux: i32,
 }
 
-#[derive(BinRead, Debug, Clone)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone)]
 #[brw(little)]
 pub struct VehicleBodyFile {
     pub version: u32,

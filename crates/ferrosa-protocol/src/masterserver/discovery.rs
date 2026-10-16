@@ -23,7 +23,7 @@ pub async fn resolve_address(master_url: &str, master_ip: Option<&str>) -> Resul
         return ip.parse().map_err(|_| MsError::BadAddr(ip.to_string()));
     }
 
-    let client = reqwest::Client::builder().user_agent("SubRosa").build().map_err(MsError::Http)?;
+    let client = reqwest::Client::builder().user_agent("Ferrosa").build().map_err(MsError::Http)?;
 
     let body = client.get(info_url(master_url)).send().await.map_err(MsError::Http)?.text().await.map_err(MsError::Http)?;
 

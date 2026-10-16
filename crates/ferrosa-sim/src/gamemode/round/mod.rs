@@ -43,8 +43,6 @@ const TIES: [u8; ROUND_CORPS] = [2, 9, 8];
 /// The phones on each round corporation's table: 7.75 along its back, the second 0.5 beside it, numbered from 1111.
 const PHONE_BACK: f32 = 7.75;
 const PHONE_SIDE: f32 = 0.5;
-const PHONE_NUMBER_STEP: i32 = 1111;
-const MINIVAN_PLAYERS: i32 = 4;
 /// With weekly play on, the sixth round starts a new week.
 pub(crate) const WEEK_DAYS: i32 = 5;
 /// A new week's share market: the round corporations back to 100 shares at 100.
@@ -323,8 +321,8 @@ impl Sim {
                 }
             }
 
-            if self.corp_state[k].player_count > MINIVAN_PLAYERS {
-                self.corporation_spawn_vehicle(ferrosa_protocol::clientbound::game::VehicleKind::Minivan, k, 0);
+            if self.corp_state[k].player_count > 4 {
+                self.corporation_spawn_vehicle(VehicleKind::Minivan, k, 0);
             }
 
             let base = &self.world.map.level.bases[k];
@@ -339,7 +337,7 @@ impl Sim {
             let [r0, _, r2] = rot;
             let first = PHONE_BACK * r2 + t;
             let second = PHONE_SIDE * r0 + first;
-            let number = (k as i32 + 1) * PHONE_NUMBER_STEP + 1;
+            let number = (k as i32 + 1) * 1111 + 1;
 
             for (pos, texture, number) in [(first, 0, number - 1), (second, 1, number)] {
                 let Some(id) = self.create_item(ItemKind::Phone, pos, None, rot) else { continue };

@@ -1,5 +1,5 @@
 use ferrosa_protocol::clientbound::game::{
-    ItemKind, VehicleKind,
+    ItemKind,
     events::{Event, ServerEvent, bullet_hit::EventBulletHit, bullet_hole::EventBulletHole, update_vehicle::EventUpdateVehicle},
 };
 use glam::{IVec3, Vec3};
@@ -124,7 +124,7 @@ impl Sim {
 
                 ServerEvent::UpdateVehicle(update(TYRE_BURST, k))
             }
-            _ if vehicle.kind == VehicleKind::Train => return,
+            _ if vehicle.train => return,
             VehiclePart::Window(k) => {
                 if let Some(w) = vehicle.broken_windows.get_mut(k) {
                     *w = true;
