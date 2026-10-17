@@ -23,6 +23,7 @@ fn hash_noise(n: i32) -> f32 {
     let h = (n << 13) ^ n;
     let m = h.wrapping_mul(h).wrapping_mul(15731).wrapping_add(789221);
     let k = m.wrapping_mul(m).wrapping_add(1376312589);
+
     1.0 - (k as f32) * 9.313226e-10
 }
 
@@ -32,15 +33,19 @@ pub fn calculate_spread_vector(seed: &mut i32, scale: f32, base: f32) -> Vec3 {
     let n = n.wrapping_add(3);
     let xy = v[0] * v[0] + v[1] * v[1];
     let len = (v[2] * v[2] + xy).sqrt();
+
     let (x, y, z) = if len == 0.0 {
         (len, xy, 0.0)
     } else {
         let inv = 1.0 / len;
         (v[0] * inv, v[1] * inv, inv * v[2])
     };
+
     let r = hash_noise(n);
     *seed = n.wrapping_add(1);
+
     let k = base + ((r + 1.0) * scale) * 0.5;
+
     Vec3::new(x * k, y * k, k * z)
 }
 
@@ -59,38 +64,43 @@ fn world(r: &RotMatrix, v: Vec3) -> Vec3 {
     r0 * v.x + r1 * v.y + r2 * v.z
 }
 
-/// The parent's spin relative to the child, in the parent's space, as a damping term.
 fn relative_spin_damping(h: &Human, parent: usize, child: usize) -> Vec3 {
     let (a, b) = (h.bones[parent].ang_vel, h.bones[child].ang_vel);
     let l = local(&h.bones[parent].rot, a - b);
+
     l * -0.25
 }
 
-/// The turn (axis and angle, at most `SPINE_TURN`) taking `child`, relative to `parent`, to the pose `pose`.
 fn joint_turn(h: &Human, parent: usize, child: usize, pose: [f32; 4]) -> (Vec3, f32) {
     let m = multiply_matrixes(&h.bones[child].rot, &h.bones[parent].rot);
     let mut q = rot_matrix_to_quaternion(&m);
     let dot = ((pose[0] * q[0] + pose[1] * q[1]) + pose[2] * q[2]) + pose[3] * q[3];
+
     if 0.0 > dot {
         q = q.map(|c| -c);
     }
+
     let q = [-q[0], -q[1], -q[2], q[3]];
     let (axis, angle) = quaternion_to_axis_angle(quaternion_multiply(q, pose));
+
     (axis, angle.clamp(-22.5_f32.to_radians(), 22.5_f32.to_radians()))
 }
 
-/// Turns `child` (relative to `parent`) towards the pose `pose`, with the damping term `damping`, and rebuilds the
-/// predicted orientation `frame`.
 fn drive_spine_joint(h: &Human, bodies: &mut RigidBodies, parent: usize, child: usize, pose: [f32; 4], damping: Vec3, frame: &mut RotMatrix) {
     let (axis, angle) = joint_turn(h, parent, child, pose);
     let t = axis * angle * 0.75 + damping;
     let mut target = world(&h.bones[child].rot, t);
+
     super::ik::clamp_bone_relative_correction(h, parent, child, &mut target, 1.125, 1.0);
+
     let len = target.length();
     let u = target.normalize_or_zero();
     let axis = local(&h.bones[parent].rot, u);
+
     *frame = multiply_matrixes(&h.bones[parent].rot, &h.bones[child].rot);
+
     rotate_orientation(frame, axis, len);
+
     if let Some(id) = h.bones[child].joint
         && let Some(Bond::Joint(j)) = bodies.bond_mut(id)
     {
@@ -99,7 +109,6 @@ fn drive_spine_joint(h: &Human, bodies: &mut RigidBodies, parent: usize, child: 
     }
 }
 
-/// Aiming a gun: `child` turns (relative to `parent`) straight to the aim pose `pose`, undamped.
 fn aim_spine_joint(h: &Human, bodies: &mut RigidBodies, parent: usize, child: usize, pose: [f32; 4]) {
     let (axis, angle) = joint_turn(h, parent, child, pose);
     let target = world(&h.bones[child].rot, axis * angle);
@@ -121,8 +130,6 @@ fn yaw_turn(angle: f32) -> [f32; 4] {
     [0.0, s, 0.0, c]
 }
 
-/// human_build_locomotion_orientation: the waist and chest poses of a human aiming a gun `yaw` to the side, and the
-/// aim itself (stored conjugated).
 fn aim_orientations(h: &Human, yaw: f32) -> [[f32; 4]; 3] {
     let identity = [0.0, 0.0, 0.0, 1.0];
     let waist = quaternion_multiply(identity, yaw_turn(0.5 * h.free_look_yaw + h.yaw_offset));
@@ -149,8 +156,6 @@ fn add_turn(pose: [f32; 4], frame: &mut RotMatrix, row: usize, angle: f32) -> [f
     quaternion_multiply(pose, q)
 }
 
-/// human_calculate_arm_angles: turns the waist, chest and head towards where the human looks and drives the arms
-/// (through the arm IK) towards their pose.
 pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, touch: &Touchables, seed: &mut i32) {
     if h.action_type != 0 && h.has_input(Input::ThrowItem) {
         h.throw_pitch = 8.0 * h.free_look_pitch;
@@ -266,7 +271,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
         if reaching {
             angle = (90.0_f64.to_radians() - (h.view_pitch + h.free_look_pitch) as f64) as f32;
 
-            scale = if pulling { 0.4 } else { 1.0 };
+            scale = if pulling { 0.4 } else { 0.95 };
         }
 
         let a = angle as f64;
@@ -287,6 +292,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
                 let ([r0, r1, r2], d) = (h.bones[2].rot, grab.spot - h.bones[2].pos);
                 Vec3::new(r0.dot(d), r1.dot(d), r2.dot(d)) - BONES[first].joint
             }
+            (None, None) if reaching => Vec3::new(if k == 0 { 0.09 } else { -0.09 }, y, z),
             (None, None) => Vec3::new(if k == 0 { -0.0625 } else { 0.0625 }, y, z),
         };
 
