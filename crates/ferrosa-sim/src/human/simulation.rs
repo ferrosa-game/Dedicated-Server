@@ -54,7 +54,7 @@ pub(crate) fn simulate_human(
     let seated = h.vehicle;
     health_sim(id, h, ticks, out);
 
-    if ticks & 0x1f == 0 {
+    if ticks.is_multiple_of(32) {
         if h.stamina > h.max_stamina {
             h.stamina = h.max_stamina;
         }
@@ -72,7 +72,7 @@ pub(crate) fn simulate_human(
 
     let base_strength = 1.0f32;
 
-    if ticks & 7 == 0 && h.pain > 0 {
+    if ticks.is_multiple_of(8) && h.pain > 0 {
         h.pain -= 1;
     }
 

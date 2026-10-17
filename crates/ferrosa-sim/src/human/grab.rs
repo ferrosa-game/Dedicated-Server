@@ -80,9 +80,11 @@ pub fn grab_hands(humans: &mut Table<Human>, bodies: &mut RigidBodies, ticks: u3
                     .map(|(human, j, b)| (point_segment_distance(b.capsule[0], b.capsule[1], palm), human, j, b))
                     .filter(|&(d, ..)| d <= GRAB_REACH)
                     .min_by(|a, b| a.0.total_cmp(&b.0));
+
                 if let Some((_, human, j, b)) = nearest {
                     h.grabs[hand] = Grab { holding: true, human, bone: j, point: to_local(b, palm), spot: palm };
                 }
+
                 continue;
             }
 
@@ -103,7 +105,7 @@ pub fn grab_hands(humans: &mut Table<Human>, bodies: &mut RigidBodies, ticks: u3
             h.grabs[hand].spot = spot;
             bodies.create_bond(Bond::ItemPoint(ItemPoint::grab(h.bones[bone].body, held.body, g.point)));
 
-            if ticks & 3 == 0 {
+            if ticks.is_multiple_of(4) {
                 h.stamina -= 1;
             }
         }
