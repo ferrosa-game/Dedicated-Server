@@ -268,12 +268,6 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
         let reaching = hold.is_none() && h.vehicle.is_none() && h.has_input(Input::Grab);
         let pulling = reaching && h.has_input(Input::RightMouse);
 
-        if reaching {
-            angle = (90.0_f64.to_radians() - (h.view_pitch + h.free_look_pitch) as f64) as f32;
-
-            scale = if pulling { 0.4 } else { 0.95 };
-        }
-
         let a = angle as f64;
 
         let (y, z) = if h.vehicle.is_some() {
@@ -292,7 +286,12 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
                 let ([r0, r1, r2], d) = (h.bones[2].rot, grab.spot - h.bones[2].pos);
                 Vec3::new(r0.dot(d), r1.dot(d), r2.dot(d)) - BONES[first].joint
             }
-            (None, None) if reaching => Vec3::new(if k == 0 { 0.09 } else { -0.09 }, y, z),
+            (None, None) if reaching => {
+                let push = if h.view_pitch > 0.0 { (h.view_pitch * 31.25).floor() * 0.0032 } else { 0.0 };
+                let reach = -0.56 - push;
+
+                Vec3::new(if k == 0 { 0.09 } else { -0.09 }, -0.01, if pulling { reach * 0.5 } else { reach })
+            }
             (None, None) => Vec3::new(if k == 0 { -0.0625 } else { 0.0625 }, y, z),
         };
 
