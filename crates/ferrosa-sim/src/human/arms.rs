@@ -287,8 +287,8 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
                 Vec3::new(r0.dot(d), r1.dot(d), r2.dot(d)) - BONES[first].joint
             }
             (None, None) if reaching => {
-                let push = if h.view_pitch > 0.0 { (h.view_pitch * 31.25).floor() * 0.0032 } else { 0.0 };
-                let reach = -0.56 - push;
+                let push = if h.view_pitch > 0.0 { h.view_pitch * 0.125 } else { 0.0 };
+                let reach = -0.55 - push;
 
                 Vec3::new(if k == 0 { 0.09 } else { -0.09 }, -0.01, if pulling { reach * 0.5 } else { reach })
             }
