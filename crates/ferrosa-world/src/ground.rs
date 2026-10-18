@@ -249,7 +249,7 @@ impl Ground {
 
                         for s in nb.sources() {
                             let (dist, dir) = toward(s.x - lx, s.z - lz);
-                            let nw = 1.0 - dist * 0.0625;
+                            let nw = 1.0 - dist / 16.0;
 
                             if nw > 0.0 {
                                 rec[i].offer(Src { x: s.x, z: s.z, w: nw }, dir, lx, lz);
@@ -436,7 +436,7 @@ pub fn generate_grass(do_hack: bool) -> Vec<f32> {
                 (9.0, 2.25, 9.0)
             };
 
-            let n1 = value_noise_2d(u32::MAX, x as f32 * 0.03125, z as f32 * 0.03125);
+            let n1 = value_noise_2d(u32::MAX, x as f32 / 32.0, z as f32 / 32.0);
             let n2 = value_noise_2d(u32::MAX, x as f32 * (1.0 / 64.0), z as f32 * (1.0 / 64.0));
             let n3 = value_noise_2d(u32::MAX, x as f32 * (1.0 / 128.0), z as f32 * (1.0 / 128.0));
 

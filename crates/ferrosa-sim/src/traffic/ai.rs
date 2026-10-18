@@ -21,7 +21,7 @@ const STREET_STEER: f64 = 45.0_f64.to_radians();
 const STREET_STEER_MAX: f32 = 45.0_f32.to_radians();
 const TURN_STEER: f64 = 56.25_f64.to_radians();
 const TURN_STEER_MAX: f32 = 56.25_f32.to_radians();
-const STEER_RATE: f32 = 0.0625;
+const STEER_RATE: f32 = 1.0 / 16.0;
 const TURN_STEER_RATE: f32 = 0.25;
 const CRUISE: f32 = 4.0 / 15.0;
 const SLOW: f32 = 2.0 / 15.0;
@@ -557,7 +557,7 @@ fn cross_intersection(traffic: &mut Traffic, map: &StreetMap, id: usize) {
         base = CRUISE as f64;
 
         if aggressive {
-            base = 0.4000000059604645;
+            base = 0.4_f32 as f64;
 
             if traffic.coop {
                 base = coop_speed(traffic, 4) as f64;

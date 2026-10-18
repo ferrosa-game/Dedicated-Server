@@ -37,9 +37,9 @@ const MAX_RPM: i32 = 8191;
 const TINY: f32 = 1.0 / 65536.0;
 const QUARTER_TURN: f64 = 90.0_f64.to_radians();
 const FULL_TURN: f64 = 360.0_f64.to_radians();
-const GEAR_RATIOS: [(i32, f32); 5] = [(1, 10.849999), (2, 7.7000003), (3, 5.25), (4, 3.5), (-1, -10.5)];
+const GEAR_RATIOS: [(i32, f32); 5] = [(1, 10.85), (2, 7.7), (3, 5.25), (4, 3.5), (-1, -10.5)];
 const WHEEL_FRICTION: f32 = 1.2;
-const WHEEL_DEPTH_SCALE: f32 = 0.03125;
+const WHEEL_DEPTH_SCALE: f32 = 1.0 / 32.0;
 const WHEEL_SOFTNESS: f32 = 0.125;
 const CHASSIS_FRICTION: f32 = 0.6;
 const MAX_CHASSIS_DEPTH: f32 = 0.125;
@@ -209,7 +209,7 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
     let threshold = v.rev_limit;
 
     let uncontrolled = |v: &mut Vehicle| {
-        v.engine_speed *= 0.9375;
+        v.engine_speed *= 15.0 / 16.0;
         v.brake = 1.0;
         v.gear = 0;
     };
@@ -472,7 +472,7 @@ fn sweep_chassis(map: &mut Map, bodies: &mut RigidBodies, v: &Vehicle, t: &Vehic
             }
         }
 
-        let (depth_scale, softness) = if broke { (1.0 / 512.0, 1.0 / 256.0) } else { (1.0 / 64.0, 0.03125) };
+        let (depth_scale, softness) = if broke { (1.0 / 512.0, 1.0 / 256.0) } else { (1.0 / 64.0, 1.0 / 32.0) };
 
         if depth > MAX_CHASSIS_DEPTH {
             depth = MAX_CHASSIS_DEPTH;
@@ -491,7 +491,7 @@ fn sweep_chassis(map: &mut Map, bodies: &mut RigidBodies, v: &Vehicle, t: &Vehic
 const BOGIE_CORNERS: [(f32, f32); 4] = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
 const BOGIE_GAUGE: f32 = 1.435;
 const BOGIE_DROP: f32 = -0.5;
-const BOGIE_TURN: f32 = 0.0625;
+const BOGIE_TURN: f32 = 1.0 / 16.0;
 const RAIL_DEPTH_SCALE: f32 = 0.125;
 const RAIL_SOFTNESS: f32 = 0.125;
 
@@ -567,7 +567,7 @@ const STATION_WAIT: i32 = 899;
 const SPEED_GAIN: f32 = 8.0;
 const PULL_LIMIT: f32 = -0.875;
 const BRAKE_LIMIT: f32 = 0.75;
-const FULL_PULL: f32 = 0.00097222225;
+const FULL_PULL: f32 = 3.5 / 60.0 / 60.0;
 const FULL_BRAKE: f32 = -1.0 / 1200.0;
 const SPEEDO_SCALE: f32 = 120.0;
 /// The train door is its window 3: open (broken) while the train stands, so the capsule test lets humans through.
@@ -680,9 +680,8 @@ const ROTOR_YAW: f32 = 1.0 / 225.0;
 /// The rotor disc is pushed at 16 points around it, a sixteenth of a turn apart, 1 from its hub.
 const BLADE_POINTS: usize = 16;
 const BLADE_STEP: f64 = std::f64::consts::FRAC_PI_8;
-const BLADE_REACH: f64 = 1.5339233875274658;
 /// The fixed bite the blades' pitch starts from.
-const BLADE_BITE: f64 = 0.14726215563703127;
+const BLADE_BITE: f64 = 3.0 * std::f64::consts::PI / 64.0;
 
 /// The point (`x`, 0, `z`) of a body's frame, from its centre.
 fn in_frame(rot: &RotMatrix, x: f32, z: f32) -> Vec3 {
@@ -776,14 +775,14 @@ fn update_helicopter(v: &mut Vehicle, bodies: &mut RigidBodies, driven: bool) {
         angle = (BLADE_STEP + angle as f64) as f32;
 
         let r = in_frame(&blade.rot, -c as f32, -s as f32);
-        let radial = (in_frame(&blade.rot, (-BLADE_REACH * c) as f32, (-BLADE_REACH * s) as f32)).normalize_or_zero();
+        let radial = in_frame(&blade.rot, -c as f32, -s as f32).normalize_or_zero();
         let point_vel = r.cross(w) + blade_vel;
         let pitch = ((((v.gear_y * 0.125) * 0.125) * 0.5) as f64 * BLADE_PI) * c + collective - ((v.gear_x * 0.125) * 0.125) as f64 * BLADE_PI * s;
         let lift = ((-(pitch as f32 as f64).sin() * 240.0) / 60.0) as f32;
         let air = up * lift + point_vel;
         let m = air.length();
-        let push = air.normalize_or_zero().dot(up) - (radial.dot(blade_vel) * 0.0625) * 0.5;
-        apply_impulse_at(b, r, up * (((0.03125 * -(((m * m) * 0.125 * 4.0) * 0.5)) * push) * 0.3125));
+        let push = air.normalize_or_zero().dot(up) - (radial.dot(blade_vel) / 16.0) * 0.5;
+        apply_impulse_at(b, r, up * (((1.0 / 32.0 * -(((m * m) * 0.125 * 4.0) * 0.5)) * push) * 5.0 / 16.0));
 
         let sp = point_vel.length();
         let along = point_vel.normalize_or_zero();
@@ -993,7 +992,7 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
         };
 
         let torque = torque * v.throttle;
-        let drive = (v.engine_power / 3600.0) * torque / (v.drive_divisor * v.engine_inertia) * 0.03125 + 0.0;
+        let drive = (v.engine_power / 3600.0) * torque / (v.drive_divisor * v.engine_inertia) / 32.0 + 0.0;
         let q = es * 0.125 * 0.125 * 0.375;
         let loss = (q as f64 * q.abs() as f64) * (1.125 - v.throttle) as f64;
         v.wheel_feedback = 64.0;
@@ -1037,14 +1036,14 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
                 let steered = |k: usize| if k < 2 { rotate_vector_about_axis(r0, r1, v.wheels[k].steer) } else { r0 };
                 let axle = steered(d);
                 let Some(wb) = bodies.get_mut(wheel.body) else { continue };
-                let imp = (diff * 0.125) * 0.125 * 0.0625 * wb.inertia.x;
+                let imp = (diff * 0.125) * 0.125 / 16.0 * wb.inertia.x;
                 let i = wb.ang_impulse;
                 wb.ang_impulse = axle * imp + i;
 
                 let inv = 1.0 / (wheel.mass + v.gearbox_inertia);
-                let dg = (v.gearbox_speed * 0.125 - avg * 0.4375) * 0.25;
+                let dg = (v.gearbox_speed * 0.125 - avg * 7.0 / 16.0) * 0.25;
                 accum -= ((wheel.mass * inv) * dg) * 0.125 * v.wheel_feedback;
-                let imp2 = (dg * (v.gearbox_inertia * inv)) * 0.4375;
+                let imp2 = (dg * (v.gearbox_inertia * inv)) * 7.0 / 16.0;
                 let axle = steered(d);
                 let i = wb.ang_impulse;
 

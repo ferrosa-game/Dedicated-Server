@@ -30,7 +30,7 @@ const CASH_WORLD: u32 = ItemKind::CashWorld as u32;
 const RADIO: u32 = ItemKind::Radio as u32;
 const COMPUTER: u32 = ItemKind::Computer as u32;
 /// Packed positions are in 4096ths of a unit, x and z offset by 4096.
-const POSITION_SCALE: f32 = 0.000_244_140_63;
+const POSITION_SCALE: f32 = 1.0 / 4096.0;
 const POSITION_OFFSET: f32 = 4096.0;
 
 /// An object slot (data_1860cff4): whether it is filled, by a human (0) or item (1), and which.

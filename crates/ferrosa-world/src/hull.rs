@@ -104,7 +104,7 @@ impl ConvexHull {
             let y = match ring {
                 0 => neg_height * 0.5,
                 1 if melon => neg_height * 0.375,
-                1 => height * 0.3125,
+                1 => height * 5.0 / 16.0,
                 2 => height * 0.375,
                 _ => 0.5 * height,
             };

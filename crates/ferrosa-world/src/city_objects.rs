@@ -44,11 +44,11 @@ pub static CITY_OBJECT_TYPES: LazyLock<Vec<CityObjectType>> = LazyLock::new(|| {
     t[6].radius = 3.5;
     t[1].add_box(Vec3::ZERO, Vec3::new(0.375, 6.0, 0.375));
     t[1].add_box(Vec3::new(0.0, 3.0, -5.0), Vec3::new(0.25, 0.25, 10.0));
-    t[1].add_box(Vec3::new(0.0, 3.0, -6.0), Vec3::new(0.3125, 1.0, 0.5));
-    t[1].add_box(Vec3::new(0.0, 3.0, -10.0), Vec3::new(0.3125, 1.0, 0.5));
+    t[1].add_box(Vec3::new(0.0, 3.0, -6.0), Vec3::new(5.0 / 16.0, 1.0, 0.5));
+    t[1].add_box(Vec3::new(0.0, 3.0, -10.0), Vec3::new(5.0 / 16.0, 1.0, 0.5));
     t[1].offset = Vec3::new(0.0, 3.25, -1.0);
     t[1].radius = 3.0;
-    t[4].add_box(Vec3::new(0.0, 2.625, -8.0), Vec3::new(0.0625, 0.5, 2.0));
+    t[4].add_box(Vec3::new(0.0, 2.625, -8.0), Vec3::new(1.0 / 16.0, 0.5, 2.0));
     t
 });
 

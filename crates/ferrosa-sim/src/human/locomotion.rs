@@ -277,8 +277,8 @@ pub fn probe_ground(h: &mut Human, surface: &Surface) {
         1.0 - spread
     };
     let l = &mut h.locomotion;
-    l.terrain_speed_scale += clamp_step(scale - l.terrain_speed_scale, 0.03125);
-    l.terrain_height_delta += clamp_step(rise - l.terrain_height_delta, 0.03125);
+    l.terrain_speed_scale += clamp_step(scale - l.terrain_speed_scale, 1.0 / 32.0);
+    l.terrain_height_delta += clamp_step(rise - l.terrain_height_delta, 1.0 / 32.0);
 }
 
 /// human_update_movement_target: steers the movement target (where the body wants to be) from the inputs and the current motion.
@@ -286,7 +286,7 @@ pub fn update_movement_target(h: &mut Human, surface: &Surface, ticks: u32) {
     let target_stance = if h.has_input(Input::Crouch) { 0.625 } else { 1.0 };
     let jump_charge = h.locomotion.jump_charge;
 
-    let step = if jump_charge > 0 { 0.125 } else { 0.03125 };
+    let step = if jump_charge > 0 { 0.125 } else { 1.0 / 32.0 };
     let s = h.stance;
     h.stance = if target_stance - step > s {
         s + step
@@ -321,7 +321,7 @@ pub fn update_movement_target(h: &mut Human, surface: &Surface, ticks: u32) {
     let speed_now = l.move_target_vel.length();
     let tc = l.torso_center;
     let (dx, dz) = (l.move_target_pos.x - tc.x, l.move_target_pos.z - tc.z);
-    let limit = ((0.125 * speed_now) * 0.25) * 60.0 + 0.0625;
+    let limit = ((0.125 * speed_now) * 0.25) * 60.0 + 1.0 / 16.0;
     let dist = ((dx * dx + 0.0) + dz * dz).sqrt();
     if dist > limit {
         let (ux, uz) = if dist == 0.0 {
@@ -398,26 +398,26 @@ pub fn update_movement_target(h: &mut Human, surface: &Surface, ticks: u32) {
     let rv = l.rel_vel;
     let a = v.dot(head[0]);
     let b = head[0].dot(rv);
-    let t = clamp_step(((a - b) - h.lean_forward) * 0.0625, 1.0 / 128.0);
+    let t = clamp_step(((a - b) - h.lean_forward) / 16.0, 1.0 / 128.0);
     h.lean_forward += t;
     let a2 = v.dot(head[2]);
     let b2 = head[2].dot(rv);
     let dd = a2 - b2;
     let q = if dd > 0.0 { (-(dd.abs() as f64) * 0.125) as f32 } else { -dd.abs() };
-    let t = clamp_step((q - h.lean_side) * 0.0625, 1.0 / 128.0);
+    let t = clamp_step((q - h.lean_side) / 16.0, 1.0 / 128.0);
     h.lean_side += t;
 
     let m = l.move_target_vel.length();
     let s2 = 60.0 * m;
     let s2 = s2 + s2;
     let f = if s2 > 1.0 { 0.0 } else { 1.0 - s2 };
-    l.speed_blend += clamp_step(f - l.speed_blend, 0.03125);
-    let k = 0.96875 - l.speed_blend * 0.5;
+    l.speed_blend += clamp_step(f - l.speed_blend, 1.0 / 32.0);
+    let k = 31.0 / 32.0 - l.speed_blend * 0.5;
     let mtv = l.move_target_vel;
     l.move_target_vel = mtv * k;
     let mtv = l.move_target_vel;
     let (mut rx, mut rz) = (v.x - mtv.x, v.z - mtv.z);
-    let max = if h.movement_state == 5 { 0.0 } else { 0.0044444446 };
+    let max = if h.movement_state == 5 { 0.0 } else { 1.0 / 225.0 };
     let rl = ((rx * rx + 0.0) + rz * rz).sqrt();
     let mut ry = 0.0f32;
     if rl > max {
@@ -448,7 +448,7 @@ fn plant_foot(h: &mut Human, k: usize, yaw: f32) {
     f.mode = FOOT_PLANTED;
     f.cooldown = 5;
     f.plant = pos;
-    f.plant.y = 0.03125;
+    f.plant.y = 1.0 / 32.0;
     f.plant_yaw = yaw;
 }
 
@@ -484,9 +484,9 @@ pub fn update_foot_plant_states(h: &mut Human, surface: &Surface, hips: &[Vec3; 
         for (k, d) in dist.iter_mut().enumerate() {
             let px = mtv.x * 16.0 + (rv.x * 8.0 + tc.x);
             let pz = (rv.z * 8.0 + tc.z) + mtv.z * 16.0;
-            let side = if k == 0 { -0.09375 } else { 0.09375 };
-            let qx = r2.x * -0.03125 + (r0.x * side + px);
-            let qz = (r0.z * side + pz) + r2.z * -0.03125;
+            let side = if k == 0 { -3.0 / 32.0 } else { 3.0 / 32.0 };
+            let qx = r2.x * -1.0 / 32.0 + (r0.x * side + px);
+            let qz = (r0.z * side + pz) + r2.z * -1.0 / 32.0;
             let f = h.bones[FOOT_BONES[k]].pos;
             *d = horizontal_len(f.x - qx, f.z - qz);
         }
@@ -513,12 +513,12 @@ pub fn update_foot_plant_states(h: &mut Human, surface: &Surface, hips: &[Vec3; 
         }
         let (dx, dz) = (pos.x - f.plant.x, pos.z - f.plant.z);
         let len = horizontal_len(dx, dz);
-        if len > 0.03125 {
+        if len > 1.0 / 32.0 {
             let step = if len == 0.0 {
                 Vec3::ZERO
             } else {
                 let inv = 1.0 / len;
-                Vec3::new(dx * inv * 0.03125, 0.0 * inv * 0.03125, dz * inv * 0.03125)
+                Vec3::new(dx * inv / 32.0, 0.0 * inv / 32.0, dz * inv / 32.0)
             };
             f.plant = step + f.plant;
         }
@@ -652,7 +652,7 @@ pub fn compute_planted_foot_corrections(h: &mut Human, k: usize, weight: f32, hi
         (-0.0, -0.0)
     } else {
         let inv = 1.0 / la;
-        let c = -0.32666668f32;
+        let c = -0.98f32 / 3.0;
         ((a.x * inv) * c, (inv * a.z) * c)
     };
     let d = rv - mtv;
@@ -666,7 +666,7 @@ pub fn compute_planted_foot_corrections(h: &mut Human, k: usize, weight: f32, hi
     }
     let (ex, mut ey, ez) = (e.x * gain, e.y * gain, e.z * gain);
 
-    let (mut ang_max, mut rot_max) = (0.09375f32, 0.25f32);
+    let (mut ang_max, mut rot_max) = (3.0 / 32.0, 0.25f32);
     if h.pain > 0 {
         let d = h.pain as f32 / 30.0;
         if d > 1.0 {
@@ -733,16 +733,16 @@ pub fn update_swing_foot_target(h: &mut Human, surface: &Surface, k: usize, hip:
     let l = &h.locomotion;
     let mut px = tc.x + head[0].x * c;
     let mut pz = head[0].z * c + tc.z;
-    px += head[2].x * -0.03125;
-    pz += -0.03125 * head[2].z;
+    px += head[2].x * -1.0 / 32.0;
+    pz += -1.0 / 32.0 * head[2].z;
     let (a, b) = (mtv.x * 7.5, mtv.z * 7.5);
     let la = horizontal_len(a, b);
-    let (ax, ay, az) = if la > 0.1875 {
+    let (ax, ay, az) = if la > 3.0 / 16.0 {
         if la == 0.0 {
             (0.0, 0.0, 0.0)
         } else {
             let inv = 1.0 / la;
-            (a * inv * 0.1875, 0.0 * inv * 0.1875, b * inv * 0.1875)
+            (a * inv * 3.0 / 16.0, 0.0 * inv * 3.0 / 16.0, b * inv * 3.0 / 16.0)
         }
     } else {
         (a, 0.0, b)
@@ -765,7 +765,7 @@ pub fn update_swing_foot_target(h: &mut Human, surface: &Surface, k: usize, hip:
     y += ey;
     let px2 = px + ex;
     let pz2 = pz + ez;
-    let t = ((1.0 - l.feet[k].swing_phase) * 60.0) * 0.1875;
+    let t = ((1.0 - l.feet[k].swing_phase) * 60.0) * 3.0 / 16.0;
     let start = Vec3::new(mtv.x * t + px2, y + mtv.y * t, t * mtv.z + pz2);
     let end = start + UP * -1.75;
     let bone = FOOT_BONES[k];
@@ -837,7 +837,7 @@ fn joint_point(bone: &super::Bone, row: usize, k: f32) -> Vec3 {
 pub fn update_foot_ground_constraint(h: &mut Human, bodies: &mut RigidBodies, surface: &Surface, k: usize) {
     let bone = FOOT_BONES[k];
     let s = (h.locomotion.feet[k].plant_pitch as f64).sin();
-    let reach = (-s * 0.1875) as f32 + 0.03125;
+    let reach = (-s * 3.0 / 16.0) as f32 + 1.0 / 32.0;
     let nd = -reach;
     let p = h.bones[bone].pos;
     let start = UP * 0.375 + p;
@@ -849,7 +849,7 @@ pub fn update_foot_ground_constraint(h: &mut Human, bodies: &mut RigidBodies, su
     h.locomotion.feet[k].ground_height = hit.y;
     let e = hit - end;
     let depth = e.dot(UP);
-    let depth = if depth < 0.0625 { depth } else { 0.0625 };
+    let depth = if depth < 1.0 / 16.0 { depth } else { 1.0 / 16.0 };
 
     let mode = h.locomotion.feet[k].mode;
     let state = h.movement_state;
@@ -867,7 +867,7 @@ pub fn update_foot_ground_constraint(h: &mut Human, bodies: &mut RigidBodies, su
             let m = h.bones[bone].min_inertia;
             m + m
         },
-        lift: 0.1875,
+        lift: 3.0 / 16.0,
     };
     if state == 2 {
         c.spin_gain = 0.0;
@@ -1059,7 +1059,7 @@ pub fn update_locomotion_constraints(h: &mut Human, bodies: &mut RigidBodies, su
         let k = if up > 1.0 {
             0.25
         } else if 0.125 > up {
-            0.03125
+            1.0 / 32.0
         } else {
             0.25 * up
         };
@@ -1090,7 +1090,7 @@ pub fn update_locomotion_constraints(h: &mut Human, bodies: &mut RigidBodies, su
                 c.spin_gain = 0.0;
                 let q = 1.0 - stride;
                 let q = q * q;
-                let v = 0.5 - 0.4375 * (1.0 - q * q);
+                let v = 0.5 - 7.0 / 16.0 * (1.0 - q * q);
                 c.stiffness = v;
                 c.damping = v;
             }
@@ -1116,18 +1116,18 @@ pub fn update_locomotion_constraints(h: &mut Human, bodies: &mut RigidBodies, su
             let fhp = foot_heading(f.plant_yaw, f.plant_pitch);
             let fb = &h.bones[bone];
             let r2 = fb.rot[2];
-            let c = -0.09375f32;
+            let c = -3.0 / 32.0;
             let a = r2 * c + fb.pos;
             let start = 0.25 * UP + fb.pos;
             let end = UP * -0.5 + start;
             let mut y = a.y;
             if let Some(hit) = trace(surface, start, end) {
-                y = hit.y + 0.03125;
+                y = hit.y + 1.0 / 32.0;
             }
             if fb.ground_contact != 0 {
-                y = f.ground_height + 0.03125;
+                y = f.ground_height + 1.0 / 32.0;
             }
-            let c2 = 0.09375 - BONES[bone].offset.z;
+            let c2 = 3.0 / 32.0 - BONES[bone].offset.z;
             Vec3::new(fhp[2].x * c2 + a.x, fhp[2].y * c2 + y, c2 * fhp[2].z + a.z)
         } else {
             ang[k] = Vec3::ZERO;
@@ -1167,12 +1167,12 @@ pub fn update_locomotion_constraints(h: &mut Human, bodies: &mut RigidBodies, su
         let (mut spin_limit, flags) = if mode != FOOT_FREE {
             ([0.0; 3], if 1.0 > hp { 0x12 } else { 2 })
         } else {
-            let l = if 0.875 > h.bones[0].rot[1].y { 1.0 / 128.0 } else { 0.0625 };
+            let l = if 0.875 > h.bones[0].rot[1].y { 1.0 / 128.0 } else { 1.0 / 16.0 };
             ([l; 3], if 1.0 > hp { 0x13 } else { 3 })
         };
         if h.pain > 0 {
             let d = h.pain as f32 / 30.0;
-            let v = if d > 1.0 { 0.03125 } else { 0.125 - (d * 0.125) * 0.75 };
+            let v = if d > 1.0 { 1.0 / 32.0 } else { 0.125 - (d * 0.125) * 0.75 };
             spin_limit = [v; 3];
         }
         let params = IkParams { length: 1.0, twist: 0.0, max_turn: 45.0_f32.to_radians(), clamp_max, spin_limit, flags };
@@ -1207,11 +1207,11 @@ pub fn update_stance_height(h: &mut Human, surface: &Surface) {
     }
 
     let tilt = (((0.5 * h.view_pitch) as f64).cos() * h.locomotion.torso_rot[1].y as f64) as f32;
-    let lean = if 0.125 > tilt { 0.5625 } else { tilt * 0.5 + 0.5 };
+    let lean = if 0.125 > tilt { 9.0 / 16.0 } else { tilt * 0.5 + 0.5 };
     let s = h.stance;
-    let mut a = 0.9375 * s;
+    let mut a = 15.0 / 16.0 * s;
     let mut b = if h.movement_mode != 0 { a + 0.25 } else { ((s * 0.5) + 0.5) * 0.875 + 0.25 };
-    a += 0.3125;
+    a += 5.0 / 16.0;
     b *= lean;
     let hd = h.locomotion.terrain_height_delta;
     if 0.0 > hd {
@@ -1381,7 +1381,7 @@ pub fn step_locomotion_ik(h: &mut Human, bodies: &mut RigidBodies, surface: &Sur
         if phase >= 1.0 {
             clamp = 0.0;
         }
-        let params = IkParams { length: 1.0, twist: 0.0, max_turn: 45.0_f32.to_radians(), clamp_max: clamp, spin_limit: [0.0625; 3], flags };
+        let params = IkParams { length: 1.0, twist: 0.0, max_turn: 45.0_f32.to_radians(), clamp_max: clamp, spin_limit: [1.0 / 16.0; 3], flags };
         three_bone_ik(h, bodies, 0, 10 + 3 * k, target, &frame, torque[k], &params, &mut end_rot);
     }
 
@@ -1394,9 +1394,9 @@ pub fn step_locomotion_ik(h: &mut Human, bodies: &mut RigidBodies, surface: &Sur
     l.spin_pitch = sa.clamp(-0.5, 0.5);
     let sb = l.spin_yaw;
     let (kb, sb) = if -0.75 > sb {
-        (-0.09375, -0.75)
+        (-3.0 / 32.0, -0.75)
     } else if sb > 0.75 {
-        (0.09375, 0.75)
+        (3.0 / 32.0, 0.75)
     } else {
         (0.125 * sb, sb)
     };
@@ -1489,7 +1489,7 @@ pub fn slide_simulation(h: &mut Human, bodies: &mut RigidBodies) {
         let target = t - hipv;
         let mut end_rot = [0.0, 0.0, 0.0, 1.0];
         let params =
-            IkParams { length: 1.0, twist: 0.0, max_turn: 45.0_f32.to_radians(), clamp_max: 1.0546875_f32.to_radians(), spin_limit: [0.0625; 3], flags: 0x18 };
+            IkParams { length: 1.0, twist: 0.0, max_turn: 45.0_f32.to_radians(), clamp_max: 1.0546875_f32.to_radians(), spin_limit: [1.0 / 16.0; 3], flags: 0x18 };
         let frame = h.bones[0].rot;
         three_bone_ik(h, bodies, 0, first, target, &frame, Vec3::ZERO, &params, &mut end_rot);
         for (parent, child) in [(0, first), (first, first + 1)] {

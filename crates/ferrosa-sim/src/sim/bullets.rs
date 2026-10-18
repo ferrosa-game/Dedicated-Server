@@ -25,7 +25,7 @@ use crate::{
 
 pub const MAX_BULLETS: usize = 16384;
 const LIFETIME: i32 = 600;
-const BULLET_GRAVITY: f32 = 0.0027222224;
+const BULLET_GRAVITY: f32 = 9.8 / 60.0 / 60.0;
 const HIT_WORLD: i32 = 0;
 const HIT_BODY: i32 = 1;
 const HIT_VEHICLE: i32 = 2;
@@ -38,7 +38,7 @@ const LIGHT_BONE_MASS: f32 = 3.0;
 const IMPULSE: f32 = 3.0;
 
 /// bullet_data: each bullet type's mass (damage and recoil) and drag.
-pub const BULLET_DATA: [(f32, f32); 4] = [(0.01, 0.004560367), (0.0062, 0.0039160457), (0.008, 0.007952156), (0.016, 0.005832072)];
+pub const BULLET_DATA: [(f32, f32); 4] = [(0.01, 0.00456), (0.0062, 0.003916), (0.008, 0.007952), (0.016, 0.005832)];
 
 /// A bullet in flight.
 #[derive(Clone, Debug)]

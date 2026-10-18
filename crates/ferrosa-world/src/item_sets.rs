@@ -85,7 +85,7 @@ fn melon_set() -> ItemSet {
         let axis = rot[1];
         rotate_orientation(&mut rot, axis, WATERMELON_TILT);
 
-        SetEntry { kind: ItemKind::Watermelon as i32, pos: Vec3::new(0.5 - i as f32 * 0.25 * 1.5 - 0.1875, 1.4375, 0.0), rot }
+        SetEntry { kind: ItemKind::Watermelon as i32, pos: Vec3::new(0.5 - i as f32 * 0.25 * 1.5 - 3.0 / 16.0, 1.4375, 0.0), rot }
     }));
 
     ItemSet { entries }

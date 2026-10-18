@@ -126,7 +126,7 @@ pub(crate) fn simulate_human(
         f.prev_plant_pitch = f.plant_pitch;
         f.plant_pitch = 0.0;
         let (p, q) = (h.bones[0].pos, h.bones[foot].pos);
-        let s = ((r2.x * (p.x - q.x) + r2.y * (p.y - q.y)) + (p.z - q.z) * r2.z) + 0.1875;
+        let s = ((r2.x * (p.x - q.x) + r2.y * (p.y - q.y)) + (p.z - q.z) * r2.z) + 3.0 / 16.0;
         let mut pitch = 0.0;
 
         if 0.0 > s {

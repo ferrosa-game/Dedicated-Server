@@ -235,18 +235,18 @@ impl BlockMeshes {
 
         self.b.reset();
         self.b.box_geometry(0, 34, &ones, z, Vec3::new(1.0, height, 1.0));
-        self.b.box_geometry(0, 42, &ones, z, Vec3::new(1.0, 0.3125, Q));
+        self.b.box_geometry(0, 42, &ones, z, Vec3::new(1.0, 5.0 / 16.0, Q));
         self.store_turns(WINDOW_FRAME, one);
 
         self.b.reset();
         self.b.box_geometry(0, 50, &ones, z, Vec3::new(1.0, height, 1.0));
-        self.b.box_geometry(0, 50, &ones, z, Vec3::new(Q, 0.3125, Q));
+        self.b.box_geometry(0, 50, &ones, z, Vec3::new(Q, 5.0 / 16.0, Q));
         self.store_turns(DOOR_FRAME, one);
 
         self.b.reset();
         self.b.box_geometry(0, 42, &ones, z, Vec3::new(1.0, Q, 1.0));
-        self.b.box_geometry(0, 63, &[0; 6], Vec3::new(0.5, 0.0, 0.5), Vec3::new(Q, 0.3125, Q));
-        self.b.box_geometry(0, 63, &[0; 6], Vec3::new(0.0, 0.25, 0.4375), Vec3::new(1.0, 0.1875, 0.125));
+        self.b.box_geometry(0, 63, &[0; 6], Vec3::new(0.5, 0.0, 0.5), Vec3::new(Q, 5.0 / 16.0, Q));
+        self.b.box_geometry(0, 63, &[0; 6], Vec3::new(0.0, 0.25, 7.0 / 16.0), Vec3::new(1.0, 3.0 / 16.0, 0.125));
         self.store_turns(LAMP, one);
     }
 
@@ -422,11 +422,11 @@ impl MeshBuilder {
                 0 => (0.0, Q),
                 1 => {
                     c = [6; 6];
-                    (-Q, 0.1875)
+                    (-Q, 3.0 / 16.0)
                 }
                 2 => {
                     c = [6; 6];
-                    (-Q, 0.3125)
+                    (-Q, 5.0 / 16.0)
                 }
                 _ => {
                     c = [7; 6];

@@ -81,8 +81,8 @@ pub fn three_bone_ik(
     let tl_x = f0.dot(target);
     let mut tl_y = f1.dot(target);
     let tl_z = target.dot(f2);
-    let yy = if p.flags & 4 == 0 && tl_y > -0.0625 {
-        tl_y = -0.0625;
+    let yy = if p.flags & 4 == 0 && tl_y > -1.0 / 16.0 {
+        tl_y = -1.0 / 16.0;
         1.0 / 256.0
     } else {
         tl_y * tl_y

@@ -273,7 +273,7 @@ impl MeshBuilder {
     }
 
     pub fn inset_face(&mut self, dir: i32, mask: u32) {
-        const E: f32 = 0.9375;
+        const E: f32 = 15.0 / 16.0;
 
         let flags = match dir {
             0 => {
@@ -486,7 +486,7 @@ pub fn dir_flag(n: Vec3) -> u32 {
     }
 }
 
-pub const Q: f32 = 0.0625;
+pub const Q: f32 = 1.0 / 16.0;
 
 pub const CUBE_CORNERS: [Vec3; 8] = [
     Vec3::new(0.0, 0.0, 0.0),

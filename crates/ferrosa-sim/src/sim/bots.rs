@@ -11,14 +11,14 @@ use crate::input::Input;
 use crate::{PlayerId, player::BotTarget, world::trace::line_intersect_level};
 
 /// How far the view may turn from the body, either way.
-const MAX_LOOK: f64 = 2.74889357189125;
+const MAX_LOOK: f64 = 7.0 * f64::consts::PI / 8.0;
 const LOOK_LIMIT: f32 = 157.5_f32.to_radians();
 /// A bot remembers up to 16 enemies within 128 of its chest, sure of them up to 16; every other tick it looks again
 /// and its memory fades (x 31/32) until it forgets below 0.875.
 const MAX_TARGETS: usize = 16;
 const SIGHT_RANGE: f32 = 128.0;
 const MAX_AWARENESS: f32 = 16.0;
-const FADE: f32 = 0.96875;
+const FADE: f32 = 31.0 / 32.0;
 const FORGET: f32 = 0.875;
 const TARGET_TIMER: i32 = 600;
 /// Each sighting pulls the remembered place an eighth of the way to where the enemy is going (4 ticks ahead), give or
@@ -40,7 +40,7 @@ const SHOT_LENGTH: f32 = -64.0;
 const SHOT_RADIUS: f32 = 0.25;
 /// Aim is good when within 0.125 of the target in yaw and pitch, and a seated bot's gun must point within 0.9975.
 const AIM_TOLERANCE: f32 = 0.125;
-const GUN_ALIGNMENT: f32 = -0.9975;
+const GUN_ALIGNMENT: f32 = -399.0 / 400.0;
 const EYE_DROP: f32 = 0.25;
 const TURN_RATE: f32 = 0.125;
 const HALF: f32 = 0.5;

@@ -18,19 +18,19 @@ use crate::{
 const ANTI_TUNNEL_BONES: usize = 4;
 const BONE_FRICTION: f32 = 0.8;
 const BONE_FRICTION_STATE_2: f32 = 0.1;
-const BONE_SOFTNESS: f32 = 0.0625;
+const BONE_SOFTNESS: f32 = 1.0 / 16.0;
 const HEAD_IMPACT: f32 = 4.0 / 15.0;
 const TORSO_IMPACT: f32 = 0.2;
 const SPIN_LIMIT: f32 = 1.0 / 4096.0;
 const LIMIT_STIFFNESS: f32 = 0.25;
 const LIMIT_DAMPING: f32 = 0.5;
 const ITEM_FRICTION: f32 = 0.4;
-const ITEM_DEPTH_SCALE: f32 = 0.0625;
+const ITEM_DEPTH_SCALE: f32 = 1.0 / 16.0;
 const ITEM_SOFTNESS: f32 = 0.125;
 const MAX_NEARBY_VEHICLES: usize = 8;
 const VEHICLE_FRICTION: f32 = 0.4;
-const VEHICLE_DEPTH_SCALE: f32 = 0.03125;
-const VEHICLE_SOFTNESS: f32 = 0.0625;
+const VEHICLE_DEPTH_SCALE: f32 = 1.0 / 32.0;
+const VEHICLE_SOFTNESS: f32 = 1.0 / 16.0;
 /// How fast a vehicle's point of contact must move into a bone to hurt (legs take a third of a unit a tick).
 const RUN_OVER: f32 = 0.2;
 const LEG_RUN_OVER: f32 = 1.0 / 3.0;
@@ -119,9 +119,9 @@ pub(super) fn bone_world_contacts(h: &mut Human, bodies: &mut RigidBodies, map: 
             continue;
         }
         let depth_scale = if j == BoneId::Head as usize {
-            0.0625
+            1.0 / 16.0
         } else if j <= BoneId::Torso as usize {
-            0.03125
+            1.0 / 32.0
         } else {
             1.0 / 64.0
         };
@@ -179,8 +179,8 @@ pub(super) fn bone_world_contacts(h: &mut Human, bodies: &mut RigidBodies, map: 
 }
 
 const TRACK_FRICTION: f32 = 0.4;
-const TRACK_DEPTH_SCALE: f32 = 0.03125;
-const TRACK_SOFTNESS: f32 = 0.0625;
+const TRACK_DEPTH_SCALE: f32 = 1.0 / 32.0;
+const TRACK_SOFTNESS: f32 = 1.0 / 16.0;
 
 /// The track part of human_generate_world_item_self_contacts: every bone capsule but the feet (and the shins of a
 /// human standing) against the track walls within the human's bounds, its deepest-axis triangle pushing it out.
@@ -399,7 +399,7 @@ impl OtherHuman {
 const NO_HUMAN_CONTACT: [usize; 4] = [11, 12, 14, 15];
 const HUMAN_FRICTION: f32 = 0.4;
 const HUMAN_DEPTH_SCALE: f32 = 1.0 / 32.0;
-const HUMAN_SOFTNESS: f32 = 0.0625;
+const HUMAN_SOFTNESS: f32 = 1.0 / 16.0;
 
 /// The human-against-human part of human_generate_world_item_self_contacts: every bone capsule (but the shins and
 /// feet) against those of each later, unseated human whose bounds overlap, pushing the other human's bone away.

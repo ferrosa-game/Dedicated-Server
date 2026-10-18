@@ -6,8 +6,8 @@ use crate::{
     body::{BodyContact, Contact, GroundContact},
 };
 
-const JOINT_STIFFNESS: f32 = 0.1875;
-const JOINT_MAX_ERROR: f32 = 0.0625;
+const JOINT_STIFFNESS: f32 = 3.0 / 16.0;
+const JOINT_MAX_ERROR: f32 = 1.0 / 16.0;
 const JOINT_MAX_IMPULSE: f32 = 1.0 / 30.0;
 const JOINT_DAMPING: f32 = 0.875;
 
@@ -65,7 +65,7 @@ impl ItemPoint {
     /// A hand holding on to another human's bone (human_update_hand_grab_and_inventory): a softer pull than an
     /// item's.
     pub fn grab(hand: usize, bone: usize, anchor: Vec3) -> Self {
-        Self { gains: Some((0.0625, 0.1875)), ..Self::new(hand, bone, Vec3::ZERO, anchor) }
+        Self { gains: Some((1.0 / 16.0, 3.0 / 16.0)), ..Self::new(hand, bone, Vec3::ZERO, anchor) }
     }
 
     /// vehicle_bond_something: a lasting point bond between two bodies of one vehicle.
@@ -82,7 +82,7 @@ impl ItemPoint {
         let c = -self.rest;
         let mut corr = n * c + d;
         let both_vehicles = matches!(a.kind, RigidBodyType::Vehicle) && matches!(b.kind, RigidBodyType::Vehicle);
-        let (k, stiffness) = if both_vehicles { (1.0 / 256.0, 0.125) } else { (0.1875, 0.1875) };
+        let (k, stiffness) = if both_vehicles { (1.0 / 256.0, 0.125) } else { (3.0 / 16.0, 3.0 / 16.0) };
 
         if !both_vehicles && matches!(b.kind, RigidBodyType::Item) {
             let len = corr.length();

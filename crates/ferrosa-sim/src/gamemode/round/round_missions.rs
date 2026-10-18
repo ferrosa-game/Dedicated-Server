@@ -23,7 +23,7 @@ const CASH_VALUE: i32 = 250;
 const ITEM_STEP: f32 = 0.5;
 const CASE_STEP: f32 = 0.75;
 /// An acquisition's reward rate per unit of value.
-const RATE_SCALE: f32 = 2.5e-5;
+const RATE_SCALE: f32 = 1.0 / 40000.0;
 /// At round end each member is paid their share and a flat 250.
 const ROUND_WAGE: i32 = 250;
 /// A share's price grows by the earnings over 50000 of itself; below 50 it is held at 50, at 500 or more (outside

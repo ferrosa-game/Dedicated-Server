@@ -33,10 +33,10 @@ pub const MAX_ITEMS: usize = 1024;
 
 /// A disk in a computer sits in the drive: 0.15625 down and 0.09375 back from the computer.
 /// A door hangs from two hinges 0.4375 across and 0.5 up and down from its middle.
-const DOOR_HINGE_ACROSS: f32 = -0.4375;
+const DOOR_HINGE_ACROSS: f32 = -7.0 / 16.0;
 const DOOR_HINGE_UP: f32 = 0.5;
-const DRIVE_DOWN: f32 = -0.15625;
-const DRIVE_BACK: f32 = 0.09375;
+const DRIVE_DOWN: f32 = -5.0 / 32.0;
+const DRIVE_BACK: f32 = 3.0 / 32.0;
 const SETTLE_SPEED: f32 = 1.0 / 240.0;
 const SETTLE_TICKS: i32 = 60;
 const CONTACT_FRICTION: f32 = 0.6;
@@ -52,7 +52,7 @@ const KICK_SKIPPED_BONES: [usize; 4] = [5, 6, 8, 9];
 const KICK_FRICTION: f32 = 0.4;
 const KICK_DEPTH_SCALE: f32 = 1.0 / 32.0;
 const KICK_SOFTNESS: f32 = 1.0 / 16.0;
-const BALL_SPIN_DAMPING: f32 = 0.9375;
+const BALL_SPIN_DAMPING: f32 = 15.0 / 16.0;
 const SPAWN_DISTANCE: f32 = 1.5;
 
 pub struct Item {
@@ -572,10 +572,10 @@ impl Sim {
     /// The child part of logic_item: a mounted item sits on its parent, cash fanned out across an open briefcase and
     /// anything else 0.0625 below the parent's middle.
     fn place_mounted_items(&mut self) {
-        const CASH_SPREAD: f32 = 0.1875;
+        const CASH_SPREAD: f32 = 3.0 / 16.0;
         const CASH_SCALE: f32 = 0.75;
         const CASH_START: f32 = 27.0 / 128.0;
-        const BELOW: f32 = -0.0625;
+        const BELOW: f32 = -1.0 / 16.0;
         for id in self.items.ids() {
             let item = self.items.get(id).unwrap();
             if item.parent_item == -1 {

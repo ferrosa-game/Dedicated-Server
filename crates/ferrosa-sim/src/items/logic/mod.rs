@@ -77,7 +77,7 @@ impl Sim {
         const FIRE_TICK: i32 = 2;
         const MAGNUM_FIRE_TICK: i32 = 6;
         const LEVER_BACK: f32 = -0.625;
-        const LEVER_UP: f32 = 0.03125;
+        const LEVER_UP: f32 = 1.0 / 32.0;
 
         let Some(item) = self.items.get(id) else { return };
         let (kind, holder, trigger, body_id) = (item.item_type, item.parent_human, item.has_input(ItemInput::Use), item.body);

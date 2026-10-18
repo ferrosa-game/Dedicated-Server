@@ -23,7 +23,7 @@ const ENGINE_POWER_SCALE: f32 = 213.0;
 const FULL_HEALTH: i32 = 100;
 /// A train's bogies: 80000 each, set 6 along and 1 (the front 1.25) below the chassis.
 const BOGIE_MASS: f32 = 80000.0;
-const BOGIE_INERTIA: Vec3 = Vec3::new(0.9375, 1.5, 0.9375);
+const BOGIE_INERTIA: Vec3 = Vec3::new(15.0 / 16.0, 1.5, 15.0 / 16.0);
 /// A helicopter's rotor: 160, 1.5 up the chassis' up axis, held by a point bond at (0, 1.5, 0) and an angular bond.
 const ROTOR_MASS: f32 = 160.0;
 const ROTOR_HEIGHT: f32 = 1.5;
@@ -208,7 +208,7 @@ pub fn spawn_vehicle(
                 ((r0.z * l.x + centre.z) + r1.z * l.y) + l.z * r2.z,
             );
             let r = w.radius;
-            let side = (r * r * 3.0 + 0.0625) * (1.0 / 12.0);
+            let side = (r * r * 3.0 + 1.0 / 16.0) * (1.0 / 12.0);
             let inertia = Vec3::new(r * r * 0.5, side, side);
             let wheel_body = bodies.create(RigidBodyType::Wheel, world_pos, rot, vel, inertia, w.mass)?;
 
@@ -305,8 +305,8 @@ pub fn spawn_vehicle(
         gearbox_inertia: 0.0,
         wheel_feedback: 0.0,
         engine_inertia: 12.0,
-        clutch_drag: 199.99998,
-        drive_divisor: 0.0050000004,
+        clutch_drag: 200.0,
+        drive_divisor: 0.005,
         gear: 0,
         prev_gear: 0,
         gear_ratio: 0.0,

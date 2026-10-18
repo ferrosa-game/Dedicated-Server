@@ -21,7 +21,7 @@ const BED_OUTER: f32 = -6.0;
 const BED_INNER: f32 = -5.0;
 const THIRD: f32 = 1.0 / 3.0;
 const PATCH_STEPS: usize = 17;
-const PATCH_STEP: f32 = 0.0625;
+const PATCH_STEP: f32 = 1.0 / 16.0;
 const PATCH_EDGE_HEIGHT: f32 = 23.0;
 
 /// The race track: 104 tube pieces from the start, each 56 or 400/7 long, turning and sloping at set pieces.
