@@ -1,5 +1,4 @@
 target/
-Cargo.lock
 map.ppm
 server.srk
 stats.txt
