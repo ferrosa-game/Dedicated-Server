@@ -293,21 +293,23 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-bin"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "dirs-next",
  "ferrosa-map",
  "ferrosa-net",
  "ferrosa-protocol",
  "ferrosa-sim",
+ "reqwest",
  "serde",
+ "serde_json",
  "tokio",
  "toml",
 ]
 
 [[package]]
 name = "ferrosa-map"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "binrw",
  "glam",
@@ -319,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-net"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ferrosa-protocol",
  "ferrosa-sim",
@@ -328,7 +330,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-physics"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "glam",
  "rayon",
@@ -336,7 +338,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-protocol"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bitflags",
  "glam",
@@ -346,7 +348,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-sim"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ferrosa-map",
  "ferrosa-physics",
@@ -360,7 +362,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-world"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ferrosa-map",
  "ferrosa-physics",
@@ -1154,6 +1156,8 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",

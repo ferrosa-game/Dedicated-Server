@@ -8,10 +8,13 @@ use tokio::{net::UdpSocket, sync::mpsc};
 use crate::config::ConfigMain;
 
 pub mod config;
+pub mod check_for_updates;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[Main] Ferrosa version v{}", env!("CARGO_PKG_VERSION"));
+
+    check_for_updates::print_update_status();
 
     let config = ConfigMain::read_from_file();
     let mode = ferrosa_sim::by_name(&config.gamemode).unwrap_or_else(|| {
