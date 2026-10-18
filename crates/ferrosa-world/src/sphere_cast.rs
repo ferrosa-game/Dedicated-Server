@@ -27,7 +27,7 @@ impl Best {
 
     fn take(&mut self, hit: Option<(Vec3, Vec3, f32)>) {
         if let Some((pos, normal, dist)) = hit
-            && !(self.dist <= dist)
+            && dist < self.dist
         {
             *self = Self { pos, normal, dist };
         }
@@ -71,7 +71,7 @@ pub fn sphere_intersect_segment(center: Vec3, p0: Vec3, p1: Vec3, radius: f32) -
 
     let t = v.dot(u);
 
-    if !(t > 0.0) || !(len > t) {
+    if t <= 0.0 || len <= t {
         return None;
     }
 
@@ -79,7 +79,7 @@ pub fn sphere_intersect_segment(center: Vec3, p0: Vec3, p1: Vec3, radius: f32) -
     let d = center - q;
     let dist = d.length();
 
-    if !(radius > dist) {
+    if radius <= dist {
         return None;
     }
 
@@ -95,7 +95,7 @@ pub fn sphere_intersect_segment(center: Vec3, p0: Vec3, p1: Vec3, radius: f32) -
 
 /// A face the centre is in front of: its two triangles, then its four edges.
 fn quad(best: &mut Best, center: Vec3, n: Vec3, [a, b, c, d]: [Vec3; 4], radius: f32) {
-    if !((center - a).dot(n) > 0.0) {
+    if (center - a).dot(n) <= 0.0 {
         return;
     }
 

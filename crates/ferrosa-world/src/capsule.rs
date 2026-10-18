@@ -44,7 +44,7 @@ pub fn segment_closest_points(p0: Vec3, p1: Vec3, q0: Vec3, q1: Vec3, radius: f3
         let s = (b * f - c * e) / denom;
         if 0.0 > s {
             (0.0, b * 0.0)
-        } else if !(s > 1.0) {
+        } else if s <= 1.0 {
             (s, s * b)
         } else {
             (1.0, b)
@@ -65,13 +65,13 @@ pub fn segment_closest_points(p0: Vec3, p1: Vec3, q0: Vec3, q1: Vec3, radius: f3
             d1 * s
         };
         (pd, qd)
-    } else if !(t > 1.0) {
+    } else if t <= 1.0 {
         (d1 * s, d2 * t)
     } else {
         let s = (b - c) / a;
         let pd = if 0.0 > s {
             d1 * 0.0
-        } else if !(s > 1.0) {
+        } else if s <= 1.0 {
             d1 * s
         } else {
             d1
@@ -103,7 +103,7 @@ pub fn capsule_intersect_triangle_facing(start: Vec3, end: Vec3, a: Vec3, b: Vec
         return None;
     }
 
-    if !(d0 > 0.0) || !(d1 > 0.0) {
+    if d0 <= 0.0 || d1 <= 0.0 {
         if let Some((_, p)) = segment_intersect_face(n, start, end, a, b, c) {
             return Some((p, n, 0.0));
         }
@@ -315,7 +315,7 @@ pub fn capsule_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, start: Vec3
                         let (pos, rot) = entry_pose(e, cell, f.size, turn);
                         let Some(hull) = area.item_sets.hull(e.kind) else { continue };
                         if let Some((p, n, d)) = hull.intersect_capsule(&hull.world_verts(pos, &rot), ls, le, radius)
-                            && !(best.dist <= d)
+                            && best.dist > d
                         {
                             best = Best { dist: d, pos: p, normal: n };
                             block = cell;
@@ -359,7 +359,7 @@ pub fn capsule_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, start: Vec3
             }
         }
     }
-    if !(NO_HIT > best.dist) {
+    if NO_HIT <= best.dist {
         return None;
     }
     if raw {

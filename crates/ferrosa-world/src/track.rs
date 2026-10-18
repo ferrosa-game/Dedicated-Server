@@ -525,7 +525,7 @@ const MAX_TRIANGLES: usize = 1024;
 pub const WALLS: u32 = 4;
 
 fn boxes_overlap(lo: Vec3, hi: Vec3, min: Vec3, max: Vec3) -> bool {
-    !(lo.x > max.x) && !(lo.y > max.y) && !(lo.z > max.z) && !(min.x > hi.x) && !(min.y > hi.y) && !(min.z > hi.z)
+    lo.x <= max.x && lo.y <= max.y && lo.z <= max.z && min.x <= hi.x && min.y <= hi.y && min.z <= hi.z
 }
 
 impl Track {
@@ -603,7 +603,7 @@ pub fn segment_intersect_triangles(tris: &[TrackTriangle], start: Vec3, end: Vec
         let n = calculate_face_normal(a, b, c);
 
         if let Some((t, p)) = crate::collide::segment_intersect_face(n, start, end, a, b, c)
-            && !(best.0 <= t)
+            && best.0 > t
         {
             best = (t, p, n);
         }

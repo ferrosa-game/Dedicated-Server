@@ -284,7 +284,7 @@ impl ConvexHull {
 
             for (p, q) in [(b, c), (c, d)] {
                 if let Some((t, hit)) = segment_intersect_face(n, start, end, a, p, q)
-                    && !(best.0 <= t)
+                    && t < best.0
                 {
                     best = (t, hit, n);
                 }
@@ -306,7 +306,7 @@ impl ConvexHull {
 
             for (p, q) in [(b, c), (c, d)] {
                 if let Some((t, hit)) = segment_intersect_face(n, start, end, a, p, q)
-                    && !(best.0 <= t)
+                    && t < best.0
                 {
                     best = (t, hit, n);
                 }

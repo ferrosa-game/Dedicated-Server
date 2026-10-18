@@ -54,7 +54,7 @@ fn search_step(map: &StreetMap, nodes: &mut [SearchNode], from: usize, to: usize
                 nodes[j] = SearchNode { state: OPEN, cost: if dead_end { cost + DEAD_END_COST } else { cost }, parent: sel };
             }
             _ => {
-                if !(nodes[j].cost > cost) {
+                if nodes[j].cost <= cost {
                     continue;
                 }
 

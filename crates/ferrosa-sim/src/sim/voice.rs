@@ -94,7 +94,7 @@ impl Sim {
 
                 let v = VoiceItem {
                     kind: i.item_type,
-                    pos: i.pos2,
+                    pos: i.pos,
                     parent_human: i.parent_human,
                     parent_slot: i.parent_slot,
                     connected: phone.and_then(|p| p.connected),

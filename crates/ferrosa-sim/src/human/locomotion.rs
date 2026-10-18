@@ -173,14 +173,14 @@ pub fn trace_hit(surface: &Surface, start: Vec3, end: Vec3) -> Option<(Vec3, Opt
         let Some(v) = surface.vehicles.get(id) else { continue };
         let Some(t) = surface.vehicle_types.get(v.kind as usize) else { continue };
         if let Some(hit) = trace_vehicle(v, t, start, end)
-            && !(best.0 <= hit.0)
+            && hit.0 < best.0
         {
             best = hit;
             vehicle = Some(id);
         }
     }
 
-    (!(1.0 <= best.0)).then_some((best.1, vehicle))
+    (best.0 < 1.0).then_some((best.1, vehicle))
 }
 
 /// The point [`trace_hit`] reaches.
@@ -526,7 +526,7 @@ pub fn update_foot_plant_states(h: &mut Human, surface: &Surface, hips: &[Vec3; 
 
     for k in 0..2 {
         let f = &h.locomotion.feet[k];
-        if f.mode != FOOT_SWING || !(f.swing_phase >= 1.0) {
+        if f.mode != FOOT_SWING || f.swing_phase < 1.0 {
             continue;
         }
         h.locomotion.feet[k].swing_phase = 1.0;
@@ -972,7 +972,7 @@ pub fn update_locomotion_constraints(h: &mut Human, bodies: &mut RigidBodies, su
         h.is_standing = true;
         let l = &h.locomotion;
         if l.feet[0].mode == FOOT_FREE && l.feet[1].mode == FOOT_FREE {
-            if h.is_on_ground && !(l.rel_vel.y > 1.0 / 60.0) {
+            if h.is_on_ground && l.rel_vel.y <= 1.0 / 60.0 {
                 h.is_standing = false;
             } else {
                 if h.bones[0].rot[1].y > 0.875 {
@@ -1353,7 +1353,7 @@ pub fn step_locomotion_ik(h: &mut Human, bodies: &mut RigidBodies, surface: &Sur
             push[k] = rest;
         }
         let phase = h.locomotion.feet[0].swing_phase;
-        if !(phase < 1.0) {
+        if phase >= 1.0 {
             torque[k] = Vec3::ZERO;
             push[k] = rest;
         }
@@ -1378,7 +1378,7 @@ pub fn step_locomotion_ik(h: &mut Human, bodies: &mut RigidBodies, surface: &Sur
             torque[k] = Vec3::ZERO;
             (seg * pp + s, 67.5_f32.to_radians(), 1)
         };
-        if !(phase < 1.0) {
+        if phase >= 1.0 {
             clamp = 0.0;
         }
         let params = IkParams { length: 1.0, twist: 0.0, max_turn: 45.0_f32.to_radians(), clamp_max: clamp, spin_limit: [0.0625; 3], flags };

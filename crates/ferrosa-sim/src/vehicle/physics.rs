@@ -87,11 +87,11 @@ pub fn update_vehicle_bounds(v: &mut Vehicle, bodies: &RigidBodies, types: &[Veh
             ];
 
             for k in 0..3 {
-                if !(mn[k] <= w[k]) {
+                if mn[k] > w[k] {
                     mn[k] = w[k];
                 }
 
-                if !(w[k] <= mx[k]) {
+                if w[k] > mx[k] {
                     mx[k] = w[k];
                 }
             }
@@ -151,7 +151,7 @@ fn crash_and_drag(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, out: &mu
     let speed = vel.length();
     let dir = vel.normalize_or_zero();
     let s2 = speed * speed;
-    let under = !(b.pos.y > WATER_LEVEL);
+    let under = b.pos.y <= WATER_LEVEL;
     let (hi, lo) = (speed * 0.125, -speed * 0.125);
 
     let clamp = |x: f32| {
@@ -533,7 +533,7 @@ fn update_train(v: &mut Vehicle, bodies: &mut RigidBodies, track: &crate::world:
 
     for seg in candidates {
         let Some(m) = track.meshes.get(seg as usize) else { continue };
-        if m.kind != 0 || m.box_min.x > hi.x || m.box_min.z > hi.z || lo.x > m.box_max.x || !(lo.z <= m.box_max.z) {
+        if m.kind != 0 || m.box_min.x > hi.x || m.box_min.z > hi.z || lo.x > m.box_max.x || lo.z > m.box_max.z {
             continue;
         }
 
@@ -1085,7 +1085,7 @@ pub fn capsule_intersect_vehicle(v: &Vehicle, t: &VehicleType, start: Vec3, end:
     
     let mut take = |h: Option<(Vec3, Vec3, f32)>| {
         if let Some(h) = h
-            && !(best_dist <= h.2)
+            && h.2 < best_dist
         {
             best_dist = h.2;
             best = Some(h);
@@ -1211,7 +1211,7 @@ pub fn trace_vehicle_parts(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3,
             let n = calculate_face_normal(a, c, d);
 
             if let Some((frac, p)) = segment_intersect_face(n, start, end, a, c, d)
-                && !(best.fraction <= frac)
+                && frac < best.fraction
             {
                 best = VehicleHit { fraction: frac, pos: p, normal: n, part: VehiclePart::Body(k) };
             }
@@ -1228,7 +1228,7 @@ pub fn trace_vehicle_parts(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3,
             let n = calculate_face_normal(a, b, c);
 
             if let Some((frac, p)) = segment_intersect_triangle_two_sided(n, start, end, a, b, c)
-                && !(best.fraction <= frac)
+                && frac < best.fraction
             {
                 best = VehicleHit { fraction: frac, pos: p, normal: n, part: VehiclePart::Window(k) };
             }
@@ -1238,7 +1238,7 @@ pub fn trace_vehicle_parts(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3,
     if wheels {
         for (k, w) in v.wheels.iter().enumerate() {
             if let Some((frac, p, n)) = segment_intersect_sphere(start, end, w.world_pos, w.radius)
-                && !(best.fraction <= frac)
+                && frac < best.fraction
             {
                 best = VehicleHit { fraction: frac, pos: p, normal: n, part: VehiclePart::Wheel(k) };
             }
@@ -1271,7 +1271,7 @@ pub fn segment_intersect_vehicle(v: &Vehicle, t: &VehicleType, start: Vec3, end:
 
     let mut take = |n: Vec3, a: Vec3, b: Vec3, c: Vec3| {
         if let Some((frac, p)) = segment_intersect_face(n, start, end, a, b, c)
-            && !(best.0 <= frac)
+            && frac < best.0
         {
             best = (frac, p, n);
         }
@@ -1323,9 +1323,7 @@ pub fn vehicle_vehicle_contacts(vehicles: &Table<Vehicle>, bodies: &mut RigidBod
                 let Some((_, hit, normal)) = segment_intersect_vehicle(vj, tj, vi.pos, end) else { continue };
                 let mut depth = ((hit.x - end.x) * normal.x + (hit.y - end.y) * normal.y) + (hit.z - end.z) * normal.z;
 
-                if !(depth <= MAX_CHASSIS_DEPTH) {
-                    depth = MAX_CHASSIS_DEPTH;
-                }
+                depth = depth.min(MAX_CHASSIS_DEPTH);
 
                 let (Some(pa), Some(pb)) = (bodies.get(vi.body).map(|b| b.pos), bodies.get(vj.body).map(|b| b.pos)) else { continue };
                 let off_a = hit - pa;

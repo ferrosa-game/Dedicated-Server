@@ -7,7 +7,7 @@ impl Sim {
     pub(crate) fn bandage_logic(&mut self, id: usize) {
         let item = self.items.get_mut(id).unwrap();
 
-        let (item_pos, holder) = (self.bodies.get(item.body).map_or(item.pos2, |b| b.pos), item.parent_human);
+        let (item_pos, holder) = (self.bodies.get(item.body).map_or(item.pos, |b| b.pos), item.parent_human);
 
         let mut nearest = (BANDAGE_RANGE, None);
 

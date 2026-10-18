@@ -60,7 +60,7 @@ pub struct Item {
     pub body: usize,
     /// Hit points (100 at creation); an item at none is destroyed, a watermelon shot bursting.
     pub health: i32,
-    pub pos2: Vec3,
+    pub pos: Vec3,
     /// The body's velocity at the last sync, what a burst sends.
     pub vel: Vec3,
     pub physics_sim: bool,
@@ -139,7 +139,7 @@ impl Sim {
             item_type,
             body,
             health: ITEM_HEALTH,
-            pos2: pos,
+            pos,
             vel: vel.unwrap_or(Vec3::ZERO),
             physics_sim: false,
             physics_settled: false,
@@ -364,7 +364,7 @@ impl Sim {
             }
 
             let Some(body) = self.bodies.get_mut(item.body) else { continue };
-            let from = item.pos2;
+            let from = item.pos;
 
             if let Some(h) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, from, body.pos) {
                 let t = 0.975 * h.hit.fraction;
@@ -372,7 +372,7 @@ impl Sim {
                 body.pos = d * t + from;
             }
 
-            item.pos2 = body.pos;
+            item.pos = body.pos;
             item.vel = body.vel;
 
             let (pos, [r0, r1, r2]) = (body.pos, body.rot);
@@ -423,12 +423,12 @@ impl Sim {
             let Some(item) = self.items.get_mut(id) else { continue };
             item.in_pocket = in_pocket;
 
-            if !(-32.0 <= item.pos2.y) {
+            if item.pos.y < -32.0 {
                 item.despawn_time = 0;
             }
 
             if item.health <= 0 {
-                let e = EventBulletHit { unk: 0, hit_type: 0, pos: item.pos2, normal: item.vel };
+                let e = EventBulletHit { unk: 0, hit_type: 0, pos: item.pos, normal: item.vel };
                 self.events.push(Event { tick_created: self.tick, kind: ServerEvent::BulletHit(e) });
                 item.despawn_time = 0;
             }
@@ -451,7 +451,7 @@ impl Sim {
                     if let Some((pos, rot)) = item.mount_pose {
                         body.pos = pos;
                         body.rot = rot;
-                        item.pos2 = pos;
+                        item.pos = pos;
                     }
 
                     body.vel = Vec3::ZERO;
@@ -472,7 +472,7 @@ impl Sim {
                     if let Some((pos, rot)) = item.pocket_pose {
                         body.pos = pos;
                         body.rot = rot;
-                        item.pos2 = pos;
+                        item.pos = pos;
                     }
 
                     body.vel = h.bones[0].vel;
@@ -600,7 +600,7 @@ impl Sim {
             };
             let item = self.items.get_mut(id).unwrap();
             item.mount_pose = Some((pos, rot));
-            item.pos2 = pos;
+            item.pos = pos;
         }
     }
 
@@ -621,7 +621,7 @@ impl Sim {
             let [r0, r1, _] = rot;
             let pos = r1 * -0.25 + chest.pos + r0 * 0.125;
             item.pocket_pose = Some((pos, rot));
-            item.pos2 = h.vehicle.and_then(|v| self.vehicles.get(v)).map_or(pelvis.pos, |v| v.pos);
+            item.pos = h.vehicle.and_then(|v| self.vehicles.get(v)).map_or(pelvis.pos, |v| v.pos);
             let vel = pelvis.vel;
             if let Some(body) = self.bodies.get_mut(item.body) {
                 body.vel = vel;
@@ -687,7 +687,7 @@ impl Sim {
     /// item_soccerball_kick: every bone but the arms' within reach of the ball pushes it away from the bone, with a
     /// contact on the ball's surface facing the bone.
     fn soccerball_kick(&mut self, id: usize, ball_body: usize) {
-        let Some(ball) = self.items.get(id).map(|i| i.pos2) else { return };
+        let Some(ball) = self.items.get(id).map(|i| i.pos) else { return };
         let Some(ball_pos) = self.bodies.get(ball_body).map(|b| b.pos) else { return };
 
         let bones = self.humans.iter().flat_map(|(_, h)| h.bones.iter().enumerate()).filter(|(k, _)| !KICK_SKIPPED_BONES.contains(k));
@@ -695,7 +695,7 @@ impl Sim {
             let d = ball - bone.pos;
             let len = d.length();
 
-            if !(KICK_REACH > len) {
+            if len >= KICK_REACH {
                 continue;
             }
 

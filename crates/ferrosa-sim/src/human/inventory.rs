@@ -106,7 +106,7 @@ pub(crate) fn detach_item(h: &mut Human, bodies: &mut RigidBodies, touch: &mut T
             if let Some(body) = bodies.get_mut(item.body) {
                 body.pos = at;
             }
-            item.pos2 = at;
+            item.pos = at;
         }
     }
 
@@ -137,10 +137,10 @@ pub fn hand_grab_and_inventory(h: &mut Human, human_id: usize, bodies: &mut Rigi
         while h.inventory[slot].count > 0 {
             let item_id = h.inventory[slot].items[0] as usize;
             let Some(item) = touch.items.get(item_id) else { break };
-            let (a, b) = (h.bones[hand].pos, item.pos2);
+            let (a, b) = (h.bones[hand].pos, item.pos);
             let d = a - b;
 
-            if !(d.length() <= HAND_DROP_DISTANCE) {
+            if d.length() > HAND_DROP_DISTANCE {
                 unlink_item(h, bodies, touch, item_id);
 
                 continue;
@@ -208,7 +208,7 @@ pub fn hand_grab_and_inventory(h: &mut Human, human_id: usize, bodies: &mut Rigi
 fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchables, slot: usize) {
     let item_id = h.inventory[slot].items[0] as usize;
     let Some(item) = touch.items.get(item_id) else { return };
-    let (kind, pos) = (item.item_type, item.pos2);
+    let (kind, pos) = (item.item_type, item.pos);
 
     if kind == ItemKind::Computer {
         let (p, [_, _, r2]) = (h.bones[0].pos, h.bones[0].rot);
@@ -234,7 +234,7 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
             continue;
         }
 
-        let d = point_segment_distance(p, end, c.pos2);
+        let d = point_segment_distance(p, end, c.pos);
 
         if best > d {
             best = d;
@@ -417,7 +417,7 @@ fn mount(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut T
 
     let complete = if progress < EJECT_AT {
         !can_mount(h, touch, hand)
-    } else if !(progress < 1.0) {
+    } else if progress >= 1.0 {
         true
     } else {
         let swap = match (held(h, hand), held(h, other)) {
@@ -599,7 +599,11 @@ fn drop(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchables, f: usiz
     }
 
     let tp = h.throw_pitch as f64;
-    if !(tp <= -11.25_f64.to_radians()) && !(5.625_f64.to_radians() <= tp) {
+
+    let min_angle = -11.25_f64.to_radians();
+    let max_angle = 5.625_f64.to_radians();
+
+    if tp > min_angle && tp < max_angle {
         let s = &h.inventory[slot as usize];
         if s.count > 0 {
             let item = s.items[0] as usize;
@@ -633,7 +637,7 @@ fn item_in_sight(h: &Human, touch: &Touchables, free: impl Fn(&Item) -> bool) ->
             continue;
         }
 
-        let d = point_segment_distance(p, end, item.pos2);
+        let d = point_segment_distance(p, end, item.pos);
 
         if best > d {
             best = d;
@@ -691,7 +695,7 @@ fn pickup(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut 
             continue;
         }
 
-        let d = point_segment_distance(p, end, item.pos2);
+        let d = point_segment_distance(p, end, item.pos);
 
         if best > d {
             best = d;

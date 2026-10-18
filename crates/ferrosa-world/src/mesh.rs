@@ -473,11 +473,11 @@ impl MeshBuilder {
 pub fn dir_flag(n: Vec3) -> u32 {
     if n.y > 0.707 {
         FACE_UP
-    } else if !(-0.707 <= n.y) {
+    } else if n.y < -0.707 {
         FACE_DOWN
     } else if n.x > 0.707 {
         FACE_POS_X
-    } else if !(-0.707 <= n.x) {
+    } else if n.x < -0.707 {
         FACE_NEG_X
     } else if n.z > 0.707 {
         FACE_POS_Z

@@ -179,7 +179,7 @@ impl Sim {
         for (id, h) in self.humans.iter() {
             let Some(hit) = trace_ray_human(h, from, to, 0.0) else { continue };
 
-            if !(best > hit.fraction) {
+            if hit.fraction >= best {
                 continue;
             }
 
@@ -199,7 +199,7 @@ impl Sim {
             let Some(t) = self.vehicle_types.get(v.kind as usize) else { continue };
 
             if let Some(hit) = trace_vehicle_parts(v, t, from, to, true)
-                && !(best <= hit.fraction)
+                && hit.fraction < best
             {
                 best = hit.fraction;
                 target = Some(Target::Vehicle(vid, hit));
@@ -220,7 +220,7 @@ impl Sim {
             let Some(world) = self.bodies.get(item.body).map(|b| hull.world_verts(b.pos, &b.rot)) else { continue };
 
             if let Some((fraction, _, _)) = hull.trace_mesh(&world, from, to)
-                && !(best <= fraction)
+                && fraction < best
             {
                 best = fraction;
                 target = Some(Target::Item(id));

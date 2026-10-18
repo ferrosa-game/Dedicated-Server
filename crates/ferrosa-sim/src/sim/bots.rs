@@ -198,7 +198,7 @@ impl Sim {
                 continue;
             }
             let d = chest - h.bones[3].pos;
-            if !(SIGHT_RANGE > d.length()) {
+            if d.length() >= SIGHT_RANGE {
                 continue;
             }
             let bot = &self.players.get(pid.idx()).unwrap().bot;
@@ -208,7 +208,7 @@ impl Sim {
             let dir = seen - chest;
             let range = dir.length();
             let facing = dir.dot(front);
-            if !(0.0 > facing) {
+            if facing >= 0.0 {
                 continue;
             }
             if !zombie && line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, chest, seen).is_some() {
@@ -260,7 +260,7 @@ impl Sim {
         let d = my_pos - first;
         let mut best = d.length();
         for (k, t) in targets.iter().enumerate().skip(1) {
-            if !(t.awareness > AIM) {
+            if t.awareness <= AIM {
                 continue;
             }
             let d = my_pos - pos_of(t);
@@ -366,26 +366,36 @@ impl Sim {
         let horiz = ((dx * dx + dz * dz) as f64).sqrt();
         let pitch = ((-dy) as f64).atan2(horiz) as f32;
         let p = self.players.get_mut(pid.idx()).unwrap();
+
         if zombie {
             p.controls.walk = 1.0;
         } else if STOP_RANGE > d {
             p.controls.walk = 0.0;
         }
-        if !(FIRE_RANGE > d) {
+
+        if d >= FIRE_RANGE {
             return (yaw, pitch);
         }
-        if !(AIM_TOLERANCE > wrap(h.view_yaw, yaw).abs()) || !(AIM_TOLERANCE > wrap(pitch_now, pitch).abs()) {
+
+        let yaw_diff = wrap(h.view_yaw, yaw).abs();
+        let pitch_diff = wrap(pitch_now, pitch).abs();
+
+        if yaw_diff >= AIM_TOLERANCE || pitch_diff >= AIM_TOLERANCE {
             return (yaw, pitch);
         }
+
         let head = &h.bones[9];
         let (start, up) = (head.pos, head.rot[1]);
         let end = up * SHOT_LENGTH + start;
+
         if self.teammate_in_line(hid, team, h.bones[3].pos, start, end, TEAMMATE_RANGE_FOOT) {
             return (yaw, pitch);
         }
+
         if self.bot_gun_loaded(hid) && rand::random_ratio(1, 4) {
             self.players.get_mut(pid.idx()).unwrap().input_bits |= Input::LeftMouse.mask();
         }
+
         (yaw, pitch)
     }
 
@@ -457,19 +467,25 @@ impl Sim {
         let Some(body) = self.bodies.get(mag.body) else { return };
         let r2 = body.rot[2];
         let along = n.dot(r2);
-        if !(GUN_ALIGNMENT > along) {
+
+        if along >= GUN_ALIGNMENT {
             return;
         }
-        let start = mag.pos2;
+
+        let start = mag.pos;
         let end = r2 * SHOT_LENGTH + start;
+
         if self.teammate_in_line(hid, team, h.bones[3].pos, start, end, TEAMMATE_RANGE_SEATED) {
             return;
         }
+
         let own_body =
             self.vehicles.get(veh).and_then(|v| crate::vehicle::physics::trace_vehicle_parts(v, &self.vehicle_types[v.kind as usize], start, end, false));
+
         if own_body.is_some_and(|hit| matches!(hit.part, crate::vehicle::physics::VehiclePart::Body(_))) {
             return;
         }
+
         if self.bot_gun_loaded(hid) {
             self.players.get_mut(pid.idx()).unwrap().input_bits |= Input::LeftMouse.mask();
         }

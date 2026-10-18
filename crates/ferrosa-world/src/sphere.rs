@@ -55,7 +55,7 @@ fn disc_edge(best: &mut DiscHit, centre: Vec3, axis: Vec3, a: Vec3, b: Vec3) {
     let d = centre - p;
     let dist = d.length();
 
-    if !(best.dist > dist) {
+    if best.dist <= dist {
         return;
     }
 
@@ -134,14 +134,14 @@ fn sphere_intersect_terrain_mesh(mesh: &TerrainMesh, centre: Vec3, axis: Vec3, r
         let (a, b, c) = (mesh.verts[ia], mesh.verts[ib], mesh.verts[ic]);
         let mut hit = DiscHit { pos: Vec3::ZERO, normal: calculate_face_normal(a, b, c), dist: radius };
 
-        if sphere_intersect_face(&mut hit, centre, axis, radius, a, b, c) && !(best_dist <= hit.dist) {
+        if sphere_intersect_face(&mut hit, centre, axis, radius, a, b, c) && best_dist > hit.dist {
             best_dist = hit.dist;
             best = Some(hit);
         }
 
         if let Some(&[_, _, id]) = quad.get(1)
             && sphere_intersect_face(&mut hit, centre, axis, radius, a, c, mesh.verts[id])
-            && !(best_dist <= hit.dist)
+            && best_dist > hit.dist
         {
             best_dist = hit.dist;
             best = Some(hit);
@@ -153,7 +153,7 @@ fn sphere_intersect_terrain_mesh(mesh: &TerrainMesh, centre: Vec3, axis: Vec3, r
 
 fn take(best: &mut Option<DiscHit>, best_dist: &mut f32, hit: Option<DiscHit>) {
     if let Some(h) = hit
-        && !(*best_dist <= h.dist)
+        && *best_dist > h.dist
     {
         *best_dist = h.dist;
         *best = Some(h);

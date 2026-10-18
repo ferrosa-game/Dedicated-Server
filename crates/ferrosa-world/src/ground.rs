@@ -49,7 +49,7 @@ impl Rec {
 
     /// Whether the cell has a source at full weight (a road cell), so takes no others.
     fn settled(&self) -> bool {
-        self.n != 0 && !(1.0 > self.s[0].w)
+        self.n != 0 && self.s[0].w >= 1.0
     }
 
     /// `src`, seen from cell (lx, lz) in direction `dir`, as one of the cell's sources: in place of the last source
@@ -376,7 +376,7 @@ impl Ground {
                 a += ad[1];
                 c -= ad[2];
                 dd += ad[2];
-            } else if !(g < ee) {
+            } else if g >= ee {
                 b += ad[0];
                 a -= ad[0];
                 ee += ad[2];

@@ -150,13 +150,13 @@ pub fn lane_clearance(traffic: &Traffic, map: &StreetMap, car: usize, street: i3
         }
 
         let gap = if !reverse {
-            if !(o.front_proj > pos) {
+            if o.front_proj <= pos {
                 continue;
             }
 
             o.rear_proj - pos
         } else {
-            if !(pos > o.front_proj) {
+            if pos <= o.front_proj {
                 continue;
             }
 

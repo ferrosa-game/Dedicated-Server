@@ -127,19 +127,14 @@ pub struct PatrolSpot {
 }
 
 impl BuildingRecord {
-    /// is_in_building: whether `pos` is inside the box, grown by `margin`.
     pub fn contains(&self, pos: Vec3, margin: f32) -> bool {
-        let (a, b) = (self.interior_min, self.interior_max);
-        !(pos.x < a.x - margin)
-            && !(b.x + margin <= pos.x)
-            && !(pos.y < a.y - margin)
-            && !(b.y + margin <= pos.y)
-            && !(pos.z < a.z - margin)
-            && margin + b.z > pos.z
+        let min = self.interior_min - Vec3::splat(margin);
+        let max = self.interior_max + Vec3::splat(margin);
+
+        pos.cmpge(min).all() && pos.cmplt(max).all()
     }
 }
 
-/// The record kind a building type gets, if any.
 fn record_kind(building_type: i32) -> Option<i32> {
     match building_type {
         0..=5 => Some(CORPORATION_BASE),
@@ -206,29 +201,32 @@ impl Default for CorporationBase {
 }
 
 impl CorporationBase {
-    /// Whether `pos` is inside the base (x and z only).
     pub fn contains(&self, pos: Vec3) -> bool {
-        !(pos.x < self.interior_min.x) && !(self.interior_max.x + 0.0 <= pos.x) && !(pos.z < self.interior_min.z) && self.interior_max.z + 0.0 > pos.z
+        pos.x >= self.interior_min.x
+            && pos.x < self.interior_max.x
+            && pos.z >= self.interior_min.z
+            && pos.z < self.interior_max.z
     }
 
-    /// is_position_in_vault: whether `pos` is inside the vault grown by `tolerance` on every side.
     pub fn in_vault(&self, pos: Vec3, tolerance: f32) -> bool {
-        let (a, b) = (self.vault_min, self.vault_max);
-        !(pos.x < a.x - tolerance)
-            && !(b.x + tolerance <= pos.x)
-            && !(pos.y < a.y - tolerance)
-            && !(b.y + tolerance <= pos.y)
-            && !(pos.z < a.z - tolerance)
-            && tolerance + b.z > pos.z
+        let min = self.vault_min - Vec3::splat(tolerance);
+        let max = self.vault_max + Vec3::splat(tolerance);
+
+        pos.x >= min.x && pos.x < max.x
+            && pos.y >= min.y && pos.y < max.y
+            && pos.z >= min.z && pos.z < max.z
     }
 
     /// The table's frame: turned to the table's way, then half around.
     pub fn frame(&self) -> RotMatrix {
         let mut m = IDENTITY;
         let axis = m[1];
+        
         rotate_orientation(&mut m, axis, self.table_orientation);
+
         let axis = m[1];
         rotate_orientation(&mut m, axis, 180.0_f32.to_radians());
+
         m
     }
 

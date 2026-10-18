@@ -461,9 +461,9 @@ impl Sim {
             let base = &self.world.map.level.bases[k];
             let (lo, hi) = (base.interior_min, base.interior_max);
             let inside = |p: Vec3| p.x >= lo.x && hi.x + 0.0 > p.x && p.z >= lo.z && hi.z + 0.0 > p.z;
-            let pos = |id: i32| usize::try_from(id).ok().and_then(|i| self.items.get(i)).map(|i| i.pos2);
+            let pos = |id: i32| usize::try_from(id).ok().and_then(|i| self.items.get(i)).map(|i| i.pos);
             let mut earnings = self.corp_state[k].spent;
-            earnings += self.items.iter().filter(|(_, i)| i.item_type == ItemKind::CashRound && inside(i.pos2)).count() as i32 * CASH_VALUE;
+            earnings += self.items.iter().filter(|(_, i)| i.item_type == ItemKind::CashRound && inside(i.pos)).count() as i32 * CASH_VALUE;
 
             for m in self.corp_state[k].missions.iter().filter(|m| m.active && m.item != -1) {
                 if !pos(m.item).is_some_and(inside) {

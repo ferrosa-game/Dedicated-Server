@@ -89,7 +89,7 @@ impl Writer {
     /// packet_write_24_float: an angle as a fraction of a turn in `count - 1` bits, the top bit its sign.
     pub fn fixed_float(&mut self, v: f32, count: u32) {
         let sign = 1u32 << count >> 1;
-        let a = ((sign as f32 as f64 / 6.28318530718 * v.abs() as f64) as i64 as u32) & (sign - 1);
+        let a = ((sign as f32 as f64 / std::f64::consts::TAU * v.abs() as f64) as i64 as u32) & (sign - 1);
         self.bits(if 0.0 <= v { a } else { sign | a } as i32, count);
     }
 

@@ -353,7 +353,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
 
         let airborne = !one_arm
             && h.vehicle.is_none()
-            && ((state == 1 && !h.has_input(Input::Crouch)) || (state == 3 && !(0.125 + h.locomotion.feet[0].swing_phase < 1.0)));
+            && ((state == 1 && !h.has_input(Input::Crouch)) || (state == 3 && 0.125 + h.locomotion.feet[0].swing_phase >= 1.0));
 
         let params = if airborne {
             IkParams { length: 21.0 / 32.0, twist: 0.0, max_turn, clamp_max: 4.21875_f32.to_radians(), spin_limit: [0.0625; 3], flags }
@@ -506,7 +506,7 @@ fn arm_item(h: &Human, touch: &Touchables, k: usize) -> Option<(usize, usize)> {
     let item = slots[0].items[0] as usize;
     let kind = touch.items.get(item)?.item_type;
 
-    if (touch.types[kind as usize].hands <= 1 && kind != ItemKind::Rope) || (!(h.bones[0].rot[1].y > 0.707) && h.has_input(Input::Crouch)) {
+    if (touch.types[kind as usize].hands <= 1 && kind != ItemKind::Rope) || (h.bones[0].rot[1].y <= 0.707 && h.has_input(Input::Crouch)) {
         return None;
     }
 
@@ -588,9 +588,10 @@ fn hold_frame(
     if throwing {
         let z = (h.throw_pitch as f64 + 67.5_f64.to_radians()) as f32;
         let mut k = -0.25f32;
-        if !(z > 0.0) {
+        if z <= 0.0 {
             k -= ((((z * 3.0) as f64).sin()) * 0.375) as f32;
         }
+
         v = Vec3::new(v.x + k * r2.x, v.y + k * r2.y, 0.0 + k * r2.z);
     }
 
@@ -806,7 +807,7 @@ fn crouch_reach(h: &Human, map: &Map, first: usize) -> Vec3 {
     let mut k = -0.65625;
     if let Some(hit) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, shoulder, end).map(|h| h.hit.pos) {
         let v = (shoulder.y - hit.y) + (1.0 / 256.0);
-        if !(v > 0.65625) {
+        if v <= 0.65625 {
             k = -v;
         }
     }

@@ -6,10 +6,7 @@ use super::Sim;
 use crate::{PlayerId, human::damage::damage_human};
 
 const MAX_CRIMINAL_RATING: i32 = 1023;
-/// The share of team damage turned back on the attacker in round and versus modes (both settings default to 50).
-/// The versus team damage share until its config is ported.
 pub(crate) const VERSUS_TEAM_DAMAGE: i32 = 50;
-/// The damage a run-over kill scores.
 const RUN_OVER_SCORE: i32 = 100;
 
 impl Sim {
@@ -58,20 +55,25 @@ impl Sim {
         let mut k = rate as f32 / 100.0;
         if attacker_victim.crim_rating > 0 {
             let f = attacker_victim.crim_rating as f32 / 100.0;
+
             if f > 1.0 {
                 k *= 0.0;
-            } else if !(0.0 > f) {
+            } else if f >= 0.0 {
                 k *= 1.0 - f;
             }
         }
+
         let gain = (damage as f32 * k) as i32;
         let Some(a) = self.players.get_mut(attacker.idx()) else { return };
+
         if gain > 0 {
             a.crim_rating += gain;
         }
+
         if a.crim_rating > MAX_CRIMINAL_RATING {
             a.crim_rating = MAX_CRIMINAL_RATING;
         }
+
         if cfg.crimekick <= a.crim_rating
             && let Some(h) = self.humans.get_mut(attacker_human)
         {
@@ -79,7 +81,6 @@ impl Sim {
         }
     }
 
-    /// Whether `pos` is inside the interior of corporation `team`'s base.
     fn in_base(&self, team: i32, pos: Vec3) -> bool {
         usize::try_from(team).ok().and_then(|t| self.world.map.level.bases.get(t)).is_some_and(|b| b.contains(pos))
     }

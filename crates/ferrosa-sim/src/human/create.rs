@@ -27,13 +27,10 @@ pub fn create_human(humans: &mut Table<Human>, bodies: &mut RigidBodies, pos: Ve
             b.owner = id as i32;
             b.part = i as i32;
         }
+
         let mut min_inertia = inertia.x;
-        if !(min_inertia <= inertia.y) {
-            min_inertia = inertia.y;
-        }
-        if !(min_inertia <= inertia.z) {
-            min_inertia = inertia.z;
-        }
+        min_inertia = min_inertia.min(inertia.y).min(inertia.z);
+
         bones.push(Bone {
             body,
             pos: world,

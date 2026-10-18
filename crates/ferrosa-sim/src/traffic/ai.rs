@@ -384,7 +384,7 @@ fn slow_for_queue(traffic: &mut Traffic, id: usize, remaining: f32, mut approach
 
         let o = &cars[j];
 
-        if !(QUEUE_REACH > o.near[(nxt.end & 1) as usize]) || !(PUSHING > o.vel.length()) {
+        if o.near[(nxt.end & 1) as usize] >= QUEUE_REACH || o.vel.length() >= PUSHING {
             continue;
         }
 
@@ -515,7 +515,7 @@ fn cross_intersection(traffic: &mut Traffic, map: &StreetMap, id: usize) {
     let (t, om, q0, q1) = 'bez: {
         let clamped_end = (1.0, 0.0, p0 * 0.0 * 0.0, p1);
 
-        if !(len > BEZIER_EPSILON) {
+        if len <= BEZIER_EPSILON {
             break 'bez clamped_end;
         }
 

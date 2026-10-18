@@ -107,7 +107,7 @@ fn scaled_cell_mesh(meshes: &BlockMeshes, start: Vec3, end: Vec3, cell: IVec3, s
 
     let take = |n: Vec3, a: Vec3, b: Vec3, c: Vec3, attr: u32, best: &mut f32, out: &mut (Vec3, Vec3, u32)| {
         if let Some((t, p)) = segment_intersect_face(n, start, end, a, b, c)
-            && !(*best <= t)
+            && *best > t
         {
             *best = t;
             *out = (p, n, attr);
@@ -223,7 +223,7 @@ pub fn line_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, start: Vec3, e
                     let (pos, rot) = entry_pose(e, cell, f.size, turn);
                     let Some(hull) = area.item_sets.hull(e.kind) else { continue };
                     if let Some((t, p, n)) = hull.trace_mesh(&hull.world_verts(pos, &rot), sl, el)
-                        && !(best <= t)
+                        && best > t
                     {
                         best = t;
                         result = Some((TraceHit { fraction: t, pos: p, normal: n }, cell, 0, 0, -1, Some(SetHit { set: word & 1023, turn, index: i })));
@@ -258,7 +258,7 @@ pub fn line_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, start: Vec3, e
                     _ => (None, cell, v),
                 };
                 if let Some((t, p, nrm, attr)) = hit
-                    && !(best <= t)
+                    && best > t
                 {
                     best = t;
                     let p = f.rotate_back(p);
@@ -273,7 +273,7 @@ pub fn line_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, start: Vec3, e
         if c == c1 {
             return None;
         }
-        if !(a[0] >= a[1]) && !(b[0] >= a[2]) {
+        if a[0] < a[1] && b[0] < a[2] {
             c[0] += step[0];
             a[1] -= d[1];
             a[0] += d[1];
@@ -309,7 +309,7 @@ pub fn line_intersect_level(ground: &Ground, area: &AreaGrid, meshes: &BlockMesh
         best = Some(LevelHit { hit: h, area: -1, block: IVec3::splat(-1), cell: 0, face_attr: 0, object: -1, set: None });
     }
     if let Some((h, block, cell, face_attr, object, set)) = line_intersect_area(area, meshes, start, end) {
-        if !(frac <= h.fraction) {
+        if frac > h.fraction {
             frac = h.fraction;
             best = Some(LevelHit { hit: h, area: 0, block, cell, face_attr, object, set });
         } else if let Some(b) = &mut best {

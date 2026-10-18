@@ -336,7 +336,7 @@ impl ObjectDecoder {
             }
             v[3] = self.delta_bits(r, base[3], 9)?;
             self.frame().traffic[i] = v;
-            let yaw = (v[3] as f32 as f64 * 3.14159265359 / 255.0) as f32;
+            let yaw = (v[3] as f32 as f64 * std::f64::consts::PI / 255.0) as f32;
             out.push(TrafficEntry { index: i as u16, vehicle, kind_color, pos: unpack_position(&v[0..3]), yaw });
         }
         Ok(out)

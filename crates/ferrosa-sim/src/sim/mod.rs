@@ -662,7 +662,7 @@ impl Sim {
                         let d = Vec3::new(i.pos.x - camera.x, i.pos.y - camera.y, i.pos.z - camera.z);
                         let dist = d.length();
                         let packed = client.packed.get(&i.slot).is_some_and(|p| p.kind == 1 && p.index == i.item_id);
-                        if packed { dist <= UNPACK_RANGE } else { !(PACK_RANGE <= dist) }
+                        if packed { dist <= UNPACK_RANGE } else { dist < PACK_RANGE }
                     })
                     .map(|i| (i.slot, ObjectPack { slot: i.slot, unpack: false, kind: 1, item_type: i.item_type as u16, index: i.item_id })),
             )
@@ -711,10 +711,12 @@ impl Sim {
         for item in items {
             let Some(&(pos, mask, ids)) = ctx.item_links.get(&item) else { continue };
             let d = camera - pos;
-            if !(NEAR > d.length()) {
+            if d.length() >= NEAR {
                 continue;
             }
+
             let sent = client.link_sent.entry(item as usize).or_insert(0);
+
             for (k, &link) in ids.iter().enumerate() {
                 if mask & (1 << k) != 0 && *sent & (1 << k) == 0 {
                     *sent |= 1 << k;

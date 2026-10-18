@@ -56,7 +56,7 @@ impl Sim {
         }
 
         item.despawn_time = 0;
-        let pos = self.bodies.get(item.body).map_or(item.pos2, |b| b.pos);
+        let pos = self.bodies.get(item.body).map_or(item.pos, |b| b.pos);
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Explosion(EventExplosion { size: 0, pos }) });
         let primer = *primer;
         self.grenade_explosion(pos, primer);

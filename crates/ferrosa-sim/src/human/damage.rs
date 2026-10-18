@@ -46,7 +46,7 @@ pub fn trace_ray_human(h: &Human, start: Vec3, end: Vec3, radius: f32) -> Option
         let e = end - start;
         let t = ((on_ray.x - start.x) * e.x + (on_ray.y - start.y) * e.y + (on_ray.z - start.z) * e.z) / e.length_squared();
 
-        if !(fraction <= t) {
+        if t < fraction {
             fraction = t;
             best = Some(BoneHit { bone: BoneId::ALL[i], pos: on_ray, normal, fraction: t });
         }

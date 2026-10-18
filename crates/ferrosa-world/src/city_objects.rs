@@ -104,7 +104,7 @@ pub fn segment_intersect_object(kind: usize, pos: Vec3, rot: &RotMatrix, start: 
 
         for (p, q) in [(b, c), (c, d)] {
             if let Some((f, hit)) = segment_intersect_face(n, start, end, a, p, q)
-                && !(best <= f)
+                && f < best
             {
                 best = f;
                 out = (hit, n);
@@ -164,7 +164,7 @@ pub fn sphere_intersect_object(kind: usize, pos: Vec3, rot: &RotMatrix, center: 
 
         for (p, q) in [(b, c), (c, d)] {
             if let Some((hit, dist)) = sphere_project_onto_triangle(center, n, a, p, q, radius)
-                && !(best <= dist)
+                && dist < best
             {
                 best = dist;
                 out = (hit, n);

@@ -102,17 +102,19 @@ impl Sim {
 
     /// item_update_grid_footprint_bit: an item deleted close to where its set placed it goes back into the set.
     pub(crate) fn return_set_item(&mut self, id: usize) {
-        let Some((o, at)) = self.items.get(id).and_then(|i| Some((i.set_origin?, i.pos2))) else { return };
+        let Some((o, at)) = self.items.get(id).and_then(|i| Some((i.set_origin?, i.pos))) else { return };
         let area = &self.world.map.level.area;
         let Some(e) = area.item_sets.set(o.word).and_then(|s| s.entries.get(o.index)) else { return };
         let (pos, _) = entry_pose(e, o.cell, area.block_size, (o.word >> 24) & 3);
         let d = pos - at;
         let dist = d.length();
-        if !(RETURN_REACH > dist) {
+        if dist >= RETURN_REACH {
             return;
         }
+
         let area = &mut self.world.map.level.area;
         let taken = !1u32.wrapping_shl(o.index as u32) & area.taken(o.cell.x, o.cell.y, o.cell.z);
+
         area.set_taken(o.cell.x, o.cell.y, o.cell.z, taken);
         self.item_set_cell_event(o.cell, taken);
     }

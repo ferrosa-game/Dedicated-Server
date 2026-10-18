@@ -70,11 +70,12 @@ pub fn sync_bones(h: &mut Human, bodies: &mut RigidBodies, map: &Map) {
             for end in [a, b] {
                 let v = end.to_array()[k];
                 let lo = v - r;
-                if !(mn[k] <= lo) {
+                if mn[k] > lo {
                     mn[k] = lo;
                 }
+
                 let hi = v + r;
-                if !(hi <= mx[k]) {
+                if hi > mx[k] {
                     mx[k] = hi;
                 }
             }
@@ -144,9 +145,10 @@ pub(super) fn bone_world_contacts(h: &mut Human, bodies: &mut RigidBodies, map: 
         let Some(hit) = capsule_intersect_level(&map.ground, &mut map.level.area, &map.level.meshes, a, b, radius) else { continue };
         let n = hit.normal;
         let impact = bone.vel.dot(n).abs();
-        if !(impact <= 1.0 / 15.0) && hit.area != -1 && hit.block.x != -1 {
+        if impact > 1.0 / 15.0 && hit.area != -1 && hit.block.x != -1 {
             add_bullet_hole(map, hit, bone.pos, bone.vel, out);
         }
+
         if h.last_vehicle_cooldown == 0 && !h.is_immortal {
             if j == BoneId::Head as usize {
                 if impact > HEAD_IMPACT {
@@ -164,6 +166,7 @@ pub(super) fn bone_world_contacts(h: &mut Human, bodies: &mut RigidBodies, map: 
                 }
             }
         }
+
         let friction = if movement_state == 2 { BONE_FRICTION_STATE_2 } else { BONE_FRICTION };
         let body = h.bones[j].body;
         let Some(bp) = bodies.get(body).map(|b| b.pos) else { continue };
@@ -200,7 +203,7 @@ pub(super) fn bone_track_contacts(h: &Human, bodies: &mut RigidBodies, track: &c
         let mut best_d = 65536.0f32;
         for &[a, b, c] in &tris {
             if let Some(hit) = crate::world::capsule::capsule_intersect_triangle(start, end, a, b, c, radius)
-                && !(best_d <= hit.2)
+                && best_d > hit.2
             {
                 best_d = hit.2;
                 best = Some(hit);

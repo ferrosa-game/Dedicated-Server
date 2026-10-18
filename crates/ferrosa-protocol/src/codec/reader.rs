@@ -92,7 +92,7 @@ impl<'a> Reader<'a> {
     pub fn fixed_float(&mut self) -> Result<f32, CodecError> {
         let raw = self.bits(24)?;
         let sign = 1u32 << 23;
-        let v = (((raw & (sign - 1)) as f32 as f64) / ((sign as f32 as f64) / 6.28318530718)) as f32;
+        let v = (((raw & (sign - 1)) as f32 as f64) / ((sign as f32 as f64) / std::f64::consts::TAU)) as f32;
         Ok(if raw & sign == sign { -v } else { v })
     }
 
@@ -146,7 +146,7 @@ impl<'a> Reader<'a> {
     pub fn angle(&mut self, count: u32) -> Result<f32, CodecError> {
         let v = self.bits(count)?;
         let sign = 1u32 << count >> 1;
-        let a = ((((sign - 1) & v) as f32) as f64 / ((sign as f32) as f64 / 6.28318530718)) as f32;
+        let a = ((((sign - 1) & v) as f32) as f64 / ((sign as f32) as f64 / std::f64::consts::TAU)) as f32;
         Ok(if v & sign == sign { -a } else { a })
     }
 

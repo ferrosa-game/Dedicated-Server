@@ -107,7 +107,7 @@ impl RigidBodies {
             min_inertia = inertia.y;
         }
 
-        if !(min_inertia <= inertia.z) {
+        if min_inertia > inertia.z {
             min_inertia = inertia.z;
         }
 
@@ -300,7 +300,7 @@ fn solve_world_contact(b: &mut RigidBody, c: &Contact) {
     let u = (r.cross(w) + v) * k + c.bias * n;
     let d = u.dot(n);
 
-    if !(d > 0.0) {
+    if d <= 0.0 {
         return;
     }
 
@@ -351,7 +351,7 @@ fn solve_body_contact(bodies: &mut Table<RigidBody>, c: &BodyContact) {
     let u = (va + ra.cross(wa)) * ns + bias * n + (rb.cross(wb) + vb) * s;
     let d = u.dot(n);
 
-    if !(d > 0.0) {
+    if d <= 0.0 {
         return;
     }
 
@@ -393,7 +393,7 @@ fn solve_ground_contact(b: &mut RigidBody, c: &GroundContact) {
     let u = (v + 0.0 - g) * nd + (c.drift * k + push * n);
     let d = u.dot(n);
 
-    if !(d > 0.0) {
+    if d <= 0.0 {
         return;
     }
 

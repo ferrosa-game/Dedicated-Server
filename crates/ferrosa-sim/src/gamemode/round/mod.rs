@@ -435,7 +435,7 @@ impl Sim {
     fn loot_all_in_bases(&self) -> bool {
         let bases = &self.world.map.level.bases[..ROUND_CORPS];
 
-        self.items.iter().filter(|(_, i)| Self::is_loot(i.item_type)).all(|(_, i)| bases.iter().any(|b| b.contains(i.pos2)))
+        self.items.iter().filter(|(_, i)| Self::is_loot(i.item_type)).all(|(_, i)| bases.iter().any(|b| b.contains(i.pos)))
     }
 
     /// Whether every round corporation member with a human is inside their own base.
@@ -453,7 +453,7 @@ impl Sim {
     fn loot_all_in_vaults(&self) -> bool {
         let bases = &self.world.map.level.bases[..ROUND_CORPS];
 
-        self.items.iter().filter(|(_, i)| Self::is_loot(i.item_type)).all(|(_, i)| bases.iter().any(|b| b.in_vault(i.pos2, 0.0)))
+        self.items.iter().filter(|(_, i)| Self::is_loot(i.item_type)).all(|(_, i)| bases.iter().any(|b| b.in_vault(i.pos, 0.0)))
     }
 
     fn round_restarting(&mut self) {
@@ -483,9 +483,10 @@ impl Sim {
                     self.saved_accounts.players.iter().find(|a| a.account_id == p.account_id).map_or(0, |a| a.money as i32)
                 } else {
                     let w = p.stocks as f32 * price + p.money as f32;
-                    if !(w <= best.0 as f32) {
+                    if w > best.0 as f32 {
                         best = (w as i32, Some(i));
                     }
+
                     continue;
                 };
 

@@ -10,6 +10,3 @@ bitflags = "2.13.2"
 glam.workspace = true
 serde.workspace = true
 reqwest.workspace = true
-
-[lints]
-workspace = true

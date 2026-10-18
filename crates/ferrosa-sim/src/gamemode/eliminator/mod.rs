@@ -539,7 +539,7 @@ impl Sim {
                 continue;
             }
 
-            if p.distance_squared(item.pos2) < radius_sq {
+            if p.distance_squared(item.pos) < radius_sq {
                 item.despawn_time = 0;
             }
         }
