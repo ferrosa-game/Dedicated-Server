@@ -16,7 +16,6 @@ impl WireRead for InfoRequest {
 }
 
 impl WireWrite for InfoRequest {
-    /// The server list's ping: the type byte (0), the client's version and when it asked.
     fn write(&self, w: &mut Writer) {
         w.byte(0);
         w.byte(self.version);

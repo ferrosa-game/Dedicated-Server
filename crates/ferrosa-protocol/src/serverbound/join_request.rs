@@ -37,7 +37,6 @@ pub struct JoinRequest {
 }
 
 impl AvatarInfo {
-    /// The 32-bit look the client sends: gender, head, skin, hair colour, hair style and eyes.
     pub fn to_avatar_info(&self) -> u32 {
         self.gender as u32
             | (self.head as u32) << 1
@@ -49,7 +48,6 @@ impl AvatarInfo {
 }
 
 impl WireWrite for JoinRequest {
-    /// client_recv_packet's join request: the type byte (2) and the request.
     fn write(&self, w: &mut Writer) {
         w.byte(2);
         w.bits(self.version as i32, 8);
@@ -60,6 +58,7 @@ impl WireWrite for JoinRequest {
         w.string(&self.password, 32);
         w.bits(self.protocol_version as i32, 8);
         w.u32(self.phone_number);
+        w.bits(self.is_ferrosa as i32, 1);
     }
 }
 
