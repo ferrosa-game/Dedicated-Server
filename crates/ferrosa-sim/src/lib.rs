@@ -66,10 +66,8 @@ pub struct Client {
     last_sdl_tick: u32,
     /// Ticks since the client's last packet (the connection's timeoutTime): dropped at 1800, a kick sets 1200.
     timeout: i32,
-    /// Whether the connection gets admin chat and the admin list (an admin's).
     admin_visible: bool,
     earshots: [Option<sim::Earshot>; 8],
-    /// The human the client says it is watching, heard from while it has none of its own.
     spectating: Option<usize>,
     /// The client's object slot ring (2048 entries): what was queued, how far, and how far the client has
     /// acknowledged (the 11 bits after the spectated human in its game packet).

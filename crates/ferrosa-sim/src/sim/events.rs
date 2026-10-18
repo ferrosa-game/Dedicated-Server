@@ -13,12 +13,11 @@ use glam::Vec3;
 use super::Sim;
 use crate::{Client, ConnId, PlayerId, SimJoinMsg};
 
-/// The gravity the game is tuned for, in m/s², which /gravity values are relative to.
 const EARTH_GRAVITY: f32 = 9.8;
 
 impl Sim {
     pub(crate) fn on_join(&mut self, conn: ConnId, src: SocketAddr, j: SimJoinMsg) {
-        println!("[Sim] Player {} is joining... from {}...", j.auth_packet.player_name, src);
+        println!("[Sim] Player {} is joining... from {}... FERROSA: {}", j.auth_packet.player_name, src, j.join_packet.is_ferrosa);
 
         let accout_data = self.join_account(&j.auth_packet);
 

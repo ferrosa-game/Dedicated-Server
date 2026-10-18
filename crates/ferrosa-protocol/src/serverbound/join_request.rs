@@ -33,6 +33,7 @@ pub struct JoinRequest {
     pub password: String,
     pub phone_number: u32,
     pub protocol_version: u8,
+    pub is_ferrosa: bool
 }
 
 impl AvatarInfo {
@@ -73,6 +74,12 @@ impl WireRead for JoinRequest {
         let protocol_version = reader.u8()?;
         let phone_number = reader.u32()?;
 
+        let is_ferrosa = if let Ok(packet) = reader.bits(1) {
+            packet != 0
+        } else {
+            false
+        };
+
         Ok(JoinRequest {
             version,
             account_id,
@@ -82,6 +89,7 @@ impl WireRead for JoinRequest {
             password,
             phone_number,
             protocol_version,
+            is_ferrosa
         })
     }
 }

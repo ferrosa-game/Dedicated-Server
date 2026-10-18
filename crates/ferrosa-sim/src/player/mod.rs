@@ -65,27 +65,20 @@ pub struct Player {
     pub ghost_human: bool,
     /// What the binary still has of that deleted human (its record stays behind): purchases go into it.
     pub ghost: Option<round::menus::GhostHuman>,
-    /// Ticks before the player can change team in the lobby again.
     pub team_switch_timer: i32,
-    /// Vehicles bought this round day and the $5 and $10 bills taken from a bank since.
     pub vehicles_bought: i32,
     pub bills_withdrawn: i32,
-    /// What the player's human held at the end of the last round, slot by slot.
     pub saved_inventory: [Vec<crate::gamemode::round::SavedItem>; 7],
-    /// Where the player's human stood when the world day ended.
     pub saved_body: Option<crate::gamemode::world::SavedBody>,
-    /// The money and credit of the player's corporation, copied every tick.
     pub corp_money: i32,
     pub corp_credit: i32,
     pub account_id: u32,
     pub input: InputFlags,
     pub money: i32,
-    /// Shares held in the player's corporation (`team`).
     pub stocks: i32,
     pub corp_rating: i32,
     pub crim_rating: i32,
     pub spawn_timer: i32,
-    /// The human's vitality as of the last tick, never below zero (player oldHealth, sent to the client).
     pub vitality: i32,
     pub phone_number: u32,
     pub is_ready: bool,
@@ -99,23 +92,18 @@ pub struct Player {
     pub input_bits: u32,
     pub control_mode: u32,
     pub zoom_level: u32,
-    /// A player the server drives: the crews of round car chases.
     pub is_bot: bool,
-    /// God mode, toggled by /godmode: bullets pass through the player and team damage is not punished.
     pub god_mode: bool,
-    /// An admin: from serveradmin.txt, or after /admin with the password.
     pub is_admin: bool,
-    /// /admin attempts so far; the fifth on is refused.
     pub admin_tries: i32,
     /// A mission bot's deadline on the world clock and the deal it belongs to.
     pub bot_deadline: i32,
     pub bot_mission: i32,
-    /// The bot AI's state (player_ai): see [`BotBrain`].
     pub bot: BotBrain,
+    #[allow(unused)]
+    pub ferrosa_client: bool
 }
 
-/// An enemy a bot has seen: the human, where the bot thinks it is, how sure it is (0 to 16)
-/// and a timer set to 600 when first seen.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct BotTarget {
     pub human: i32,
@@ -124,22 +112,15 @@ pub struct BotTarget {
     pub timer: i32,
 }
 
-/// What player_ai keeps for a bot.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BotBrain {
-    /// A zombie walks at what it sees, through walls.
     pub is_zombie: bool,
-    /// The heading to face with nothing else to do.
     pub idle_yaw: f32,
-    /// The waypoint being walked to, how many there are and the waypoints.
     pub waypoint: i32,
     pub waypoint_count: i32,
     pub waypoints: Vec<Vec3>,
-    /// Ticks the bot does nothing for.
     pub delay: i32,
-    /// Ticks the bot's vehicle has been wrecked; past 179 it gets out.
     pub wrecked_ticks: i32,
-    /// The enemies seen (up to 16) and the one aimed at.
     pub targets: Vec<BotTarget>,
     pub target: i32,
 }
@@ -153,6 +134,7 @@ impl BotBrain {
         if self.waypoints.len() <= i {
             self.waypoints.resize(i + 1, Vec3::ZERO);
         }
+
         self.waypoints[i] = p;
     }
 }
@@ -220,10 +202,10 @@ impl Player {
             bot_deadline: 0,
             bot_mission: 0,
             bot: BotBrain::default(),
+            ferrosa_client: j.join_packet.is_ferrosa
         }
     }
 
-    /// create_player: an empty player with 50000 money, no account and a random look (head, skin, hair, eyes).
     pub(crate) fn new_bot(player_id: PlayerId, customization: CharacterCustomization, menu: MenuType) -> Self {
         Self {
             player_id,
@@ -273,6 +255,7 @@ impl Player {
             bot_deadline: 0,
             bot_mission: 0,
             bot: BotBrain::default(),
+            ferrosa_client: false
         }
     }
 
