@@ -46,7 +46,7 @@ pub struct ClientGamePacket {
     pub free_look_yaw: f32,
     pub free_look_pitch: f32,
     pub view_yaw: f32,
-    pub unknown: f32,
+    pub spin_yaw: f32,
     pub view_pitch_delta: f32,
 
     // Go to next byte if in the middle of one from current written bits
@@ -86,7 +86,7 @@ impl WireRead for ClientGamePacket {
         let free_look_yaw = r.fixed_float()?;
         let free_look_pitch = r.fixed_float()?;
         let view_yaw = r.fixed_float()?;
-        let unknown = r.fixed_float()?;
+        let spin_yaw = r.fixed_float()?;
         let view_pitch_delta = r.fixed_float()?;
 
         let input_flags = r.u32()?;
@@ -122,7 +122,7 @@ impl WireRead for ClientGamePacket {
             free_look_yaw,
             free_look_pitch,
             view_yaw,
-            unknown,
+            spin_yaw,
             view_pitch_delta,
             input_flags,
             input_type,
@@ -157,7 +157,7 @@ impl WireWrite for ClientGamePacket {
             self.free_look_yaw,
             self.free_look_pitch,
             self.view_yaw,
-            self.unknown,
+            self.spin_yaw,
             self.view_pitch_delta,
         ] {
             w.fixed_float(v, 24);

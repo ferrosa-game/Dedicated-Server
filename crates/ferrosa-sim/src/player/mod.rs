@@ -289,7 +289,7 @@ impl Player {
             free_look_yaw: msg.free_look_yaw,
             free_look_pitch: msg.free_look_pitch,
             body_yaw: msg.view_yaw,
-            spin_yaw: msg.unknown,
+            spin_yaw: msg.spin_yaw,
             spin_pitch: msg.view_pitch_delta,
         };
 
