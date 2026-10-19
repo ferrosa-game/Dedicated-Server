@@ -26,11 +26,13 @@ Driving, racing, co-op and versus exist in the client but are not ported. Becaus
 
 ## Running
 
-You of course need the rust toolchain installed, along with a fresh copy of Sub Rosa. Since we will NOT be shipping the data folder as this is copyrighted.
+**The simplest way is to download it from our latest release for your platform! [Here. Or on the right.](https://github.com/ferosa-game/Dedicated-Server/releases/latest)**
 
-1. Build: `cargo build --release`
-2. Copy your Sub Rosa `data/` folder into the folder you intend to run the dedicated server in
-3. Run it from that folder: `cargo run --release`
+The only thing you need installed is the [Rust toolchain.](https://rustup.rs/)
+
+1. `git submodule update --init --recursive`
+2. `cargo run --release`
+3. Enjoy! Its pretty simple!
 
 The server listens on UDP port 27584 by default and registers with the master server so it shows in the server list.
 
