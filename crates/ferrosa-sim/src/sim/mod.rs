@@ -557,7 +557,8 @@ impl Sim {
     fn build_game_packet(client: &mut Client, ctx: &TickCtx, player_id: PlayerId) -> ServerGamePacket {
         let first_event = client.event_cursor as u32;
         let player = ctx.players.get(player_id.idx()).unwrap();
-        let (global_event_count, events) = Self::collect_events(client, ctx, player.team as i32, player_id.0 as i32);
+        let alive = ctx.gamestate != GameState::Restarting && player.human.is_some_and(|h| ctx.humans.iter().any(|o| o.human_id as usize == h && o.alive));
+        let (global_event_count, events) = Self::collect_events(client, ctx, player.team as i32, player_id.0 as i32, alive);
         let earshots = Self::calculate_earshot(client, player_id, ctx);
         let (object_packs, pack_offset, packed_items) = Self::object_packs(client, ctx, player.camera_pos);
         let (line_links, link_offset) = Self::link_section(client, ctx, player.camera_pos);
@@ -758,8 +759,8 @@ impl Sim {
     }
 
     /// add_events_to_packet: the events the client has not had, up to 63, with old sounds and other teams' corporation
-    /// updates sent empty.
-    fn collect_events(client: &mut Client, ctx: &TickCtx, team: i32, player_id: i32) -> (u32, Vec<(u32, Event)>) {
+    /// updates sent empty. Spectators' chat is sent empty to players who are alive.
+    fn collect_events(client: &mut Client, ctx: &TickCtx, team: i32, player_id: i32, alive: bool) -> (u32, Vec<(u32, Event)>) {
         let total = ctx.events.count;
         let pending = total.wrapping_sub(client.event_cursor);
         let to_send = pending.min(63);
@@ -779,7 +780,7 @@ impl Sim {
                 ServerEvent::UpdateCorporation(e) => e.corporation() != team,
                 ServerEvent::MissionText(e) => e.corporation != team,
                 ServerEvent::Mission(e) => e.player != player_id,
-                ServerEvent::Chat(c) => c.chat_type == ChatType::AdminChat && !client.admin_visible,
+                ServerEvent::Chat(c) => (c.chat_type == ChatType::AdminChat && !client.admin_visible) || (c.chat_type == ChatType::Announce && c.speaker_id >= 0 && alive),
                 _ => false,
             };
             let kind = if (expired && ephemeral) || foreign { ServerEvent::Empty } else { ev.kind.clone() };
