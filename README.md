@@ -26,7 +26,7 @@ Driving, racing, co-op and versus exist in the client but are not ported. Becaus
 
 ## Running
 
-**The simplest way is to download it from our latest release for your platform! [Here. Or on the right.](https://github.com/ferosa-game/Dedicated-Server/releases/latest)**
+**The simplest way is to download it from our latest release for your platform! [Here. Or on the right.](https://github.com/ferrosa-game/Dedicated-Server/releases/latest)**
 
 The only thing you need installed is the [Rust toolchain.](https://rustup.rs/)
 
