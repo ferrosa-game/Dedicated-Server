@@ -1,6 +1,5 @@
 //! Real time in server ticks, and the world clock.
 
-/// The server runs 60 ticks a second.
 pub const TICKS_PER_SECOND: i32 = 60;
 
 pub const TICKS_PER_SECOND_F32: f32 = TICKS_PER_SECOND as f32;

@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use super::{MAX_STREET_CARS, Traffic, maxss, minss};
+use super::{MAX_STREET_CARS, Traffic};
 use crate::{time::TICKS_PER_SECOND_F32, world::streets::StreetMap};
 
 /// A car covers the lanes whose start line its bounds come within this of.
@@ -85,19 +85,19 @@ pub fn add_cars(traffic: &mut Traffic, map: &StreetMap) {
         let fwd = s * d.z + (co * d.x + d.y * 0.0);
 
         if fwd > 0.0 {
-            c.front_proj = maxss(pmin, pmax);
-            c.rear_proj = minss(pmin, pmax);
+            c.front_proj = pmin.max(pmax);
+            c.rear_proj = pmin.min(pmax);
         } else {
-            c.front_proj = minss(pmin, pmax);
-            c.rear_proj = maxss(pmin, pmax);
+            c.front_proj = pmin.min(pmax);
+            c.rear_proj = pmin.max(pmax);
         }
 
         let (ls, le) = (st.lanes[0].start, st.lanes[0].end);
         let a = (d.x * (min.x - ls.x) + (min.y - ls.y) * d.y) + (min.z - ls.z) * d.z;
         let b = (max.z - ls.z) * d.z + (d.x * (max.x - ls.x) + (max.y - ls.y) * d.y);
 
-        c.near[0] = minss(a, b);
-        c.far[0] = maxss(a, b);
+        c.near[0] = a.min(b);
+        c.far[0] = a.max(b);
 
         let cmin = ((min.y - le.y) * d.y + (min.x - le.x) * d.x) + (min.z - le.z) * d.z;
         let cmax = ((max.y - le.y) * d.y + d.x * (max.x - le.x)) + d.z * (max.z - le.z);
@@ -164,7 +164,7 @@ pub fn lane_clearance(traffic: &Traffic, map: &StreetMap, car: usize, street: i3
         };
 
         let v = ((gap - FOLLOW_GAP) * CLOSE_RATE) / TICKS_PER_SECOND_F32 + o.speed();
-        best = minss(maxss(0.0, v), best);
+        best = v.max(0.0).min(best);
     }
     
     best

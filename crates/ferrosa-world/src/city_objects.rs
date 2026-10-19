@@ -111,6 +111,7 @@ pub fn segment_intersect_object(kind: usize, pos: Vec3, rot: &RotMatrix, start: 
             }
         }
     }
+
     (1.0 > best).then_some((best, out.0, out.1))
 }
 

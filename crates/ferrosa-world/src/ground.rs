@@ -58,10 +58,12 @@ impl Rec {
         if self.n == 0 {
             return self.push(src);
         }
+
         let same_way = self.sources().iter().enumerate().fold(None, |found, (k, e)| {
             let (_, (ex, ez)) = toward(e.x - lx, e.z - lz);
             if ez * dir.1 + ex * dir.0 > 0.0 { Some((src.w > e.w).then_some(k)) } else { found }
         });
+
         match same_way {
             None if self.n != 2 => self.push(src),
             Some(Some(k)) => self.s[k] = src,
@@ -90,9 +92,11 @@ fn smooth(t: f32) -> f32 {
 fn toward(dx: i32, dz: i32) -> (f32, (f32, f32)) {
     let (x, z) = (dx as f32, dz as f32);
     let len = (x * x + z * z).sqrt();
+
     if len == 0.0 {
         return (len, (0.0, 0.0));
     }
+
     let inv = 1.0 / len;
     (len, (x * inv, z * inv))
 }
@@ -128,6 +132,7 @@ impl Ground {
         for (dx, dz) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
             let key = (((z + dz) as u32) << 12) | (x + dx) as u32;
             let cur = self.roadmap.get(&key).copied().unwrap_or(0.0);
+
             if height > cur {
                 self.roadmap.insert(key, height);
             }
@@ -214,6 +219,7 @@ impl Ground {
                 let [r00, r10, r01, r11] = road;
 
                 let mut v = 0f32;
+
                 for j in 0..5 {
                     let (left, right) = (lerp(r00, r01, v), lerp(r10, r11, v));
                     let mut u = 0f32;
@@ -335,6 +341,7 @@ impl Ground {
         }
 
         let mut f = [0f32; 3];
+
         for i in 0..3 {
             let mut v = (s[i] as f64 - (s[i].floor() as f64 + 0.5)) as f32;
 

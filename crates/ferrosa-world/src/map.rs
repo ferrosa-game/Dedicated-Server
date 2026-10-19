@@ -37,6 +37,7 @@ impl Map {
         let mut roads = RoadNetwork::from_city(&city);
 
         let mut ground = Ground::new(generate_grass(!roundcity), roundcity);
+
         if let Some(bounds) = roads.bounds() {
             ground.set_street_bounds(bounds);
         }

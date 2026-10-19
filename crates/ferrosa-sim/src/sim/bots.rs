@@ -142,16 +142,22 @@ impl Sim {
     /// left hand or a pocket, now and then.
     fn bot_reload(&mut self, pid: PlayerId, hid: usize) {
         let Some(h) = self.humans.get(hid) else { return };
+
         if h.action_type != -1 || h.inventory[0].count <= 0 {
             return;
         }
+
         let Some(gun) = self.items.get(h.inventory[0].items[0] as usize) else { return };
+
         if gun.state.left() != 0 {
             return;
         }
+
         let gun_type = gun.item_type as usize;
+
         if let Some(&mag) = gun.children.first() {
             let rounds = self.items.get(mag).map_or(0, |m| m.state.left());
+
             if rounds <= 0 {
                 if rand::random_ratio(1, 32) {
                     self.push_bot_action(pid, 1);
@@ -159,19 +165,26 @@ impl Sim {
             } else if rand::random_ratio(1, 32) {
                 self.players.get_mut(pid.idx()).unwrap().input_bits |= Input::Reload.mask();
             }
+
             return;
         }
+
         if h.inventory[1].count <= 0 {
             let pockets: Vec<(usize, Option<usize>)> = (3..7).map(|s| (s, (h.inventory[s].count > 0).then(|| h.inventory[s].items[0] as usize))).collect();
+
             for (s, first) in pockets {
                 let Some(kind) = first.and_then(|i| self.items.get(i)).map(|i| i.item_type as usize) else { continue };
+
                 if self.item_types[kind].can_mount_to[gun_type] != 0 && !rand::random::<bool>() {
                     self.push_bot_action(pid, s as u16 + 1);
                 }
             }
+
             return;
         }
+
         let rounds = self.items.get(h.inventory[1].items[0] as usize).map_or(0, |m| m.state.left());
+
         if rand::random_ratio(1, 32) {
             self.push_bot_action(pid, if rounds <= 0 { 2 } else { 1 });
         }
@@ -183,24 +196,32 @@ impl Sim {
         if (self.tick as i32 ^ pid.i32()) & 1 != 0 {
             return;
         }
+
         let Some(me) = self.humans.get(hid) else { return };
         let (chest, front) = (me.bones[3].pos, me.bones[3].rot[2]);
         let Some(team) = self.players.get(pid.idx()).map(|p| p.team) else { return };
         let zombie = self.players.get(pid.idx()).is_some_and(|p| p.bot.is_zombie);
         let map = &self.world.map;
+
         for j in self.humans.ids() {
             let h = self.humans.get(j).unwrap();
+
             if h.health.vitality <= 0 {
                 continue;
             }
+
             let Some(their) = h.player.and_then(|p| self.players.get(p.idx())) else { continue };
+
             if their.team == team {
                 continue;
             }
+
             let d = chest - h.bones[3].pos;
+
             if d.length() >= SIGHT_RANGE {
                 continue;
             }
+
             let bot = &self.players.get(pid.idx()).unwrap().bot;
             let found = bot.targets.iter().rposition(|t| t.human == j as i32);
             let bone = if h.vehicle.is_some() { 3 } else { (self.tick & 15) as usize };
@@ -208,12 +229,15 @@ impl Sim {
             let dir = seen - chest;
             let range = dir.length();
             let facing = dir.dot(front);
+
             if facing >= 0.0 {
                 continue;
             }
+
             if !zombie && line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, chest, seen).is_some() {
                 continue;
             }
+
             let p = self.players.get_mut(pid.idx()).unwrap();
             let k = match found {
                 Some(k) => k,
@@ -221,15 +245,18 @@ impl Sim {
                     if p.bot.targets.len() >= MAX_TARGETS {
                         continue;
                     }
+
                     p.bot.targets.push(BotTarget { human: j as i32, pos: seen, awareness: 0.0, timer: TARGET_TIMER });
                     p.bot.targets.len() - 1
                 }
             };
             let t = &mut p.bot.targets[k];
             let mut aw = 1.0 + t.awareness;
+
             if aw > MAX_AWARENESS {
                 aw = MAX_AWARENESS;
             }
+
             t.awareness = aw;
             t.pos *= SIGHTING_KEEP;
             let unsure = (MAX_AWARENESS - aw) * SIGHTING_STEP;
@@ -239,13 +266,16 @@ impl Sim {
             let t = &mut self.players.get_mut(pid.idx()).unwrap().bot.targets[k];
             t.pos = ahead * SIGHTING_STEP + t.pos;
         }
+
         let my_pos = self.humans.get(hid).unwrap().pos;
         let humans = &self.humans;
         let p = self.players.get_mut(pid.idx()).unwrap();
         let targets = &mut p.bot.targets;
         let mut i = 0;
+
         while i < targets.len() {
             targets[i].awareness *= FADE;
+
             if FORGET > targets[i].awareness {
                 let last = targets.len() - 1;
                 targets[i] = targets[last];
@@ -254,17 +284,21 @@ impl Sim {
                 i += 1;
             }
         }
+
         p.bot.target = 0;
         let pos_of = |t: &BotTarget| humans.get(t.human as usize).map_or(Vec3::ZERO, |h| h.pos);
         let first = targets.first().map_or(Vec3::ZERO, pos_of);
         let d = my_pos - first;
         let mut best = d.length();
+
         for (k, t) in targets.iter().enumerate().skip(1) {
             if t.awareness <= AIM {
                 continue;
             }
+
             let d = my_pos - pos_of(t);
             let r = d.length();
+
             if best > r {
                 p.bot.target = k as i32;
                 best = r;
@@ -284,19 +318,25 @@ impl Sim {
         let turn = wrap(p.controls.body_yaw, body_yaw);
         let mut look = p.controls.look_yaw - turn;
         p.controls.body_yaw = body_yaw;
+
         if -MAX_LOOK > look as f64 {
             look = -LOOK_LIMIT;
         } else if look as f64 > MAX_LOOK {
             look = LOOK_LIMIT;
         }
+
         p.controls.look_yaw = look;
+
         if UPRIGHT > pelvis_up {
             if (tick & 0x7f) > 64 {
                 p.input_bits |= Input::Crouch.mask();
             }
+
             return;
         }
+
         let mut yaw_to = p.bot.idle_yaw;
+
         if p.bot.waypoint < p.bot.waypoint_count {
             p.controls.walk = 1.0;
             let wp = p.bot.waypoint_pos(p.bot.waypoint);
@@ -308,17 +348,22 @@ impl Sim {
                 let inv = 1.0 / d;
                 ((dx * inv) as f64).atan2((-(inv * dz)) as f64) as f32
             };
+
             if WAYPOINT_RADIUS > d {
                 p.bot.waypoint += 1;
+
                 if !(p.bot.waypoint < p.bot.waypoint_count) {
                     p.bot.waypoint = 0;
                 }
             }
         }
+
         let mut attack = false;
+
         if !p.bot.targets.is_empty() {
             let t = p.bot.targets[p.bot.target as usize];
             let mut aw = t.awareness;
+
             if INVESTIGATE > aw && INVESTIGATE > (t.pos.y - pos.y).abs() {
                 if rand::random_ratio(1, 32) {
                     let p = self.players.get_mut(pid.idx()).unwrap();
@@ -326,6 +371,7 @@ impl Sim {
                     p.bot.set_waypoint(0, t.pos);
                     p.bot.waypoint_count = 1;
                 }
+
                 let p = self.players.get(pid.idx()).unwrap();
                 aw = p.bot.targets.get(p.bot.target as usize).map_or(0.0, |t| t.awareness);
                 attack = !p.bot.targets.is_empty() && aw > ATTACK;
@@ -333,19 +379,24 @@ impl Sim {
                 attack = aw > ATTACK;
             }
         }
+
         let (yaw_to, pitch_to) = if attack { self.bot_attack_on_foot(pid, hid) } else { (yaw_to, 0.0) };
         let p = self.players.get_mut(pid.idx()).unwrap();
         let mut facing = (view_yaw + yaw_offset) + p.controls.look_yaw;
+
         if -180.0_f64.to_radians() > facing as f64 {
             facing = (facing as f64 + 360.0_f64.to_radians()) as f32;
         }
+
         if facing as f64 > 180.0_f64.to_radians() {
             facing = (facing as f64 - 360.0_f64.to_radians()) as f32;
         }
+
         let d = wrap(facing, yaw_to);
         p.controls.look_yaw += d * HALF;
         p.controls.look_pitch = (TURN_RATE * (pitch_to - p.controls.look_pitch)) * HALF + p.controls.look_pitch;
         p.zoom_level = 1;
+
         if p.bot.targets.first().is_some_and(|t| t.awareness > AIM) {
             p.zoom_level = 0;
         }
@@ -404,9 +455,11 @@ impl Sim {
         self.humans.ids().into_iter().filter(|&j| j != hid).any(|j| {
             let h = self.humans.get(j).unwrap();
             let Some(p) = h.player.and_then(|p| self.players.get(p.idx())) else { return false };
+
             if p.team != team {
                 return false;
             }
+
             let d = chest - h.bones[3].pos;
             range > d.length() && crate::human::damage::trace_ray_human(h, start, end, SHOT_RADIUS).is_some()
         })
@@ -431,6 +484,7 @@ impl Sim {
         let p = self.players.get(pid.idx()).unwrap();
         let team = p.team;
         let aimed_at = p.bot.targets.get(p.bot.target as usize).filter(|t| !p.bot.targets.is_empty() && t.awareness > AIM).copied();
+
         if let Some(t) = aimed_at {
             let h = self.humans.get(hid).unwrap();
             let eye = h.bones[9].pos;
@@ -451,10 +505,12 @@ impl Sim {
             let horiz = ((lx * lx + lz * lz) as f64).sqrt();
             pitch = ((-ly) as f64).atan2(horiz) as f32;
             let p = self.players.get(pid.idx()).unwrap();
+
             if STOP_RANGE > d && AIM_TOLERANCE > wrap(p.controls.look_yaw, yaw).abs() && AIM_TOLERANCE > wrap(p.controls.look_pitch, pitch).abs() {
                 self.bot_seated_fire(pid, hid, veh, team, n);
             }
         }
+
         let p = self.players.get_mut(pid.idx()).unwrap();
         p.controls.look_yaw = ((yaw - p.controls.look_yaw) * TURN_RATE) * HALF + p.controls.look_yaw;
         p.controls.look_pitch = ((pitch - p.controls.look_pitch) * TURN_RATE) * HALF + p.controls.look_pitch;
@@ -511,11 +567,13 @@ impl Sim {
         let gas = if gas > 1.0 { 1.0 } else { gas };
         p.controls.walk = if MIN_TARGET_SPEED > target { -1.0 } else { (gas as f64 / ((steer.abs() as f64) + 1.0)) as f32 };
         p.input_bits = 0;
+
         if stuck > STUCK_FORWARD {
             p.controls.walk = 1.0;
             p.controls.strafe = 0.0;
             p.controls.gear_x = DRIVE_GEAR_X;
             p.controls.gear_y = 1.0;
+
             if stuck > STUCK_REVERSE {
                 p.controls.walk = -1.0;
             }

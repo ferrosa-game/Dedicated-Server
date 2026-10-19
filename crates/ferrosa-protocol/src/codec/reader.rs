@@ -22,9 +22,11 @@ impl<'a> Reader<'a> {
     pub fn bytes(&mut self, n: usize) -> Result<&'a [u8], CodecError> {
         self.align();
         let end = self.pos.checked_add(n).ok_or(CodecError::EoF)?;
+
         if end > self.buf.len() {
             return Err(CodecError::EoF);
         }
+
         let slice = &self.buf[self.pos..end];
         self.pos = end;
         Ok(slice)
@@ -36,6 +38,7 @@ impl<'a> Reader<'a> {
         }
 
         let abs = self.pos * 8 + self.bit_pos;
+
         if abs + count as usize > self.buf.len() * 8 {
             return Err(CodecError::EoF);
         }
@@ -48,6 +51,7 @@ impl<'a> Reader<'a> {
         remaining -= first;
         read += first;
         self.bit_pos += first as usize;
+
         if self.bit_pos >= 8 {
             self.bit_pos = 0;
             self.pos += 1;
@@ -133,6 +137,7 @@ impl<'a> Reader<'a> {
         if keep_flag && self.bits(1)? == 0 {
             return Ok(previous);
         }
+
         Ok(if self.bits(1)? == 0 {
             previous.wrapping_add(self.signed(small)?)
         } else if self.bits(1)? == 0 {

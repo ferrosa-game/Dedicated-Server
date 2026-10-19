@@ -62,6 +62,7 @@ fn search_step(map: &StreetMap, nodes: &mut [SearchNode], from: usize, to: usize
                 nodes[j].cost = if dead_end { cost + DEAD_END_COST } else { cost };
             }
         }
+
         if j == to {
             path.push(j);
             let mut cur = j;

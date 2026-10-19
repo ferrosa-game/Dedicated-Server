@@ -130,7 +130,6 @@ struct TickCtx<'a> {
 /// The spectated human a client sends when it watches no one.
 const NO_HUMAN: u8 = 255;
 
-/// The length of a tick.
 const TICK_MS: u64 = 16;
 
 pub struct Sim {
@@ -273,9 +272,11 @@ impl Sim {
                 let Some(client) = self.clients.get_mut(&input.conn) else { return };
                 client.timeout = 0;
                 client.round_number = g.round_num;
+
                 if g.round_num != self.round_number {
                     return;
                 }
+
                 let player = self.players.get_mut(client.player_id.idx()).unwrap();
 
                 client.last_sdl_tick = g.sdl_tick;
@@ -370,7 +371,6 @@ impl Sim {
         timed!(self, "input", {
             self.connection_timeouts();
 
-            // Apply all of the `SimMsg`'s received
             while let Ok(inp) = self.in_rx.try_recv() {
                 self.apply(inp);
             }
@@ -543,6 +543,7 @@ impl Sim {
 
         clients.par_iter_mut().for_each(|(_, client)| {
             let Some(player) = ctx.players.get(client.player_id.idx()) else { return };
+
             if client.round_number != round_number {
                 let _ = out_tx.send((frame_packet(sync.clone()), client.addr));
                 return;
@@ -645,9 +646,11 @@ impl Sim {
         const PACK_RANGE: f32 = 256.0;
         const UNPACK_RANGE: f32 = 264.0;
         const RING: u16 = 2048;
+
         if client.pack_ring.is_empty() {
             client.pack_ring = vec![ObjectPack { slot: 0, unpack: true, kind: 0, item_type: 0, index: 0 }; RING as usize];
         }
+
         let current: HashMap<u16, ObjectPack> = ctx
             .humans
             .iter()
@@ -659,6 +662,7 @@ impl Sim {
                         if ctx.pocketed.contains(&i.item_id) {
                             return false;
                         }
+
                         let d = Vec3::new(i.pos.x - camera.x, i.pos.y - camera.y, i.pos.z - camera.z);
                         let dist = d.length();
                         let packed = client.packed.get(&i.slot).is_some_and(|p| p.kind == 1 && p.index == i.item_id);
@@ -669,25 +673,31 @@ impl Sim {
             .collect();
         let queue = |client: &mut Client, pack: ObjectPack| {
             let next = (client.pack_count + 1) & (RING - 1);
+
             if next == client.pack_ack {
                 return;
             }
+
             client.pack_ring[client.pack_count as usize] = pack;
             client.pack_count = next;
         };
         let mut gone: Vec<u16> = client.packed.keys().filter(|s| !current.contains_key(s)).copied().collect();
         gone.sort_unstable();
+
         for slot in gone {
             queue(client, ObjectPack { slot, unpack: true, kind: 0, item_type: 0, index: 0 });
             client.packed.remove(&slot);
         }
+
         let mut changed: Vec<ObjectPack> =
             current.values().filter(|p| client.packed.get(&p.slot).is_none_or(|q| q.kind != p.kind || q.index != p.index)).copied().collect();
         changed.sort_unstable_by_key(|p| p.slot);
+
         for pack in changed {
             queue(client, pack);
             client.packed.insert(pack.slot, pack);
         }
+
         let pending = client.pack_count.wrapping_sub(client.pack_ack) & (RING - 1);
         let packs = (0..pending).map(|k| client.pack_ring[((client.pack_ack + k) & (RING - 1)) as usize]).collect();
         let items = client.packed.values().filter(|p| p.kind == 1).map(|p| p.slot).collect();
@@ -711,6 +721,7 @@ impl Sim {
         for item in items {
             let Some(&(pos, mask, ids)) = ctx.item_links.get(&item) else { continue };
             let d = camera - pos;
+
             if d.length() >= NEAR {
                 continue;
             }
@@ -751,9 +762,10 @@ impl Sim {
     fn collect_events(client: &mut Client, ctx: &TickCtx, team: i32, player_id: i32) -> (u32, Vec<(u32, Event)>) {
         let total = ctx.events.count;
         let pending = total.wrapping_sub(client.event_cursor);
-        let to_send = pending.min(63); // 63 cap
+        let to_send = pending.min(63);
 
         let mut out = Vec::with_capacity(to_send as usize);
+
         for i in 0..to_send {
             let idx = client.event_cursor.wrapping_add(i);
             let Some(ev) = ctx.events.get(idx) else {

@@ -1,3 +1,4 @@
+use ferrosa_physics::rotation::rotate;
 use ferrosa_protocol::clientbound::game::{
     TrafficEntry,
     events::{Event, ServerEvent, update_vehicle_type_color::EventUpdateVehicleTypeColor},
@@ -39,12 +40,9 @@ const STUCK_REVERSE: i32 = 279;
 
 /// Where a traffic car's vehicle goes: its type's chassis centred on the car, 1.5 back from its position.
 pub(crate) fn vehicle_pos(c: &TrafficCar, types: &[VehicleType]) -> Vec3 {
-    let [r0, r1, r2] = c.rot;
     let k = types.get(c.kind as usize).map_or(Vec3::ZERO, |t| t.centroid);
-    let n = -k;
-    let back = -BODY_OFFSET;
-    let p = c.pos;
-    back * r2 + p + n.x * r0 + n.y * r1 + r2 * n.z
+
+    c.pos - rotate(&c.rot, k + Vec3::Z * BODY_OFFSET)
 }
 
 impl Sim {
@@ -183,20 +181,25 @@ impl Sim {
     fn traffic_states(&mut self) {
         for c in &mut self.traffic.cars {
             c.state = 0;
+
             for (hid, h) in self.humans.iter() {
                 let Some(pid) = h.player else { continue };
+
                 if h.health.vitality <= 0 || c.state > EDGE || c.human == hid as i32 {
                     continue;
                 }
+
                 let range = if self.players.get(pid.idx()).is_some_and(|p| p.is_bot) { BOT_RANGE } else { PLAYER_RANGE };
                 let d = c.pos - h.bones[0].pos;
                 let dist = d.length();
+
                 if range > dist {
                     c.state = NEAR;
                 } else if range + KEEP_RANGE > dist {
                     c.state = EDGE;
                 }
             }
+
             if self.traffic.roundcity && (c.physical_street == LOOP_STREET || c.physical_street == LOOP_STREET_2) {
                 c.state = 0;
             }
@@ -207,28 +210,36 @@ impl Sim {
     /// traffic first).
     fn traffic_spawns(&mut self) {
         let n_streets = self.world.map.streets.streets.len() as i32;
+
         for id in 0..self.traffic.cars.len() {
             let c = &self.traffic.cars[id];
+
             if c.state == NEAR {
                 if c.vehicle != -1 {
                     continue;
                 }
+
                 let pos = vehicle_pos(c, &self.vehicle_types);
                 let (vel, rot, kind, color) = (c.vel, c.rot, c.kind, c.color);
                 let vid = spawn_vehicle(&mut self.vehicles, &mut self.bodies, &self.vehicle_types, kind, color, pos, rot, Some(vel));
                 self.traffic.cars[id].vehicle = vid.map_or(-1, |v| v as i32);
+
                 if let Some(v) = vid {
                     if let Some(veh) = self.vehicles.get_mut(v) {
                         veh.traffic_car = id as i32;
                     }
+
                     let e = EventUpdateVehicleTypeColor { vehicle_id: v as i32, vehicle_type: kind, vehicle_color: color as u8 };
                     self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateVehicleTypeColor(e) });
                 }
+
                 continue;
             }
+
             if c.state != 0 || c.is_bot <= 0 {
                 continue;
             }
+
             if c.is_bot == TAKEN {
                 if c.physical_street != -1 {
                     let ps = c.physical_street;
@@ -246,10 +257,13 @@ impl Sim {
             } else if c.is_aggressive != 0 {
                 continue;
             }
+
             let c = &self.traffic.cars[id];
+
             if let Some(v) = usize::try_from(c.vehicle).ok().and_then(|v| self.vehicles.get_mut(v)) {
                 v.despawn_time = 0;
             }
+
             if let Some(h) = usize::try_from(c.human).ok().and_then(|h| self.humans.get_mut(h)) {
                 h.despawn_ticks = 0;
             }
@@ -262,22 +276,25 @@ impl Sim {
         let c = &mut self.traffic.cars[id];
         let Some(v) = usize::try_from(c.vehicle).ok().and_then(|v| self.vehicles.get_mut(v)) else { return };
         let k = self.vehicle_types.get(c.kind as usize).map_or(Vec3::ZERO, |t| t.centroid);
-        let [r0, r1, r2] = v.rot;
-        let vp = v.pos;
+        let r2 = v.rot[2];
         c.vel = v.vel;
         c.rot = v.rot;
-        c.pos = r2 * BODY_OFFSET + vp + r0 * k.x + r1 * k.y + k.z * r2;
+        c.pos = v.pos + rotate(&v.rot, k + Vec3::Z * BODY_OFFSET);
         c.yaw = ((-r2.z) as f64).atan2((-r2.x) as f64) as f32;
+
         if c.is_bot != DRIVEN {
             return;
         }
+
         v.gear_x = DRIVE_GEAR;
         v.gear_y = -1.0;
         v.steer_control = c.steer;
         let mut g = (v.vel.dot(r2) + c.target_speed) * GAS_GAIN;
+
         if 0.0 > g {
             g = g + g;
         }
+
         v.gas_control = g;
         let gd = if -1.0 > g {
             v.gas_control = -1.0;
@@ -290,6 +307,7 @@ impl Sim {
         };
         v.gas_control = if CREEP > c.target_speed { -1.0 } else { (gd / ((c.steer.abs() as f64) + 1.0)) as f32 };
         v.controls = 0;
+
         if c.stuck > STUCK_TICKS {
             v.steer_control = 0.0;
             v.gear_x = DRIVE_GEAR;
@@ -332,6 +350,7 @@ pub(crate) fn traffic_section(
     order.sort_by_key(|&i| client.traffic_priority[i]);
 
     let mut sent: Vec<usize> = order.into_iter().rev().take(SENT_PER_PACKET).collect();
+
     for &i in &sent {
         client.traffic_priority[i] = 0;
     }

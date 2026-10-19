@@ -47,7 +47,6 @@ impl BoneId {
         BoneId::FootRight,
     ];
 
-    /// The bone at index `i`, if there is one.
     pub const fn from_index(i: usize) -> Option<BoneId> {
         if i < BONE_COUNT { Some(Self::ALL[i]) } else { None }
     }

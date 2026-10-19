@@ -40,10 +40,12 @@ impl Computer {
     /// Writes `text` over the first `width` columns of line `l`, the rest spaces, in `color`, ended at `width`.
     fn field(&mut self, l: usize, text: &[u8], width: usize, color: u8) {
         let n = text_len(text);
+
         for k in 0..width {
             self.lines[l][k] = if k < n { text[k] } else { b' ' };
             self.colors[l][k] = color;
         }
+
         self.lines[l][width] = 0;
     }
 }
@@ -54,14 +56,18 @@ impl Sim {
         c.current_line = 0;
         c.top_line = 0;
         c.mission = MissionScreen { selected: -1, ..Default::default() };
+
         for l in 0..SCREEN_LINES {
             c.lines[l][0] = 0;
+
             if l == 0 {
                 super::put_text(&mut c.lines[0], b"CONNECTING...");
             }
+
             c.colors[l][..63].fill(WHITE);
             self.register_line(id, c, l as i32);
         }
+
         c.mission.kind = 0;
         c.mission.timer = CONNECT_TICKS;
         self.phone_sound(ferrosa_protocol::clientbound::game::events::sound::Sound::Modem, id, 1.0);
@@ -83,8 +89,10 @@ impl Sim {
             c.mission.page = 0;
             return;
         };
+
         for row in 0..SCREEN_LINES as i32 {
             let l = row as usize;
+
             if row == 1 {
                 c.field(1, b"MISSION SELECT", 16, WHITE);
             } else if (3..=12).contains(&row) {
@@ -110,6 +118,7 @@ impl Sim {
                 c.lines[l][0] = 0;
             }
         }
+
         for l in 0..SCREEN_LINES as i32 {
             self.register_line(id, c, l);
         }
@@ -122,6 +131,7 @@ impl Sim {
             return;
         };
         let mission = self.modes.world.missions.missions.get(m).cloned().unwrap_or_default();
+
         for row in 0..SCREEN_LINES {
             match row {
                 0 => {
@@ -137,6 +147,7 @@ impl Sim {
                 _ => c.lines[row][0] = 0,
             }
         }
+
         for l in 0..SCREEN_LINES as i32 {
             self.register_line(id, c, l);
         }
@@ -146,20 +157,25 @@ impl Sim {
     /// progress bar.
     fn mission_upload(&mut self, id: usize, c: &mut Computer) {
         let vol = self.items.get(id).map_or(-1, |i| i.volume);
+
         if c.mission.timer <= 0 {
             for row in 0..SCREEN_LINES {
                 if row == 0 {
                     c.field(0, b"UPLOAD FILE", 20, TITLE);
                     continue;
                 }
+
                 let r = row as i32 - 4;
+
                 if !(0..PAGE).contains(&r) {
                     c.lines[row][0] = 0;
                     continue;
                 }
+
                 let k = r + (c.mission.file & !(PAGE - 1));
                 let count = c.mission.files.len() as i32;
                 let color = if k == c.mission.file { BUTTON } else { WHITE };
+
                 if k < count {
                     let f = c.mission.files[k as usize];
                     let name = self.fs.volume(vol).and_then(|v| v.files.get(f as usize)).map_or(String::new(), |f| f.name.clone());
@@ -183,6 +199,7 @@ impl Sim {
                 }
             }
         }
+
         for l in 0..SCREEN_LINES as i32 {
             self.register_line(id, c, l);
         }
@@ -191,6 +208,7 @@ impl Sim {
     /// Back to the shell with the screen blanked.
     fn mission_exit(&mut self, id: usize, c: &mut Computer) {
         c.mode = Mode::Shell;
+
         for l in 0..SCREEN_LINES {
             c.lines[l][0] = 0;
             c.colors[l][..63].fill(WHITE);
@@ -203,9 +221,11 @@ impl Sim {
         if menu_first && c.mission.page == 0 {
             self.mission_menu(id, c);
         }
+
         if c.mission.page == 1 {
             self.mission_page(id, c);
         }
+
         if c.mission.page == 2 {
             self.mission_upload(id, c);
         }
@@ -215,13 +235,17 @@ impl Sim {
     pub(crate) fn mission_key(&mut self, id: usize, c: &mut Computer, key: i32) {
         let vol = self.items.get(id).map_or(-1, |i| i.volume);
         let Some(team) = usize::try_from(c.team).ok().filter(|_| vol != -1) else { return self.mission_exit(id, c) };
+
         if key & 0x100 != 0 {
             if (key as u8).eq_ignore_ascii_case(&b'X') {
                 self.mission_exit(id, c);
             }
+
             return;
         }
+
         let s = &mut c.mission;
+
         match s.page {
             0 => match key {
                 KEY_UP => {
@@ -274,6 +298,7 @@ impl Sim {
                     KEY_ENTER if s.button == 0 => s.page = 0,
                     _ => {}
                 }
+
                 if s.page == 1 {
                     return self.mission_page(id, c);
                 }
@@ -301,11 +326,13 @@ impl Sim {
                     KEY_BACK => s.page = 0,
                     _ => {}
                 }
+
                 if s.page == 2 {
                     return self.mission_upload(id, c);
                 }
             }
         }
+
         self.mission_redraw(id, c, true);
     }
 
@@ -314,38 +341,48 @@ impl Sim {
     pub(crate) fn mission_tick(&mut self, id: usize, c: &mut Computer) {
         let vol = self.items.get(id).map_or(-1, |i| i.volume);
         let Some(team) = usize::try_from(c.team).ok().filter(|_| vol != -1) else { return };
+
         if c.mission.timer <= 0 {
             if (self.tick ^ id as u32) & 0xf != 0 {
                 return;
             }
+
             return self.mission_redraw(id, c, true);
         }
+
         c.mission.timer -= 1;
+
         if c.mission.kind == 1 {
             if c.mission.timer & 0xf != 0 {
                 return;
             }
+
             self.mission_upload(id, c);
         }
+
         if c.mission.timer != 0 {
             return;
         }
+
         match c.mission.kind {
             0 => self.mission_menu(id, c),
             1 => {
                 c.mission.page = 0;
                 let f = c.mission.files.get(c.mission.file as usize).copied().unwrap_or(0);
                 let data = self.fs.volume(vol).and_then(|v| v.files.get(f as usize)).map_or(-1, |f| f.data);
+
                 for m in 0..MISSION_ROWS as usize {
                     if self.modes.world.missions.missions.get(m).is_some_and(|x| x.document == data) {
                         if !self.modes.world.missions.missions[m].teams[team].uploaded {
                             self.file_trade(m, team);
                         }
+
                         c.mission.selected = m as i32;
                         c.mission.page = 1;
                         c.mission.button = 0;
                     }
                 }
+
                 self.mission_redraw(id, c, true);
             }
             _ => {}

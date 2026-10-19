@@ -39,7 +39,6 @@ pub struct WheelDef {
     pub mass_offset: Vec3,
 }
 
-/// A vehicle type.
 #[derive(Clone, Debug, Default)]
 pub struct VehicleType {
     /// The state a vehicle of this type spawns in (controllableState).
@@ -174,6 +173,7 @@ impl VehicleType {
     /// mean here; models are written about the point the game moved them to, so nothing moves.
     fn precompute_physics(&mut self) {
         let total = self.nodes.iter().fold(0.0f32, |t, n| t + n.mass);
+
         for n in self.nodes.iter_mut() {
             n.mass /= total;
         }
@@ -297,6 +297,7 @@ pub fn vehicle_types(data: &std::path::Path) -> Vec<VehicleType> {
                 || VehicleType { driven_wheels: DRIVEN_WHEELS.to_vec(), rev_limit: REV_LIMIT_DEGREES.to_radians(), max_rpm: MAX_RPM, ..Default::default() };
             let Ok(kind) = VehicleKind::try_from(k as u8) else { return empty() };
             let path = model_path(data, kind);
+
             if !path.exists() {
                 return empty();
             }

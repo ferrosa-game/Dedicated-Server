@@ -51,6 +51,7 @@ pub fn trace_ray_human(h: &Human, start: Vec3, end: Vec3, radius: f32) -> Option
             best = Some(BoneHit { bone: BoneId::ALL[i], pos: on_ray, normal, fraction: t });
         }
     }
+
     best.filter(|b| 1.0 > b.fraction)
 }
 
@@ -61,11 +62,14 @@ pub fn damage_human(h: &mut Human, bone: BoneId, damage: i32) {
     if !h.is_immortal {
         h.health.blood_level -= damage / 2;
     }
+
     let blood_health = |health: i32, blood: i32| (health as f32 - ((90 - blood) * damage) as f32 / 100.0) as i32;
+
     match bone {
         BoneId::Pelvis | BoneId::Stomach | BoneId::Torso => {
             h.health.chest -= damage;
             h.pain += damage;
+
             if h.health.blood_level < 100 {
                 let scale = (1.0f32).min((100 - h.health.blood_level) as f32 / 25.0);
                 h.health.health = (h.health.health as f32 - scale * damage as f32) as i32;

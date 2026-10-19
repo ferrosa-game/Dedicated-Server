@@ -26,6 +26,7 @@ impl Sim {
             if rising {
                 *fuse = 240;
                 *pin = 0;
+
                 if holder != -1 {
                     *primer = holder_player;
                 }
@@ -47,10 +48,12 @@ impl Sim {
             } else if holder == -1 {
                 *fuse = 240 - 1;
             }
+
             return;
         }
 
         *fuse = c - 1;
+
         if c - 1 != 1 {
             return;
         }
@@ -66,6 +69,7 @@ impl Sim {
     /// outwards. The primer is scored for each player killed other than themselves.
     fn grenade_explosion(&mut self, at: Vec3, primer: Option<PlayerId>) {
         let mut killed = Vec::new();
+
         for (_, human) in self.humans.iter_mut() {
             let dist = human.bones[0].pos.distance(at);
 

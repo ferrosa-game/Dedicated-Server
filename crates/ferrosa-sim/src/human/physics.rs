@@ -40,6 +40,7 @@ const NO_ITEM_CONTACT: [BoneId; 4] = [BoneId::ForearmLeft, BoneId::HandLeft, Bon
 pub fn sync_bones(h: &mut Human, bodies: &mut RigidBodies, map: &Map) {
     h.aabb_min = Vec3::splat(65536.0);
     h.aabb_max = Vec3::splat(-65536.0);
+
     for (j, bone) in h.bones.iter_mut().enumerate() {
         let Some(body) = bodies.get_mut(bone.body) else { continue };
         bone.pos2 = bone.pos;
@@ -66,24 +67,30 @@ pub fn sync_bones(h: &mut Human, bodies: &mut RigidBodies, map: &Map) {
         bone.capsule = [a, b];
         let r = t.shape_size[1];
         let (mut mn, mut mx) = (h.aabb_min.to_array(), h.aabb_max.to_array());
+
         for k in 0..3 {
             for end in [a, b] {
                 let v = end.to_array()[k];
                 let lo = v - r;
+
                 if mn[k] > lo {
                     mn[k] = lo;
                 }
 
                 let hi = v + r;
+
                 if hi > mx[k] {
                     mx[k] = hi;
                 }
             }
         }
+
         h.aabb_min = Vec3::from_array(mn);
         h.aabb_max = Vec3::from_array(mx);
     }
+
     h.aabb_min.y -= 0.25;
+
     for k in 0..3 {
         h.grid_min[k] = (h.aabb_min.to_array()[k] * 0.25) as i32;
         h.grid_max[k] = (h.aabb_max.to_array()[k] * 0.25) as i32;
@@ -110,14 +117,18 @@ pub(super) fn update_networked_bones(h: &mut Human) {
 
 pub(super) fn bone_world_contacts(h: &mut Human, bodies: &mut RigidBodies, map: &mut Map, out: &mut Vec<HumanOutput>) {
     let movement_state = h.movement_state;
+
     for j in 0..BONE_COUNT {
         if j == BoneId::FootLeft as usize || j == BoneId::FootRight as usize {
             continue;
         }
+
         let standing = movement_state != 2 && h.health.vitality > 0 && h.health.health > 49;
+
         if (j == BoneId::ShinLeft as usize || j == BoneId::ShinRight as usize) && standing {
             continue;
         }
+
         let depth_scale = if j == BoneId::Head as usize {
             1.0 / 16.0
         } else if j <= BoneId::Torso as usize {
@@ -134,10 +145,12 @@ pub(super) fn bone_world_contacts(h: &mut Human, bodies: &mut RigidBodies, map: 
         let p = bone.pos;
         let nh = neg * 0.5;
         let mut a = nh * row + p;
+
         if movement_state == 0 && h.health.vitality > 0 && h.health.health > 49 && (j == BoneId::ThighLeft as usize || j == BoneId::ThighRight as usize) {
             let q = neg * 0.125;
             a = q * row + p;
         }
+
         let half = size * 0.5;
         let b = row * half + p;
         let radius = t.shape_size[1];
@@ -145,6 +158,7 @@ pub(super) fn bone_world_contacts(h: &mut Human, bodies: &mut RigidBodies, map: 
         let Some(hit) = capsule_intersect_level(&map.ground, &mut map.level.area, &map.level.meshes, a, b, radius) else { continue };
         let n = hit.normal;
         let impact = bone.vel.dot(n).abs();
+
         if impact > 1.0 / 15.0 && hit.area != -1 && hit.block.x != -1 {
             add_bullet_hole(map, hit, bone.pos, bone.vel, out);
         }
@@ -171,9 +185,11 @@ pub(super) fn bone_world_contacts(h: &mut Human, bodies: &mut RigidBodies, map: 
         let body = h.bones[j].body;
         let Some(bp) = bodies.get(body).map(|b| b.pos) else { continue };
         let offset = hit.pos - bp;
+
         if hit.set.is_none() {
             bodies.add_world_contact(body, offset, n, radius - hit.dist, friction, depth_scale, BONE_SOFTNESS);
         }
+
         h.is_on_ground = true;
     }
 }
@@ -186,21 +202,27 @@ const TRACK_SOFTNESS: f32 = 1.0 / 16.0;
 /// human standing) against the track walls within the human's bounds, its deepest-axis triangle pushing it out.
 pub(super) fn bone_track_contacts(h: &Human, bodies: &mut RigidBodies, track: &crate::world::track::Track) {
     let tris = track.collect(h.aabb_min, h.aabb_max, crate::world::track::WALLS);
+
     if tris.is_empty() {
         return;
     }
+
     let standing = h.movement_state != 2 && h.health.vitality > 0 && h.health.health > 49;
+
     for (j, bone) in h.bones.iter().enumerate() {
         if j == BoneId::FootLeft as usize || j == BoneId::FootRight as usize {
             continue;
         }
+
         if (j == BoneId::ShinLeft as usize || j == BoneId::ShinRight as usize) && standing {
             continue;
         }
+
         let radius = BONES[j].shape_size[1];
         let [start, end] = bone.capsule;
         let mut best: Option<(Vec3, Vec3, f32)> = None;
         let mut best_d = 65536.0f32;
+
         for &[a, b, c] in &tris {
             if let Some(hit) = crate::world::capsule::capsule_intersect_triangle(start, end, a, b, c, radius)
                 && best_d > hit.2
@@ -209,6 +231,7 @@ pub(super) fn bone_track_contacts(h: &Human, bodies: &mut RigidBodies, track: &c
                 best = Some(hit);
             }
         }
+
         let Some((p, n, d)) = best else { continue };
         let Some(bp) = bodies.get(bone.body).map(|b| b.pos) else { continue };
         let offset = p - bp;
@@ -221,17 +244,21 @@ pub(super) fn bone_item_contacts(h: &Human, bodies: &mut RigidBodies, touch: &mu
     for id in touch.grid.query(IVec3::from_array(h.grid_min), IVec3::from_array(h.grid_max)) {
         let Some(item) = touch.items.get(id) else { continue };
         let (mn, mx) = (item.aabb_min, item.aabb_max);
+
         if mn.x > h.aabb_max.x || h.aabb_min.x > mx.x || mn.z > h.aabb_max.z || h.aabb_min.z > mx.z || mn.y > h.aabb_max.y || h.aabb_min.y > mx.y {
             continue;
         }
+
         let Some(hull) = &touch.types[item.item_type as usize].hull else { continue };
         let item_body = item.body;
         let Some((item_pos, world)) = bodies.get(item_body).map(|b| (b.pos, hull.world_verts(b.pos, &b.rot))) else { continue };
         let mut woke = false;
+
         for (j, bone) in h.bones.iter().enumerate() {
             if NO_ITEM_CONTACT.iter().any(|&b| b as usize == j) {
                 continue;
             }
+
             let radius = BONES[j].shape_size[1];
             let [start, end] = bone.capsule;
             let Some((p, n, d)) = hull.intersect_capsule(&world, start, end, radius) else { continue };
@@ -241,6 +268,7 @@ pub(super) fn bone_item_contacts(h: &Human, bodies: &mut RigidBodies, touch: &mu
             bodies.add_body_contact(bone.body, item_body, off_a, off_b, n, radius - d, ITEM_FRICTION, ITEM_DEPTH_SCALE, ITEM_SOFTNESS);
             woke = true;
         }
+
         if woke && let Some(item) = touch.items.get_mut(id) {
             item.physics_settled = false;
             item.settled_timer = 0;
@@ -272,10 +300,12 @@ pub(super) fn vehicle_contacts(h: &mut Human, bodies: &mut RigidBodies, touch: &
         let vid = h.nearby_vehicles[k];
         let Some(v) = touch.vehicles.get(vid) else { continue };
         let Some(t) = touch.vehicle_types.get(v.kind as usize) else { continue };
+
         for j in 0..BONE_COUNT {
             if j == BoneId::FootLeft as usize || j == BoneId::FootRight as usize {
                 continue;
             }
+
             let shin = j == BoneId::ShinLeft as usize || j == BoneId::ShinRight as usize;
             let shape = &BONES[j];
             let bone = &h.bones[j];
@@ -294,19 +324,25 @@ pub(super) fn vehicle_contacts(h: &mut Human, bodies: &mut RigidBodies, touch: &
             let r = hit - vp;
             bodies.add_body_contact(bone.body, v.body, off_a, r, n, radius - dist, VEHICLE_FRICTION, VEHICLE_DEPTH_SCALE, VEHICLE_SOFTNESS);
             let arm = [BoneId::ForearmLeft, BoneId::HandLeft, BoneId::ForearmRight, BoneId::HandRight].iter().any(|&b| b as usize == j);
+
             if h.last_vehicle == vid as i32 || arm {
                 continue;
             }
+
             let point = r.cross(w) + vvel;
             let rel = point - bone.vel;
             let leg = shin || j == BoneId::ThighLeft as usize || j == BoneId::ThighRight as usize;
             let threshold = if leg { LEG_RUN_OVER } else { RUN_OVER };
+
             if h.is_immortal || (rel.dot(n)) <= threshold {
                 continue;
             }
+
             h.health.vitality -= 120;
+
             if (-119..=0).contains(&h.health.vitality) {
                 out.push(HumanOutput::Sound { sound: Sound::BodyHit, pos: h.pos, volume: 1.0, pitch: 0.5 });
+
                 if v.last_driver != -1 {
                     out.push(HumanOutput::RunOver { driver: crate::PlayerId(v.last_driver as u32), victim: h.player });
                 }
@@ -321,6 +357,7 @@ pub(super) fn joint_limits(h: &mut Human, bodies: &mut RigidBodies) {
         let Some(bond) = h.bones[child].joint else { continue };
         let (correction, angles) = joint_limit_correction(h, parent, BoneId::ALL[child]);
         h.bones[child].limit_angles = angles;
+
         if let Some(Bond::Joint(j)) = bodies.bond_mut(bond) {
             j.target_ang_vel = Vec3::ZERO;
             j.limit_correction = correction;
@@ -329,10 +366,6 @@ pub(super) fn joint_limits(h: &mut Human, bodies: &mut RigidBodies) {
             j.spin_limit = SPIN_LIMIT;
         }
     }
-}
-
-fn maxss(a: f32, b: f32) -> f32 {
-    if a > b { a } else { b }
 }
 
 /// human_accumulate_joint_limit_correction: (world-space corrective spin, clamped joint angles).
@@ -358,23 +391,29 @@ pub(super) fn joint_limit_correction(h: &Human, parent: BoneId, child: BoneId) -
     let (lmin, lmax) = (t.limit_min.to_array(), t.limit_max.to_array());
     let mut angles = [a0, a1, a2];
     let mut corr = [0f32; 3];
+
     for k in 0..3 {
         let a = angles[k];
+
         if lmin[k] > a {
             let x = -(a - lmin[k]) * LIMIT_STIFFNESS - LIMIT_DAMPING * local[k];
+
             if x > 0.0 {
                 corr[k] += x;
             }
         }
+
         let clamped = if a > lmax[k] {
             let x = -(a - lmax[k]) * LIMIT_STIFFNESS - local[k] * LIMIT_DAMPING;
+
             if 0.0 > x {
                 corr[k] += x;
             }
-            if lmin[k] > a { if lmin[k] > lmax[k] { lmax[k] } else { maxss(lmin[k], a) } } else { lmax[k] }
+
+            if lmin[k] > a { if lmin[k] > lmax[k] { lmax[k] } else { lmin[k].max(a) } } else { lmax[k] }
         } else {
-            let m = maxss(lmin[k], a);
-            if m > lmax[k] { lmax[k] } else { maxss(lmin[k], a) }
+            let m = lmin[k].max(a);
+            if m > lmax[k] { lmax[k] } else { lmin[k].max(a) }
         };
         angles[k] = clamped;
     }
@@ -405,24 +444,31 @@ const HUMAN_SOFTNESS: f32 = 1.0 / 16.0;
 /// feet) against those of each later, unseated human whose bounds overlap, pushing the other human's bone away.
 pub fn human_contacts(h: &Human, bodies: &mut RigidBodies, others: &[OtherHuman]) {
     let (mn, mx) = (h.aabb_min, h.aabb_max);
+
     for o in others {
         if o.aabb_min.x > mx.x || mn.x > o.aabb_max.x || o.aabb_min.z > mx.z || mn.z > o.aabb_max.z || o.aabb_min.y > mx.y || mn.y > o.aabb_max.y {
             continue;
         }
+
         for (b, bone) in h.bones.iter().enumerate() {
             if NO_HUMAN_CONTACT.contains(&b) {
                 continue;
             }
+
             let [a0, a1] = bone.capsule;
+
             for (k, &([b0, b1], other_body)) in o.bones.iter().enumerate() {
                 if NO_HUMAN_CONTACT.contains(&k) {
                     continue;
                 }
+
                 let radius = BONES[b].shape_size[1] + BONES[k].shape_size[1];
                 let (hit, pa, pb, dist) = segment_closest_points(a0, a1, b0, b1, radius);
+
                 if !hit {
                     continue;
                 }
+
                 let d = pb - pa;
                 let n = d.normalize_or_zero();
                 let mid = (pa + pb) * 0.5;
@@ -471,9 +517,11 @@ pub fn add_bullet_hole(map: &mut Map, hit: CapsuleHit, pos: Vec3, vel: Vec3, out
     if hit.area as u32 > 3 || hit.block.x < 0 {
         return false;
     }
+
     if hit.cell & 0xe000_0000 != 0x8000_0000 || hit.face_attr & 0x10000 == 0 {
         return false;
     }
+
     let face = hit.face_attr & 0xffff;
     out.push(HumanOutput::Glass(GlassBreak { area: hit.area, block: hit.block, cell: hit.cell, face: face as i32, pos, vel }));
     let b = hit.block;

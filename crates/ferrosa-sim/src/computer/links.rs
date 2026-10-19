@@ -13,7 +13,6 @@ pub const ITEM_SLOTS: usize = 64;
 pub struct Link {
     pub active: bool,
     pub kind: i32,
-    /// The tick it was made.
     pub tick: i32,
     pub item: i32,
     pub line: i32,
@@ -67,14 +66,18 @@ impl Sim {
         let colors = colors.copied().unwrap_or([0; COLUMNS]);
         let slot = line as usize & (ITEM_SLOTS - 1);
         let Some(item) = self.items.get(id) else { return -1 };
+
         if item.link_mask & (1 << slot) != 0 {
             let old = item.links[slot];
             let same = self.links.get(old).is_some_and(|k| k.text.len() == len && (real == 0 || (k.text[..] == text[..len] && k.colors[..] == colors[..len])));
+
             if same {
                 return old;
             }
+
             self.links.free(old);
         }
+
         let Some(free) = self.links.links.iter().position(|k| !k.active) else { return -1 };
         self.links.links[free] =
             Link { active: true, kind, tick: self.tick as i32, item: id as i32, line, text: text[..len].to_vec(), colors: colors[..len].to_vec() };
@@ -85,10 +88,12 @@ impl Sim {
     /// computer_set_line_link_slot: the item's slot holds the link, and every connection is due to be sent it.
     fn set_link_slot(&mut self, id: usize, link: i32, line: i32) {
         let slot = line as usize & (ITEM_SLOTS - 1);
+
         if let Some(item) = self.items.get_mut(id) {
             item.links[slot] = link;
             item.link_mask |= 1 << slot;
         }
+
         for client in self.clients.values_mut() {
             if let Some(m) = client.link_sent.get_mut(&id) {
                 *m &= !(1u64 << slot);
@@ -100,11 +105,13 @@ impl Sim {
     pub(crate) fn free_item_links(&mut self, id: usize) {
         let Some(item) = self.items.get(id) else { return };
         let (mask, links) = (item.link_mask, item.links);
+
         for (k, &link) in links.iter().enumerate() {
             if mask & (1 << k) != 0 {
                 self.links.free(link);
             }
         }
+
         for client in self.clients.values_mut() {
             client.link_sent.remove(&id);
         }

@@ -145,6 +145,7 @@ impl Sim {
         }
 
         let phone = self.items.get(id).unwrap().state.phone().unwrap();
+
         if phone.status == PhoneStatus::Ringing {
             let other = phone.connected;
             let answered = other.is_none_or(|o| self.items.get(o).and_then(|i| i.state.phone()).is_some_and(|q| q.connected.is_some()));
@@ -164,6 +165,7 @@ impl Sim {
 
                 if p.ring_timer > PHONE_RING_TICKS {
                     p.status = PhoneStatus::Idle;
+
                     if let Some(q) = self.items.get_mut(o).and_then(|i| i.state.phone_mut()) {
                         q.status = PhoneStatus::Idle;
                         q.display_number = 0;
@@ -244,6 +246,7 @@ impl Sim {
 
     fn answer(&mut self, id: usize) {
         let own_number = self.items.get(id).unwrap().state.phone().unwrap().number;
+
         for k in self.items.ids() {
             if k == id || !self.is_phone(k) || self.items.get(k).unwrap().state.phone().unwrap().connected != Some(id) {
                 continue;

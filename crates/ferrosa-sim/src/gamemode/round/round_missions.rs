@@ -55,6 +55,7 @@ impl Sim {
     /// day) shuffled, then dealt out in groups to transactions, two-team deals and acquisitions.
     pub(crate) fn generate_round_missions(&mut self) {
         self.missions.average_players = 0;
+
         for corp_state in &mut self.corp_state[..ROUND_CORPS] {
             corp_state.spent = 0;
         }
@@ -64,6 +65,7 @@ impl Sim {
 
         for k in 0..ROUND_CORPS {
             let players = self.corp_state[k].player_count;
+
             if players <= 0 {
                 continue;
             }
@@ -85,6 +87,7 @@ impl Sim {
         self.missions.average_players = (total / list.len() as i32).max(1);
 
         let n = list.len() as i32;
+
         if n > 1 {
             for _ in 0..SHUFFLES {
                 let a = rand::random_range(0..n) as usize;
@@ -263,6 +266,7 @@ impl Sim {
                 }
 
                 let mut v = rand::random_range(0..5) * VALUE_STEP + BASE_VALUE;
+
                 if funded < i {
                     v += rand::random_range(0..5) * VALUE_STEP;
                 }
@@ -343,6 +347,7 @@ impl Sim {
                 if i <= 1 {
                     return SELLER_VALUE;
                 }
+
                 let a = rand::random_range(0..5) * VALUE_STEP;
                 let b = rand::random_range(0..5) * VALUE_STEP;
                 let v = a + b + BASE_VALUE;
@@ -414,6 +419,7 @@ impl Sim {
 
         let item = self.missions.last_disks[0];
         let disk_type = self.item_kind(item);
+
         for &c in list {
             let k = c as usize;
             let Some(slot) = self.open_mission(k) else { continue };

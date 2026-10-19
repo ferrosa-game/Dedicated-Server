@@ -87,6 +87,7 @@ impl RoadNetwork {
 
             for (ii, slot) in [(i0, 0usize), (i1, 2usize)] {
                 let it = &mut intersections[ii];
+
                 match axis {
                     Axis::Z => {
                         it.streets[slot + 1] = Some(si);
@@ -147,6 +148,7 @@ impl RoadNetwork {
         };
 
         let mut d = st[cx].i1;
+
         if it[d].streets[3].is_none() {
             d = st[it[d].streets[0]?].i1;
             it[d].streets[3]?;
@@ -277,6 +279,7 @@ impl RoadNetwork {
             }
 
             let mut lane = ASPHALT;
+
             for cc in (c - left)..(c + right) {
                 if cc < 0 || y < 0 || a < 0 {
                     continue;
@@ -342,6 +345,7 @@ impl RoadNetwork {
                         area.create_block(cc, i0.pos.y, z, CUBE, end, dims);
                     }
                 }
+
                 if i1.ext_nz > 0 && (i1.ext_px > 0 || i1.ext_nx > 0) {
                     let z = i1.pos.z - i1.ext_nz - 1;
 

@@ -18,8 +18,10 @@ pub struct AdminList {
 impl WireWrite for AdminList {
     fn write(&self, w: &mut crate::codec::Writer) {
         w.byte(9);
+
         for row in &self.rows {
             w.bits(row.is_some() as i32, 1);
+
             if let Some(e) = row {
                 w.i32(e.account_id);
                 w.string(&e.name, 32);

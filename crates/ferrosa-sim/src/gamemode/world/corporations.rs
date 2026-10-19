@@ -351,6 +351,7 @@ impl Sim {
 
             return;
         }
+
         match b {
             DEPOSIT => self.corp_deposit(human, k),
             WITHDRAW_20..=WITHDRAW_1000 if self.corp_state[k].manager == Some(pid) => self.corp_withdraw(human, k, b),

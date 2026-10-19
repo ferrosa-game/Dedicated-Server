@@ -20,6 +20,7 @@ impl WireWrite for EventMission {
         w.bits(self.kind, 4);
         w.bits(self.role, 4);
         w.bits(self.value, 30);
+
         for v in self.pos {
             w.f32(v);
         }

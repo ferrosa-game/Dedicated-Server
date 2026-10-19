@@ -68,9 +68,11 @@ impl AdminState {
 /// sscanf("%d"): Err for nothing but blanks (EOF), Ok(None) when no number starts the text.
 fn scan_int(s: &str) -> Result<Option<i32>, ()> {
     let t = s.trim_start();
+
     if t.is_empty() {
         return Err(());
     }
+
     Ok(leading_int(t))
 }
 
@@ -119,20 +121,26 @@ impl Sim {
     pub(crate) fn admin_message(&mut self, pid: PlayerId, raw: &str) {
         let msg = &raw[..raw.floor_char_boundary(MESSAGE_LEN)];
         let Some(player) = self.players.get_mut(pid.idx()) else { return };
+
         if let Some(password) = msg.strip_prefix("/admin ") {
             player.admin_tries += 1;
+
             if player.admin_tries <= ADMIN_TRIES && !self.admin.password.is_empty() && password == self.admin.password {
                 player.is_admin = true;
                 let name = player.username.clone();
+
                 if let Some(c) = self.clients.values_mut().find(|c| c.player_id == pid) {
                     c.admin_visible = true;
                 }
+
                 self.admin_say(&format!("{name} admin"));
             }
         }
+
         if !self.players.get(pid.idx()).is_some_and(|p| p.is_admin) {
             return;
         }
+
         if msg.starts_with("/hlist") {
             for i in 0..HLIST_HUMANS {
                 let Some(h) = self.humans.get(i) else { continue };
@@ -143,12 +151,15 @@ impl Sim {
                 self.admin_say(&line);
             }
         }
+
         for (page, cmd) in ["/list1", "/list2", "/list3", "/list4"].into_iter().enumerate() {
             if !msg.starts_with(cmd) {
                 continue;
             }
+
             let conns = self.connection_order();
             let end = if page == 3 { conns.len() } else { (page + 1) * LIST_PAGE };
+
             for &conn in conns.iter().take(end).skip(page * LIST_PAGE) {
                 let Some(p) = self.clients.get(&conn).and_then(|c| self.players.get(c.player_id.idx())) else { continue };
                 let line = format!("{}  {}", p.username, p.phone_number as i32);
@@ -195,10 +206,12 @@ impl Sim {
 
         if let Some(rest) = msg.strip_prefix("/setmap ") {
             let mut n = self.admin.versus_map + 1;
+
             if !rest.is_empty() {
                 if let Ok(v) = scan_int(rest) {
                     n = v.unwrap_or(0);
                 }
+
                 if (0..VERSUS_MAPS).contains(&(n - 1)) {
                     self.admin.versus_map = n - 1;
                 } else {
@@ -206,8 +219,10 @@ impl Sim {
                     n = 1;
                 }
             }
+
             self.admin_say(&format!("mapnum: {n}"));
         }
+
         if msg.starts_with("/resetgame") {
             self.admin.reset_requested = true;
 
@@ -260,13 +275,16 @@ impl Sim {
             let mut nums = numbers(rest);
             let phone = nums.next().unwrap_or(0);
             let rating = nums.next().unwrap_or(0);
+
             if let Some(i) = self.saved_accounts.players.iter().position(|a| a.phone_number as i32 == phone) {
                 let a = &mut self.saved_accounts.players[i];
                 a.crim_rating = rating as u32;
                 let (id, name, phone) = (a.account_id, a.name(), a.phone_number as i32);
+
                 for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == id) {
                     p.crim_rating = rating;
                 }
+
                 self.admin_say(&format!("{name}({phone}) {rating} rating"));
             }
         }
@@ -275,6 +293,7 @@ impl Sim {
             && let Ok(time) = scan_int(rest)
         {
             let time = time.unwrap_or(0);
+
             if let Some(i) = self.admin.pending_ban.filter(|&i| i < self.saved_accounts.players.len()) {
                 let a = &mut self.saved_accounts.players[i];
                 a.ban_time = time as u32;
@@ -283,10 +302,12 @@ impl Sim {
                 self.admin.pending_ban = None;
             }
         }
+
         if msg.starts_with("/bann") {
             self.admin_say("ban canceled");
             self.admin.pending_ban = None;
         }
+
         if let Some(name) = msg.strip_prefix("/kick ") {
             let target = self
                 .connection_order()
@@ -298,9 +319,11 @@ impl Sim {
                 self.admin.kicked.push(ip);
             }
         }
+
         if let Some(text) = msg.strip_prefix("/message ") {
             self.send_chat(text, ChatType::Announce, -1, 0);
         }
+
         if msg.starts_with("/clearkick") {
             self.admin.kicked.clear();
         }
@@ -326,12 +349,14 @@ impl Sim {
         for id in self.items.ids() {
             let Some(item) = self.items.get(id) else { continue };
             let Some(p) = item.state.phone().filter(|p| item.item_type == ItemKind::Phone && p.number == 9999) else { continue };
+
             if let Some(other) = p.connected {
                 if let Some(o) = self.items.get_mut(other).and_then(|i| i.state.phone_mut()) {
                     o.connected = None;
                     o.status = PhoneStatus::Idle;
                     o.display_number = 0;
                 }
+
                 self.phone_update(other);
             }
 
@@ -373,6 +398,7 @@ impl Sim {
         }
 
         let (i, value) = (account as i32, value as i32);
+
         if i < 0 || i as usize >= self.saved_accounts.players.len() || value < 0 {
             return;
         }
@@ -441,6 +467,7 @@ impl Sim {
             for (_, p) in self.players.iter_mut() {
                 p.team = Team::Spectator;
             }
+
             self.mode = mode;
         }
 

@@ -1,7 +1,11 @@
 use ferrosa_physics::rotation::rotate_vector_about_axis;
 use glam::Vec3;
 
-use crate::{collide::calculate_face_normal, trace::cvtt};
+use crate::{
+    collide::calculate_face_normal,
+    mesh::{Degree, bezier},
+    trace::cvtt,
+};
 
 /// The track grid: 64 by 64 cells of 64 units, each listing up to 8 meshes.
 pub const GRID_CELLS: usize = 64;
@@ -71,20 +75,10 @@ pub struct Track {
     pub spawns: Vec<(Vec3, f32)>,
 }
 
-fn bezier(s: f32, p1: f32, p2: f32, e: f32, u: f32, t: f32) -> f32 {
-    ((s * u * u * u + p1 * 3.0 * u * u * t) + p2 * 3.0 * u * t * t) + e * t * t * t
-}
+fn cubic(a: Vec3, b: Vec3, c: Vec3, d: Vec3, t: f32) -> Vec3 {
+    let along = |k: usize| bezier(Some(Degree::Cubic), t, a[k], b[k], c[k], d[k]);
 
-fn bezier3(s: Vec3, p1: Vec3, p2: Vec3, e: Vec3, u: f32, t: f32) -> Vec3 {
-    Vec3::new(bezier(s.x, p1.x, p2.x, e.x, u, t), bezier(s.y, p1.y, p2.y, e.y, u, t), bezier(s.z, p1.z, p2.z, e.z, u, t))
-}
-
-fn bern(a: f32, b: f32, c: f32, d: f32, w: f32, v: f32) -> f32 {
-    ((a * w * w * w + b * 3.0 * w * w * v) + c * 3.0 * w * v * v) + d * v * v * v
-}
-
-fn bern3(a: Vec3, b: Vec3, c: Vec3, d: Vec3, w: f32, v: f32) -> Vec3 {
-    Vec3::new(bern(a.x, b.x, c.x, d.x, w, v), bern(a.y, b.y, c.y, d.y, w, v), bern(a.z, b.z, c.z, d.z, w, v))
+    Vec3::new(along(0), along(1), along(2))
 }
 
 /// The unit side vector of a direction: direction × up, both normalised (zero when either is zero).
@@ -195,10 +189,10 @@ impl Track {
         for _ in 0..2 {
             for m in 0..t.meshes.len() {
                 let (p, n) = (t.meshes[m].prev as usize, t.meshes[m].next as usize);
-                let a = minss((t.meshes[p].weight + 1.0) * 0.5, t.meshes[m].weight);
+                let a = ((t.meshes[p].weight + 1.0) * 0.5).min(t.meshes[m].weight);
                 let b = (t.meshes[n].weight + 1.0) * 0.5;
 
-                t.meshes[m].weight = minss(b, a);
+                t.meshes[m].weight = b.min(a);
             }
         }
 
@@ -293,7 +287,7 @@ impl Track {
                 break;
             }
 
-            p = if ring == TUBE_RINGS - 1 { e } else { bezier3(s, p1, p2, e, 1.0 - t, t) };
+            p = if ring == TUBE_RINGS - 1 { e } else { cubic(s, p1, p2, e, t) };
         }
 
         let (mut t, mut p) = (0.0f32, s);
@@ -314,7 +308,7 @@ impl Track {
                 break;
             }
 
-            p = if ring == TUBE_RINGS - 1 { e } else { bezier3(s, p1, p2, e, 1.0 - t, t) };
+            p = if ring == TUBE_RINGS - 1 { e } else { cubic(s, p1, p2, e, t) };
         }
 
         let rails = (0..15).flat_map(|k| {
@@ -410,12 +404,11 @@ impl Track {
         let mut v = 0.0f32;
 
         for _ in 0..PATCH_STEPS {
-            let w = 1.0 - v;
-            let cols: Vec<Vec3> = (0..4).map(|k| bern3(g[0][k], g[1][k], g[2][k], g[3][k], w, v)).collect();
+            let cols: Vec<Vec3> = (0..4).map(|k| cubic(g[0][k], g[1][k], g[2][k], g[3][k], v)).collect();
             let mut u = 0.0f32;
 
             for i in 0..PATCH_STEPS {
-                let p = bern3(cols[0], cols[1], cols[2], cols[3], 1.0 - u, u);
+                let p = cubic(cols[0], cols[1], cols[2], cols[3], u);
                 let y = if i == 0 || i == PATCH_STEPS - 1 { PATCH_EDGE_HEIGHT } else { p.y };
 
                 m.verts.push(Vec3::new(p.x, y, p.z));
@@ -469,17 +462,21 @@ impl Track {
             .iter()
             .map(|t| {
                 let (mut lo, mut hi) = (vert(t[0]).to_array(), vert(t[0]).to_array());
+
                 for &i in &t[1..] {
                     let v = vert(i).to_array();
+
                     for k in 0..3 {
                         if lo[k] > v[k] {
                             lo[k] = v[k];
                         }
+
                         if v[k] > hi[k] {
                             hi[k] = v[k];
                         }
                     }
                 }
+
                 [Vec3::from_array(lo), Vec3::from_array(hi)]
             })
             .collect();
@@ -510,10 +507,6 @@ impl Track {
 
         id
     }
-}
-
-fn minss(a: f32, b: f32) -> f32 {
-    if a < b { a } else { b }
 }
 
 /// A triangle collected from the track, as its three corners.
@@ -588,6 +581,7 @@ impl TrackMesh {
     fn collect_piece(&self, piece: usize, min: Vec3, max: Vec3, out: &mut Vec<TrackTriangle>) {
         for i in self.pieces[piece]..self.pieces[piece + 4] {
             let b = self.tri_boxes[i as usize];
+
             if out.len() < MAX_TRIANGLES && boxes_overlap(b[0], b[1], min, max) {
                 out.push(self.tris[i as usize].map(|v| self.verts[v as usize]));
             }

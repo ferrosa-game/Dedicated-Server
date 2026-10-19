@@ -237,6 +237,7 @@ impl Sim {
         b.pos = level.hit.pos;
         b.time = 0;
         let vel = b.vel;
+
         if let Some(set) = level.set {
             for (index, id) in self.spawn_hit_set(set, level.block) {
                 if index == set.index
@@ -245,8 +246,10 @@ impl Sim {
                     item.health = 0;
                 }
             }
+
             return;
         }
+
         let hole = CapsuleHit {
             pos: level.hit.pos,
             normal: level.hit.normal,

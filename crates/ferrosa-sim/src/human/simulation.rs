@@ -121,6 +121,7 @@ pub(crate) fn simulate_human(
     rotate_orientation(&mut heading, axis, h.view_yaw);
 
     let r2 = heading[2];
+
     for (k, foot) in [BoneId::FootLeft as usize, BoneId::FootRight as usize].into_iter().enumerate() {
         let f = &mut h.locomotion.feet[k];
         f.prev_plant_pitch = f.plant_pitch;
@@ -131,6 +132,7 @@ pub(crate) fn simulate_human(
 
         if 0.0 > s {
             pitch = s * 3.0;
+
             if -90.0_f64.to_radians() > pitch as f64 {
                 pitch = -90.0_f32.to_radians();
             }
@@ -179,6 +181,7 @@ pub(crate) fn simulate_human(
     }
 
     h.pos = h.bones[0].pos;
+
     if -32.0 > h.bones[0].pos.y {
         h.health.vitality = -100;
     }
@@ -245,17 +248,21 @@ fn drop_everything(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchabl
         if h.inventory[slot].count <= 0 {
             continue;
         }
+
         let item_id = h.inventory[slot].items[0] as usize;
         let Some(body) = touch.items.get(item_id).map(|item| item.body) else { continue };
         let vel = h.bones[0].vel;
         let s = calculate_spread_vector(noise_seed, 1.0 / 60.0, 0.0);
+
         if let Some(b) = bodies.get_mut(body) {
             b.vel = vel + s;
         }
+
         if let Some(item) = touch.items.get_mut(item_id) {
             item.physics_settled = false;
             item.settled_timer = 0;
         }
+
         unlink_item(h, bodies, touch, item_id);
     }
 }
@@ -265,6 +272,7 @@ const KEPT_BODY_TICKS: i32 = 4;
 
 fn despawn_timer(h: &mut Human, out: &mut Vec<HumanOutput>, keep_bodies: bool) -> HumanTick {
     let alive = h.health.vitality > 0;
+
     if h.health.vitality > 0 {
         if h.player.is_some() {
             h.despawn_ticks = game_minutes(1);
@@ -281,10 +289,12 @@ fn despawn_timer(h: &mut Human, out: &mut Vec<HumanOutput>, keep_bodies: bool) -
     {
         out.push(HumanOutput::TaxAccount(account));
     }
+
     if keep_bodies && !alive && h.despawn_ticks - 1 < KEPT_BODY_TICKS {
         h.despawn_ticks = KEPT_BODY_TICKS;
         return HumanTick::Keep;
     }
+
     h.despawn_ticks -= 1;
     if h.despawn_ticks > 0 { HumanTick::Keep } else { HumanTick::Delete }
 }
@@ -292,21 +302,29 @@ fn despawn_timer(h: &mut Human, out: &mut Vec<HumanOutput>, keep_bodies: bool) -
 fn turn_towards_view(h: &mut Human) {
     let (a, b) = (h.client_body_yaw, h.body_yaw);
     let mut b2 = b;
+
     if ((a - b) as f64) >= 180.0_f64.to_radians() {
         b2 = (b as f64 + 360.0_f64.to_radians()) as f32;
     }
+
     let mut d = b2 - a;
+
     if (d as f64) >= 180.0_f64.to_radians() {
         d = b2 - (a as f64 + 360.0_f64.to_radians()) as f32;
     }
+
     let mut c = h.look_yaw;
+
     if ((d - c) as f64) >= 180.0_f64.to_radians() {
         c = (c as f64 + 360.0_f64.to_radians()) as f32;
     }
+
     let mut e = c - d;
+
     if (e as f64) >= 180.0_f64.to_radians() {
         e = c - (d as f64 + 360.0_f64.to_radians()) as f32;
     }
+
     h.view_turn = e;
     let step = e.clamp(-TURN_STEP, TURN_STEP);
     let (step, rest) = if h.is_standing { (step, e - step) } else { (0.0, e) };
@@ -321,8 +339,10 @@ fn turn_towards_view(h: &mut Human) {
     let mut yaw = h.view_yaw + step;
     yaw += h.locomotion.support_ang_vel.y;
     let tiny = 1.0 / 65536.0;
+
     if tiny > yaw.abs() {
         yaw = 0.0;
+
         if tiny > body.abs() {
             body = 0.0;
         }
@@ -330,17 +350,20 @@ fn turn_towards_view(h: &mut Human) {
         if tiny > body.abs() {
             body = 0.0;
         }
+
         if -180.0_f64.to_radians() > yaw as f64 {
             yaw = (yaw as f64 + 360.0_f64.to_radians()) as f32;
         } else if yaw as f64 > 180.0_f64.to_radians() {
             yaw = (yaw as f64 - 360.0_f64.to_radians()) as f32;
         }
     }
+
     if -180.0_f64.to_radians() > body as f64 {
         body = (body as f64 + 360.0_f64.to_radians()) as f32;
     } else if body as f64 > 180.0_f64.to_radians() {
         body = (body as f64 - 360.0_f64.to_radians()) as f32;
     }
+
     h.view_yaw = yaw;
     h.body_yaw = body;
     h.view_pitch = h.look_pitch;
@@ -355,9 +378,11 @@ fn weak_strength(id: usize, vitality: i32, ticks: u32, base: f32) -> f32 {
     let hp = vitality as f32;
     let a = hp / 25.0;
     let mut r = (s * 0.25 * (base - a) as f64 + (a * 0.5 + 0.375) as f64) as f32;
+
     if vitality <= 9 {
         r *= (hp / 10.0) * 0.5 + 0.5;
     }
+
     r
 }
 
@@ -372,6 +397,7 @@ fn health_sim(id: usize, h: &mut Human, ticks: u32, out: &mut Vec<HumanOutput>) 
         if h.down_timer > 0 {
             h.down_timer -= 1;
         }
+
         if h.health.health <= 49 {
             h.down_timer = 1800;
         }
@@ -386,18 +412,22 @@ fn health_sim(id: usize, h: &mut Human, ticks: u32, out: &mut Vec<HumanOutput>) 
     }
 
     h.health.health = h.health.health.max(0);
+
     for hp in parts(h) {
         *hp = (*hp).max(0);
     }
 
     let every = |n: u32| ticks.is_multiple_of(n);
+
     if h.is_immortal {
         if every(8) {
             heal(&mut h.health.health);
         }
+
         if every(16) {
             parts(h).into_iter().for_each(heal);
         }
+
         if every(256) {
             heal(&mut h.health.blood_level);
         }
@@ -405,6 +435,7 @@ fn health_sim(id: usize, h: &mut Human, ticks: u32, out: &mut Vec<HumanOutput>) 
         if h.health.chest <= 0 || h.health.head <= 0 {
             h.health.vitality = 0;
         }
+
         if h.bleeding {
             if every(64) {
                 heal(&mut h.health.health);
@@ -413,9 +444,11 @@ fn health_sim(id: usize, h: &mut Human, ticks: u32, out: &mut Vec<HumanOutput>) 
             if every(32) {
                 heal(&mut h.health.health);
             }
+
             if every(64) {
                 parts(h).into_iter().for_each(heal);
             }
+
             if every(256) {
                 heal(&mut h.health.blood_level);
             }
@@ -444,16 +477,21 @@ fn parts(h: &mut Human) -> [&mut i32; 6] {
 
 fn bleed(id: usize, h: &mut Human, ticks: u32, out: &mut Vec<HumanOutput>) {
     let blood = h.health.blood_level;
+
     if blood <= 19 {
         let cap = blood * 2 + 10;
+
         if h.health.health > cap {
             h.health.health = cap;
         }
+
         if blood <= 0 {
             return;
         }
     }
+
     let id = id as i32;
+
     if (id.wrapping_mul(id).wrapping_mul(id) ^ ticks as i32) as u8 == 0 && !h.is_immortal {
         h.health.blood_level = blood - 3;
         let p = h.bones[1].pos;
@@ -467,6 +505,7 @@ fn simulate_movement(h: &mut Human, bodies: &mut RigidBodies, surface: &Surface,
     if 0.707 > h.bones[0].rot[1].y {
         h.locomotion.jump_charge = 0;
     }
+
     if h.vehicle.is_some() {
         h.movement_state = 4;
         h.locomotion.feet[0].mode = FOOT_FREE;
@@ -482,9 +521,11 @@ fn simulate_movement(h: &mut Human, bodies: &mut RigidBodies, surface: &Surface,
             _ => {}
         }
     }
+
     if h.has_input(Input::Ragdoll) {
         h.movement_state = 2;
     }
+
     match h.movement_state {
         0 | 1 | 5 => update_locomotion_constraints(h, bodies, surface, ticks),
         2 => slide_simulation(h, bodies),
@@ -492,6 +533,7 @@ fn simulate_movement(h: &mut Human, bodies: &mut RigidBodies, surface: &Surface,
         4 => walk_simulation(h, bodies),
         _ => {}
     }
+
     None
 }
 
@@ -501,6 +543,7 @@ fn lift_held_items(h: &Human, bodies: &mut RigidBodies, touch: &Touchables, lift
         if slot.count <= 0 {
             continue;
         }
+
         if let Some(b) = touch.items.get(slot.items[0] as usize).and_then(|i| bodies.get_mut(i.body)) {
             b.vel.y += lift;
         }

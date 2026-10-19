@@ -100,6 +100,7 @@ impl CityFileCSX {
 
     pub fn block_footprint(&self, id: u32) -> i32 {
         let Some(k) = id.checked_sub(716) else { return 1 };
+
         match self.custom_blocks().nth((k / 4) as usize) {
             Some((_, b)) if k % 2 == 0 => b.size.z as i32,
             Some((_, b)) => b.size.x as i32,

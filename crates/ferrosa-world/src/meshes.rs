@@ -162,6 +162,7 @@ impl BlockMeshes {
         }
 
         let mut height = 0.0f32;
+
         for w in 4..=12i32 {
             height = 1.0 / w as f32;
 
@@ -399,6 +400,7 @@ impl MeshBuilder {
         }
 
         let right = pw + x;
+
         if 1.0 > right {
             c[2] = 6;
             self.box_geometry(turns, 6 | back, &c, Vec3::new(right, 0.0, 0.0), Vec3::new(1.0 - right, 1.0, Q));
@@ -410,6 +412,7 @@ impl MeshBuilder {
         }
 
         let top = py + ph;
+
         if 1.0 > top {
             c[0] = 6;
             self.box_geometry(turns, 3 | back, &c, Vec3::new(0.0, top, 0.0), Vec3::new(1.0, 1.0 - top, Q));

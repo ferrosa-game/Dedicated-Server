@@ -43,6 +43,7 @@ pub fn bezier_derivative(deg: Option<Degree>, t: f32, p0: f32, p1: f32, p2: f32,
 
 pub fn bezier(deg: Option<Degree>, t: f32, p0: f32, p1: f32, p2: f32, p3: f32) -> f32 {
     let om = 1.0 - t;
+
     match deg {
         Some(Degree::Linear) => p0 * om + t * p3,
         Some(Degree::Quadratic) => (((p1 + p1) * om * t) + om * (p0 * om)) + t * (p3 * t),
@@ -132,6 +133,7 @@ impl MeshBuilder {
         let first = self.pos.len() as i32;
         let (du_step, dv_step) = (1.0 / u_seg as f32, 1.0 / v_seg as f32);
         let mut sv = 0.0f32;
+
         for _ in 0..=v_seg {
             let col = |c: usize, f: fn(Option<Degree>, f32, f32, f32, f32, f32) -> f32| {
                 let e = |k: usize| {

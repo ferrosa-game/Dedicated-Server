@@ -107,6 +107,7 @@ impl Sim {
                 }
                 _ => {}
             }
+
             self.check_npc_dead(idx);
         }
     }
@@ -220,6 +221,7 @@ impl Sim {
         ferrosa_physics::rotation::rotate_orientation(&mut rot, Vec3::Y, npc.yaw);
 
         let human = self.spawn_human(npc.pos, &rot, Some(pid));
+
         if let Some(p) = self.players.get_mut(pid.idx()) {
             p.human = human;
         }

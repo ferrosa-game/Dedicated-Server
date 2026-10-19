@@ -95,6 +95,7 @@ impl Reassembler {
         if s.data.len() < at + body.len() {
             s.data.resize(at + body.len(), 0);
         }
+
         s.data[at..at + body.len()].copy_from_slice(body);
         s.len = s.len.max(at + body.len());
         s.received |= 1 << index;

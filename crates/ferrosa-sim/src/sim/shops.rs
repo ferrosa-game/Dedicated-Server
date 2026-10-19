@@ -94,25 +94,33 @@ impl Sim {
         let restarting = self.gamestate == ferrosa_protocol::clientbound::game::GameState::Restarting;
         let p = self.players.get_mut(pid.idx())?;
         p.menu_buttons.clear();
+
         if p.ghost_human && p.human.is_none() {
             p.menu = MenuType::Empty;
             return None;
         }
+
         if p.human.is_none() {
             if self.rules.intermission_lobby {
                 p.menu = if self.gamestate == ferrosa_protocol::clientbound::game::GameState::Intermission { MenuType::Lobby } else { MenuType::Empty };
             }
+
             return None;
         }
+
         let pos = p.human.and_then(|h| self.humans.get(h)).map(|h| h.pos)?;
+
         if restarting {
             p.menu = MenuType::Empty;
             return Some(None);
         }
+
         let id = p.menu as u8;
+
         if (9..=11).contains(&id) && !usize::try_from(p.menu_tab).ok().and_then(|k| buildings.get(k)).is_some_and(|b| b.contains(pos, 0.0)) {
             p.menu = MenuType::Empty;
         }
+
         let shop = buildings.iter().enumerate().find_map(|(k, b)| match b.kind {
             CAR_DEALER if b.contains(pos, 0.0) => Some((k, 9)),
             GUN_STORE | BURGER_SHOP | CLOTHING_STORE if b.contains(pos, 0.0) => Some((k, 10)),
@@ -122,10 +130,12 @@ impl Sim {
         let Some((k, m)) = found else {
             return Some((p.menu != MenuType::RoundCorpStock).then_some(pos));
         };
+
         if p.menu == MenuType::Empty {
             p.menu = menu(m);
             p.menu_tab = k as i32;
         }
+
         Some(None)
     }
 
@@ -133,12 +143,15 @@ impl Sim {
     /// `button`, and the back button returns to the front page.
     pub(crate) fn shop_menu_action(&mut self, pid: PlayerId, button: u32) {
         let Some(p) = self.players.get(pid.idx()) else { return };
+
         if p.human.is_none() {
             return;
         }
+
         match p.menu as u8 {
             9 => {
                 let p = self.players.get_mut(pid.idx()).unwrap();
+
                 match button {
                     1 => p.menu = MenuType::WorldStore,
                     2 => p.menu = MenuType::WorldStoreDone,
@@ -148,6 +161,7 @@ impl Sim {
             10 => {
                 let Some(b) = usize::try_from(p.menu_tab).ok().and_then(|k| self.world.map.level.buildings.get(k)) else { return };
                 let (kind, count) = (b.kind, b.shop.len() as u32);
+
                 if button > 0 && button <= count {
                     match kind {
                         CLOTHING_STORE => self.clothing_store_purchase(pid, button),
@@ -157,6 +171,7 @@ impl Sim {
                         _ => {}
                     }
                 }
+
                 if button == BACK
                     && let Some(p) = self.players.get_mut(pid.idx())
                 {
@@ -167,6 +182,7 @@ impl Sim {
                 if button == SELL {
                     self.player_sell_vehicle(pid);
                 }
+
                 if button == BACK
                     && let Some(p) = self.players.get_mut(pid.idx())
                 {
@@ -180,6 +196,7 @@ impl Sim {
     /// The bank menu (13) of logic_playerinteractions; any other button (16) leaves it.
     pub(crate) fn bank_menu_action(&mut self, pid: PlayerId, button: u32) {
         let Some(human) = self.players.get(pid.idx()).and_then(|p| p.human) else { return };
+
         match button {
             b if WITHDRAW_BILLS.contains(&b) => self.bank_withdraw(pid, human, b),
             DEPOSIT => self.bank_deposit(pid, human),
@@ -197,10 +214,13 @@ impl Sim {
     fn bank_withdraw(&mut self, pid: PlayerId, human: usize, code: u32) {
         let value = BILL_VALUES[code as usize];
         let Some(p) = self.players.get(pid.idx()) else { return };
+
         if p.money < value || (code <= SMALL_BILL && p.bills_withdrawn > SMALL_BILL_LIMIT) {
             return;
         }
+
         let Some(hand) = self.humans.get(human).map(|h| h.inventory[0]) else { return };
+
         if hand.count <= 0 {
             self.give_item(human, ItemKind::CashWorld as u8, 0..1, |state| {
                 if let ItemState::Cash(cash) = state {
@@ -212,12 +232,15 @@ impl Sim {
             let Some(cash) = self.items.get_mut(hand.items[0] as usize).filter(|i| i.item_type == ItemKind::CashWorld).and_then(|i| i.state.cash_mut()) else {
                 return;
             };
+
             if !cash.insert(0, code) {
                 return;
             }
         }
+
         let Some(p) = self.players.get_mut(pid.idx()) else { return };
         p.money -= value;
+
         if code <= SMALL_BILL {
             p.bills_withdrawn += 1;
         }
@@ -226,14 +249,18 @@ impl Sim {
     /// The cash in the right hand goes into the player's money.
     fn bank_deposit(&mut self, pid: PlayerId, human: usize) {
         let Some(hand) = self.humans.get(human).map(|h| h.inventory[0]) else { return };
+
         if hand.count <= 0 {
             return;
         }
+
         let id = hand.items[0] as usize;
         let Some(value) = self.items.get(id).filter(|i| i.item_type == ItemKind::CashWorld).and_then(|i| i.state.cash()).map(|c| c.value()) else { return };
+
         if let Some(p) = self.players.get_mut(pid.idx()) {
             p.money += value;
         }
+
         self.mark_item_for_deletion(id);
     }
 
@@ -243,15 +270,19 @@ impl Sim {
     fn dealership_buy_vehicle(&mut self, pid: PlayerId, button: u32) {
         let Some(p) = self.players.get(pid.idx()) else { return };
         let Some(human) = p.human else { return };
+
         if p.vehicles_bought > MAX_VEHICLES_BOUGHT {
             return;
         }
+
         let Some(k) = usize::try_from(p.menu_tab).ok() else { return };
         let Some(b) = self.world.map.level.buildings.get_mut(k) else { return };
         let Some(e) = b.shop.get(button as usize - 1).copied() else { return };
+
         if p.money < e.price {
             return;
         }
+
         let n = b.car_counter;
         let d = (-n) as f32 * 4.0;
         let r2 = b.rot[2];
@@ -261,29 +292,36 @@ impl Sim {
         rotate_orientation(&mut rot, Vec3::Y, 90.0_f32.to_radians());
         let kind = u8::try_from(e.kind).ok().and_then(|k| ferrosa_protocol::clientbound::game::VehicleKind::try_from(k).ok());
         let vid = kind.and_then(|kind| self.spawn_vehicle(kind, e.extra, pos, rot));
+
         if let Some(v) = vid.and_then(|v| self.vehicles.get_mut(v)) {
             v.owner = pid.i32();
         }
+
         if let Some(p) = self.players.get_mut(pid.idx()) {
             p.money -= e.price;
         }
+
         if let Some(key) = self.create_item(ItemKind::Key, pos, None, rot) {
             if let Some(i) = self.items.get_mut(key) {
                 i.state = ItemState::Key { vehicle: vid };
             }
+
             self.link_first_free(human, key, POCKETS);
         }
+
         if let Some(p) = self.players.get_mut(pid.idx()) {
             p.vehicles_bought += 1;
 
             self.update_player_event(pid);
         }
+
         if self.rules.round_money_updates
             && let Some(p) = self.players.get(pid.idx())
         {
             let e = p.make_update_round_event(self.tick);
             self.events.push(e);
         }
+
         if let Some(b) = self.world.map.level.buildings.get_mut(k) {
             b.shop.swap_remove(button as usize - 1);
         }
@@ -294,19 +332,24 @@ impl Sim {
     fn player_sell_vehicle(&mut self, pid: PlayerId) {
         let Some(h) = self.players.get(pid.idx()).and_then(|p| p.human).and_then(|h| self.humans.get(h)) else { return };
         let hand = &h.inventory[0];
+
         if hand.count <= 0 {
             return;
         }
+
         let key = hand.items[0] as usize;
         let Some(ItemState::Key { vehicle: Some(vid) }) = self.items.get(key).map(|i| i.state.clone()) else { return };
         let Some(v) = self.vehicles.get(vid).filter(|v| v.health > 0) else { return };
         let price = self.vehicle_types.get(v.kind as usize).map_or(0, |t| t.price);
+
         if let Some(p) = self.players.get_mut(pid.idx()) {
             p.money = (price as f32 * 0.75 + p.money as f32) as i32;
         }
+
         if let Some(v) = self.vehicles.get_mut(vid) {
             v.despawn_time = 0;
         }
+
         if let Some(i) = self.items.get_mut(key) {
             i.despawn_time = 0;
         }
@@ -322,6 +365,7 @@ impl Sim {
     fn link_first_free(&mut self, human: usize, item: usize, slots: std::ops::Range<usize>) {
         let Some(h) = self.humans.get_mut(human) else { return };
         let mut touch = touchables!(self, Vec::new());
+
         for slot in slots {
             if crate::human::inventory::link_item_to_human(h, human, &mut self.bodies, &mut touch, item, slot) {
                 break;
@@ -334,9 +378,11 @@ impl Sim {
         let kind = ItemKind::try_from(kind).ok()?;
         let pos = self.humans.get(human).map(|h| h.pos)?;
         let item = self.create_item(kind, pos, None, IDENTITY)?;
+
         if let Some(i) = self.items.get_mut(item) {
             init(&mut i.state);
         }
+
         self.link_first_free(human, item, slots);
         Some(item)
     }
@@ -345,12 +391,15 @@ impl Sim {
     fn buy_shop_item(&mut self, pid: PlayerId, button: u32) {
         let Some(entry) = self.shop_entry(pid, button) else { return };
         let Some(p) = self.players.get(pid.idx()) else { return };
+
         if entry.price > p.money {
             return;
         }
+
         if let Some(h) = p.human {
             self.give_item(h, entry.kind as u8, POCKETS, |_| {});
         }
+
         let p = self.players.get_mut(pid.idx()).unwrap();
         p.money -= entry.price;
         p.items_bought += 1;
@@ -362,9 +411,11 @@ impl Sim {
     fn burger_shop_menu(&mut self, pid: PlayerId, button: u32) {
         let Some(entry) = self.shop_entry(pid, button) else { return };
         let Some(p) = self.players.get_mut(pid.idx()) else { return };
+
         if p.items_bought > BURGER_LIMIT || p.money < entry.price {
             return;
         }
+
         p.money -= entry.price;
         p.items_bought += 1;
         if let Some(h) = p.human
@@ -380,13 +431,17 @@ impl Sim {
         let Some(entry) = self.shop_entry(pid, button) else { return };
         let Some(p) = self.players.get_mut(pid.idx()) else { return };
         let Some(human) = p.human else { return };
+
         if p.money < entry.price {
             return;
         }
+
         let mut look = p.customization;
+
         match button {
             1..=3 => {
                 let suit = SUITS[button as usize - 1];
+
                 if look.suit_color != suit {
                     look.suit_color = suit;
                     p.money -= entry.price;
@@ -394,6 +449,7 @@ impl Sim {
             }
             4 | 5 => {
                 let necklace = (button != 4) as u8 + 1;
+
                 if look.necklace != necklace {
                     look.necklace = necklace;
                     p.money -= entry.price;
@@ -401,6 +457,7 @@ impl Sim {
             }
             _ => {}
         }
+
         p.customization = look;
 
         if let Some(h) = self.humans.get_mut(human) {

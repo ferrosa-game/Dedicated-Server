@@ -88,9 +88,11 @@ impl BuildingFile {
     /// see [`SpecialBlock`] and `CityFileCSX::special_block`.
     pub fn rotated(&self, quarter_turns: u8, special: &dyn Fn(&BuildingFile, u32) -> SpecialBlock) -> BuildingFile {
         let mut b = self.clone();
+
         for _ in 0..(quarter_turns & 3) {
             b = b.rotate_90(special);
         }
+
         b
     }
 
@@ -109,6 +111,7 @@ impl BuildingFile {
             if v & 0xE000_0000 != 0x8000_0000 {
                 return (nx, v);
             }
+
             let s = special(self, v);
             let v = if s.rotates { (v & !0x0300_0000) | ((v + 0x0100_0000) & 0x0300_0000) } else { v };
             (nx + 1 - s.footprint, v)
@@ -124,6 +127,7 @@ impl BuildingFile {
                     if let Some(i) = at(nx + 1, x, y) {
                         tiles[i].edge_z = src.edge_x;
                     }
+
                     if z == li {
                         continue;
                     }
@@ -148,9 +152,11 @@ impl BuildingFile {
 
                     let i = at(nx, x, y).unwrap();
                     let t = &mut tiles[i];
+
                     if interior & 0xE000_0000 == 0x8000_0000 && t.interior_block == 0 {
                         t.interior_block = 0xC000_0000;
                     }
+
                     t.build_block = src.build_block;
                     t.edge_x = src.edge_z;
                     t.floor = src.floor;

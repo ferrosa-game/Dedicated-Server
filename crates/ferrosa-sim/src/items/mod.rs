@@ -1,3 +1,4 @@
+use ferrosa_physics::rotation::rotate;
 use ferrosa_physics::{
     RotMatrix, Table,
     body::RigidBodyType,
@@ -179,7 +180,9 @@ impl Sim {
         if item_type == ItemKind::Computer {
             self.create_computer(id);
         }
+
         let item = self.items.get_mut(id).unwrap();
+
         match item_type {
             ItemKind::Door => {
                 let [r0, r1, r2] = rot;
@@ -389,6 +392,7 @@ impl Sim {
                     if mn[k] > p[k] {
                         mn[k] = p[k];
                     }
+
                     if p[k] > mx[k] {
                         mx[k] = p[k];
                     }
@@ -483,6 +487,7 @@ impl Sim {
 
                 continue;
             }
+
             if let Some(h) = holder {
                 if item.physics_settled {
                     if let Some(body) = self.bodies.get_mut(body_id) {
@@ -499,6 +504,7 @@ impl Sim {
                 item.settled_timer = 0;
 
                 let seated = h.vehicle.is_some();
+
                 if let Some(body) = self.bodies.get_mut(body_id) {
                     body.settled = false;
                 }
@@ -576,11 +582,14 @@ impl Sim {
         const CASH_SCALE: f32 = 0.75;
         const CASH_START: f32 = 27.0 / 128.0;
         const BELOW: f32 = -1.0 / 16.0;
+
         for id in self.items.ids() {
             let item = self.items.get(id).unwrap();
+
             if item.parent_item == -1 {
                 continue;
             }
+
             let (kind, slot) = (item.item_type, item.parent_slot);
             let Some(parent) = self.items.get(item.parent_item as usize) else { continue };
             let Some(body) = self.bodies.get(parent.body) else { continue };
@@ -607,13 +616,16 @@ impl Sim {
     fn snap_pocketed_items(&mut self) {
         for id in self.items.ids() {
             let item = self.items.get_mut(id).unwrap();
+
             if item.parent_human == -1 {
                 continue;
             }
+
             if item.parent_slot as u32 <= 1 {
                 item.pocket_pose = None;
                 continue;
             }
+
             let Some(h) = self.humans.get(item.parent_human as usize) else { continue };
             let (chest, pelvis) = (&h.bones[2], &h.bones[0]);
             let [c0, c1, c2] = chest.rot;
@@ -623,6 +635,7 @@ impl Sim {
             item.pocket_pose = Some((pos, rot));
             item.pos = h.vehicle.and_then(|v| self.vehicles.get(v)).map_or(pelvis.pos, |v| v.pos);
             let vel = pelvis.vel;
+
             if let Some(body) = self.bodies.get_mut(item.body) {
                 body.vel = vel;
                 body.ang_momentum = Vec3::ZERO;
@@ -637,29 +650,38 @@ impl Sim {
     fn item_update_collision_state(&mut self, id: usize) {
         let Some(item) = self.items.get(id) else { return };
         let (kind, body_a, min, max) = (item.item_type, item.body, item.aabb_min, item.aabb_max);
+
         for other in self.item_grid.query(item.block_min, item.block_max) {
             if other == id {
                 continue;
             }
+
             let Some(o) = self.items.get(other) else { continue };
+
             if id > other && !o.physics_settled {
                 continue;
             }
+
             if o.aabb_min.x > max.x || min.x > o.aabb_max.x || o.aabb_min.z > max.z || min.z > o.aabb_max.z || o.aabb_min.y > max.y || min.y > o.aabb_max.y {
                 continue;
             }
+
             let (Some(ha), Some(hb)) = (&self.item_types[kind as usize].hull, &self.item_types[o.item_type as usize].hull) else { continue };
             let body_b = o.body;
             let (Some(a), Some(b)) = (self.bodies.get(body_a), self.bodies.get(body_b)) else { continue };
             let contacts = collide_convex_hulls(ha, a.pos, &a.rot, hb, b.pos, &b.rot);
+
             for c in &contacts {
                 let (first, second) = if c.swapped { (body_b, body_a) } else { (body_a, body_b) };
                 self.bodies.add_body_contact(first, second, c.offset_a, c.offset_b, c.normal, c.depth, ITEM_FRICTION, CONTACT_DEPTH_SCALE, CONTACT_SOFTNESS);
             }
+
             if contacts.is_empty() {
                 continue;
             }
+
             let o_timer = self.items.get(other).unwrap().settled_timer;
+
             if o_timer <= 59 || self.items.get(id).unwrap().settled_timer <= 59 {
                 self.items.get_mut(id).unwrap().physics_settled = false;
                 self.items.get_mut(other).unwrap().physics_settled = false;
@@ -691,6 +713,7 @@ impl Sim {
         let Some(ball_pos) = self.bodies.get(ball_body).map(|b| b.pos) else { return };
 
         let bones = self.humans.iter().flat_map(|(_, h)| h.bones.iter().enumerate()).filter(|(k, _)| !KICK_SKIPPED_BONES.contains(k));
+
         for (_, bone) in bones {
             let d = ball - bone.pos;
             let len = d.length();
@@ -711,7 +734,7 @@ impl Sim {
     fn bounding_box_contacts(&mut self, body_id: usize, item_type: ItemKind) {
         let bounds = self.item_types[item_type as usize].bounds;
         let Some(body) = self.bodies.get(body_id) else { return };
-        let (pos, [r0, r1, r2]) = (body.pos, body.rot);
+        let (pos, rot) = (body.pos, body.rot);
 
         for i in 0..8 {
             let map = &self.world.map;
@@ -719,7 +742,7 @@ impl Sim {
             let sx = if q == 0 || q == 3 { -bounds.x } else { bounds.x };
             let sy = if i <= 3 { -bounds.y } else { bounds.y };
             let sz = if q <= 1 { -bounds.z } else { bounds.z };
-            let corner = pos + r0 * sx + r1 * sy + r2 * sz;
+            let corner = pos + rotate(&rot, Vec3::new(sx, sy, sz));
 
             let Some(h) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, pos, corner) else { continue };
 
@@ -806,6 +829,7 @@ pub fn attach_child(items: &mut Table<Item>, types: &[ItemType], parent: usize, 
     }
 
     let room = if matches!(c.item_type, ItemKind::CashRound | ItemKind::CashWorld) { n <= 4 } else { n == 0 };
+
     if !room {
         return false;
     }

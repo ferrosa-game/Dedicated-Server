@@ -24,6 +24,7 @@ impl AuthStore {
         if from != self.ms_addr {
             return false;
         }
+
         self.pending.insert(packet.account_id, Pending { received: Instant::now(), packet });
         true
     }

@@ -81,6 +81,7 @@ impl Sim {
             GameState::InGame => self.eliminator_game(),
             GameState::Restarting => {
                 self.game_timer -= 1;
+
                 if self.game_timer <= 0 {
                     self.reset_game();
                 }
@@ -140,17 +141,20 @@ impl Sim {
         self.deal_groups(ready);
 
         let spawning: Vec<PlayerId> = self.players.iter().filter(|(_, p)| p.is_ready && !p.is_bot).map(|(i, _)| PlayerId(i as u32)).collect();
+
         for pid in spawning {
             self.eliminator_spawn(pid, &mut used);
         }
 
         self.stock_eliminator_tables();
+
         for k in 0..3 {
             self.push_team_door_event(k, true);
             self.corp_state[k].door_open = true;
         }
 
         self.apply_team_doors();
+
         for i in 0..self.modes.eliminator.count {
             let target = self.modes.eliminator.groups[i].target;
             let pos = self.player_human_pos(target).unwrap_or(Vec3::ZERO);
@@ -180,9 +184,11 @@ impl Sim {
             if !list.is_empty() {
                 let i = rand::random_range(0..list.len() as i32) as usize;
                 g.eliminator = list.remove(i);
+
                 if !list.is_empty() {
                     let i = rand::random_range(0..list.len() as i32) as usize;
                     g.target = list.remove(i);
+
                     if !list.is_empty() {
                         let i = rand::random_range(0..list.len() as i32) as usize;
                         g.protector = list.remove(i);
@@ -207,6 +213,7 @@ impl Sim {
             loop {
                 let ru = r as usize;
                 let blocked = ru <= LAST_MASKED_INTERSECTION && BLOCKED_INTERSECTIONS >> ru & 1 != 0;
+
                 if !blocked && !used[ru] {
                     break;
                 }
@@ -254,6 +261,7 @@ impl Sim {
         self.update_player_event(pid);
 
         let mut told = false;
+
         for i in 0..self.modes.eliminator.count {
             let group = self.modes.eliminator.groups[i];
 
@@ -286,37 +294,48 @@ impl Sim {
             let car = crate::traffic::spawn::create_traffic_car(&mut self.traffic, map, &self.vehicle_types, kind, 0, 0, 0, 0, 0.0);
             self.traffic.cars[car].is_bot = 0;
             self.traffic.cars[car].vehicle = vid.map_or(-1, |v| v as i32);
+
             if let Some(v) = vid.and_then(|v| self.vehicles.get_mut(v)) {
                 v.traffic_car = car as i32;
             }
+
             let base = &self.world.map.level.bases[k];
             let rot = base.frame();
             let r0 = rot[0];
             let mut p = base.table;
+
             for _ in 0..TABLE_GUNS {
                 self.create_item(ItemKind::Pistol, p, None, rot);
+
                 for _ in 0..3 {
                     p = step(p, r0);
                     self.create_item(ItemKind::PistolMag, p, None, rot);
                 }
+
                 p = step(p, r0);
             }
+
             let two = rand::random::<bool>();
             self.create_item(ItemKind::Bandage, p, None, rot);
             p = step(p, r0);
+
             if two {
                 self.create_item(ItemKind::Bandage, p, None, rot);
                 p = step(p, r0);
             }
+
             let phone = self.create_item(ItemKind::Phone, p, None, rot);
             p = step(p, r0);
+
             if let Some(id) = phone {
                 if let Some(ph) = self.items.get_mut(id).and_then(|i| i.state.phone_mut()) {
                     ph.texture = 0;
                     ph.number = (k as i32 + 1) * PHONE_NUMBER_STEP;
                 }
+
                 self.phone_update(id);
             }
+
             self.create_item(ItemKind::SoccerBall, p, None, rot);
         }
     }
@@ -358,6 +377,7 @@ impl Sim {
         };
 
         let n = self.modes.eliminator.count;
+
         if let Some(pos) = (0..n).filter_map(|i| self.player_human_pos(self.modes.eliminator.groups[i].target)).next_back() {
             self.modes.eliminator.last_target = pos;
         }
@@ -611,6 +631,7 @@ impl super::ModeHooks for Hooks {
         if menu != super::round::LOBBY_MENU {
             return false;
         }
+
         sim.round_lobby(pid, button);
         true
     }

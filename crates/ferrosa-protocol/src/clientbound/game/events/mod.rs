@@ -101,17 +101,21 @@ impl WireWrite for Event {
             ServerEvent::Unused11(e) => {
                 w.bits(11, 6);
                 w.bits(self.tick_created as i32, 28);
+
                 for v in e.values {
                     w.i32(v);
                 }
+
                 return;
             }
             ServerEvent::Unused14(e) => {
                 w.bits(14, 6);
                 w.bits(self.tick_created as i32, 28);
+
                 for (v, n) in e.values.into_iter().zip([8, 8, 8, 20]) {
                     w.bits(v, n);
                 }
+
                 return;
             }
             ServerEvent::Empty => {
@@ -144,9 +148,11 @@ impl WireRead for Event {
     /// client_unpack_events: the type, then (unless it is the empty event) the tick and the type's fields.
     fn read(r: &mut Reader) -> Result<Self, CodecError> {
         let kind = r.bits(6)?;
+
         if kind == 23 {
             return Ok(Self { tick_created: 0, kind: ServerEvent::Empty });
         }
+
         let tick_created = r.bits(28)?;
         let kind = match kind {
             0 => ServerEvent::Bullet(EventBullet { bullet_type: r.bits(4)? as i32, item_id: r.bits(10)? as i32, pos: r.vec3()?, vel: r.vec3()? }),

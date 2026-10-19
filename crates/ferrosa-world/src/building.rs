@@ -6,7 +6,7 @@ use ferrosa_map::file_types::{
 };
 use ferrosa_physics::{
     RotMatrix,
-    rotation::{IDENTITY, rotate_orientation},
+    rotation::{IDENTITY, rotate, rotate_orientation},
 };
 use ferrosa_protocol::{Team, clientbound::game::ItemKind};
 use glam::{IVec3, Vec3};
@@ -303,6 +303,7 @@ impl<'a> Buildings<'a> {
 
         if let Some(k) = base {
             let b = &mut self.bases[k];
+
             for _ in 0..(rot & 3) {
                 b.table_orientation = (b.table_orientation as f64 + 90.0_f64.to_radians()) as f32;
             }
@@ -447,6 +448,7 @@ impl<'a> Buildings<'a> {
 
     fn prepare_runtime(&mut self, mem: &[Tile], w: i32, l: i32, h: i32) {
         let at = |x: i32, z: i32, y: i32| mem[BuildingFile::idx(w as u32, l as u32, x as u32, z as u32, y as u32)];
+
         for y in 0..h {
             for z in 0..=l {
                 for x in 0..=w {
@@ -455,6 +457,7 @@ impl<'a> Buildings<'a> {
 
                     if y < h - 1 {
                         let a = at(x, z, y + 1);
+
                         if a.block != 0 && a.interior != 0 && a.floor == 0 {
                             top = 0;
                         }
@@ -472,12 +475,14 @@ impl<'a> Buildings<'a> {
             for z in 0..=l {
                 for x in 0..=w {
                     let t = self.rt(x, z, y);
+
                     if t.block != CUBE {
                         continue;
                     }
 
                     let i = t.interior;
                     let qualifies = i == 65535 || i == 0 || i & FOOTPRINT == FOOTPRINT;
+
                     if !qualifies && !self.is_animated(i & 65535) {
                         continue;
                     }
@@ -533,6 +538,7 @@ impl<'a> Buildings<'a> {
         base: Option<usize>,
     ) {
         let flags = rot << 24;
+
         for y in 0..h {
             for z in 0..l {
                 for x in 0..w {
@@ -703,6 +709,7 @@ pub fn clear_collision_cell(area: &mut AreaGrid, x: i32, y: i32, z: i32) {
             (IVec3::new(1, 0, 0), 4),
         ] {
             let n = area.layer0(x + d.x, y + d.y, z + d.z);
+
             if n & TYPE_MASK == CUBE {
                 area.set_layer0(x + d.x, y + d.y, z + d.z, n | bit);
             }
@@ -716,6 +723,7 @@ pub fn clear_collision_cell(area: &mut AreaGrid, x: i32, y: i32, z: i32) {
 /// moved 32 along its third axis, the first two streets, the opposite ones standing in for missing ones.
 pub fn assign_streets(records: &mut [BuildingRecord], streets: &crate::streets::StreetMap) {
     const REACH: f32 = 32.0;
+
     for b in records {
         let [_, _, r2] = b.rot;
         let p = r2 * REACH + b.pos;
@@ -774,9 +782,7 @@ fn placement(raw: &BuildingFile, city: IVec3, rot: u32) -> (Vec3, RotMatrix) {
 
         (ox, oz) = (oz, ox);
         let (mx, mz) = (cell(-ox), cell(!oz));
-        let [r0, _, r2] = m;
-
-        pos = r0 * mx + pos + r2 * mz;
+        pos += rotate(&m, Vec3::new(mx, 0.0, mz));
     }
 
     (pos, m)

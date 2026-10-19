@@ -129,6 +129,7 @@ impl Sim {
         let mut deleted = Vec::new();
 
         let keep_bodies = self.rules.keep_bodies;
+
         for id in self.humans.ids() {
             let others = later_humans(&self.humans, id);
             let h = self.humans.get_mut(id).unwrap();
@@ -180,6 +181,7 @@ impl Sim {
                     if let Some(a) = self.saved_accounts.get_player_data(account) {
                         economy::account_wealth_tax(a);
                     }
+
                     continue;
                 }
             };
@@ -199,6 +201,7 @@ impl Sim {
                 let item = human.inventory[slot].items[human.inventory[slot].count as usize - 1] as usize;
                 let before = human.inventory[slot].count;
                 detach_item(&mut human, &mut self.bodies, &mut touch, item, slot);
+
                 if human.inventory[slot].count == before {
                     break;
                 }
@@ -235,6 +238,7 @@ impl Sim {
             .map(|(id, _)| id);
 
         let Some(id) = target else { return println!("[Sim] No living human to kill") };
+
         if let Some(h) = self.humans.get_mut(id) {
             h.health.vitality = 0;
         }
@@ -312,11 +316,14 @@ impl Sim {
                                 .filter_map(|&i| self.items.get(i as usize))
                                 .map(|item| {
                                     let kind = item.item_type as i32;
+
                                     if k > 1 {
                                         return kind;
                                     }
+
                                     let ty = &self.item_types[kind as usize];
                                     let mut shown = kind;
+
                                     if let Some(&mag) = item.children.first() {
                                         if ty.is_gun {
                                             let empty = self.items.get(mag).is_some_and(|m| m.state.left() == 0);
@@ -325,6 +332,7 @@ impl Sim {
                                             shown |= 0x100;
                                         }
                                     }
+
                                     if ty.magazine_ammo > 0 { shown | (item.state.left() << 8) } else { shown }
                                 })
                                 .collect()

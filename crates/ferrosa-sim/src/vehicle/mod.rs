@@ -63,7 +63,6 @@ pub struct Wheel {
     pub skid: f32,
 }
 
-/// A vehicle in the world.
 #[derive(Clone, Debug)]
 pub struct Vehicle {
     pub kind: ferrosa_protocol::clientbound::game::VehicleKind,
@@ -132,7 +131,6 @@ pub struct Vehicle {
     pub inv_gear_ratio: f32,
     pub clutch: f32,
     pub brake: f32,
-    /// The driven wheels.
     pub driven: Vec<usize>,
     pub engine_rpm: i32,
     /// Automatic gear changes and the ticks until the next one.

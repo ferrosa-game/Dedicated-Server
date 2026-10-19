@@ -131,14 +131,6 @@ impl Traffic {
     }
 }
 
-pub(crate) fn maxss(a: f32, b: f32) -> f32 {
-    if a > b { a } else { b }
-}
-
-pub(crate) fn minss(a: f32, b: f32) -> f32 {
-    if a < b { a } else { b }
-}
-
 /// get_random_street: a street with at most three lanes each way, rerolled up to 1024 times.
 pub fn random_street(map: &StreetMap) -> i32 {
     let n = map.streets.len() as i32;

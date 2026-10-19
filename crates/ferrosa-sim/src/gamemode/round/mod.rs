@@ -79,6 +79,7 @@ impl Default for RoundConfig {
 impl RoundConfig {
     pub(crate) fn load(path: &std::path::Path) -> Self {
         let mut c = RoundConfig::default();
+
         if let Ok(text) = std::fs::read_to_string(path) {
             let num = |key: &str| text.lines().find_map(|l| l.trim().strip_prefix(key)).and_then(|v| v.trim().parse::<i32>().ok());
             c.roundtime = num("roundtime=").unwrap_or(c.roundtime).clamp(1, 60);
@@ -87,6 +88,7 @@ impl RoundConfig {
             c.bonusratio = num("bonusratio=").unwrap_or(c.bonusratio);
             c.teamdamage = num("teamdamage=").unwrap_or(c.teamdamage).clamp(0, 200);
         }
+
         c
     }
 }
@@ -392,9 +394,11 @@ impl Sim {
         if self.game_timer % DAY == 0 {
             for (_, p) in self.players.iter_mut() {
                 p.items_bought = 0;
+
                 if p.vehicles_bought > 0 {
                     p.vehicles_bought -= 1;
                 }
+
                 p.bills_withdrawn = 0;
             }
         }
@@ -405,6 +409,7 @@ impl Sim {
 
         for k in 0..ROUND_CORPS {
             let team = Team::CORPORATIONS[k];
+
             if !self.corp_state[k].door_open && !self.players.iter().any(|(_, p)| p.team == team && p.human.is_some()) {
                 self.push_team_door_event(k, true);
                 self.corp_state[k].door_open = true;
@@ -483,6 +488,7 @@ impl Sim {
                     self.saved_accounts.players.iter().find(|a| a.account_id == p.account_id).map_or(0, |a| a.money as i32)
                 } else {
                     let w = p.stocks as f32 * price + p.money as f32;
+
                     if w > best.0 as f32 {
                         best = (w as i32, Some(i));
                     }
@@ -601,6 +607,7 @@ impl Sim {
         self.save_stats();
 
         self.modes.round.weekday += 1;
+
         if self.modes.round.cfg.weekly && self.modes.round.weekday > WEEK_DAYS {
             self.weekly_reset();
         }
@@ -810,13 +817,16 @@ impl Sim {
         let versus = self.rules.free_team_switch;
         let timer = self.game_timer;
         let Some(p) = self.players.get(pid.idx()) else { return };
+
         if (timer > LOBBY_TEAM_TIME || versus) && p.team_switch_timer == 0 {
             match button {
                 1..=3 => {
                     let k = button as usize - 1;
+
                     if self.corp_state[k].fired.contains(&p.account_id) {
                         return;
                     }
+
                     let p = self.players.get_mut(pid.idx()).unwrap();
                     p.team = Team::CORPORATIONS[k];
                     p.team_switch_timer = TEAM_SWITCH;
@@ -844,8 +854,10 @@ impl Sim {
                 _ => {}
             }
         }
+
         if button == 5 {
             let p = self.players.get_mut(pid.idx()).unwrap();
+
             if !p.is_ready {
                 p.is_ready = true;
             } else if timer > LOBBY_UNREADY_TIME {
@@ -910,6 +922,7 @@ impl super::ModeHooks for Hooks {
         if menu != LOBBY_MENU {
             return false;
         }
+
         sim.round_lobby(pid, button);
         true
     }

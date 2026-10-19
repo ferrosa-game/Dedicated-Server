@@ -59,14 +59,17 @@ fn hull_edges(verts: &[Vec3], faces: &[[usize; 3]]) -> Vec<[usize; 2]> {
     };
 
     let mut edges = Vec::new();
+
     for f in faces {
         for k in 0..3 {
             let (a, b) = (f[k], f[(k + 1) % 3]);
+
             if a != b && !flat(a, b) {
                 register_unique_pair(&mut edges, a, b);
             }
         }
     }
+
     edges
 }
 
@@ -135,9 +138,11 @@ impl VehicleBody {
 
         let hull = child(glb, root, "COL_hull").ok_or("COL_hull is required")?;
         let (nodes, faces) = mesh_faces(glb, hull)?;
+
         if nodes.len() < MIN_NODES {
             return Err(format!("COL_hull has {} corners, at least {MIN_NODES} needed", nodes.len()));
         }
+
         let faces: Vec<[usize; 3]> = faces.into_iter().filter(|f| f[0] != f[1] && f[1] != f[2] && f[2] != f[0]).collect();
 
         let edges = hull_edges(&nodes, &faces);

@@ -21,7 +21,6 @@ const STREETS: [&str; 9] =
 /// Avenue ids follow the nine street ids.
 const FIRST_AVENUE_ID: i32 = 9;
 
-/// A street intersection.
 #[derive(Clone, Debug, Default)]
 pub struct StreetIntersection {
     /// Its city grid position and world position.

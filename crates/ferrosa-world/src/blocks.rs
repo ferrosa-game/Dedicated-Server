@@ -15,6 +15,7 @@ pub fn slope_id(width: i32, boxes: bool, row: i32, col: i32) -> Option<u32> {
     if !(4..=12).contains(&width) || !(0..4).contains(&row) || !(0..width).contains(&col) {
         return None;
     }
+
     let w = width as u32;
     let base = SLOPE_BASE + (4..w).map(|v| 8 * v).sum::<u32>();
     Some(base + if boxes { 4 * w } else { 0 } + row as u32 * w + col as u32)
@@ -72,9 +73,11 @@ impl BlockTable {
 
     pub fn alloc_block_id(&mut self) -> Option<u32> {
         let id = self.next_id;
+
         if id > 65535 {
             return None;
         }
+
         self.next_id += 1;
         Some(id)
     }
@@ -87,6 +90,7 @@ pub struct StaticDims {
 impl StaticDims {
     pub fn new(custom_sizes: &[IVec3]) -> Self {
         let mut dims = vec![IVec3::ONE; CUSTOM_BASE as usize];
+
         for id in (24..=65).chain(642..=707) {
             dims[id] = IVec3::ZERO;
         }

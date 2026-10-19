@@ -1,3 +1,4 @@
+use ferrosa_physics::rotation::rotate;
 use ferrosa_physics::{Bond, Joint as BondJoint, RigidBodies, RotMatrix, Table, body::RigidBodyType};
 use ferrosa_protocol::CharacterCustomization;
 use glam::Vec3;
@@ -16,13 +17,14 @@ pub fn create_human(humans: &mut Table<Human>, bodies: &mut RigidBodies, pos: Ve
     let spawn_protection = (rand::random_range(0..4) + 3) * game_minutes(1);
 
     let mut bones = Vec::with_capacity(BONE_COUNT);
+
     for (i, t) in BONES.iter().enumerate() {
         let o = BoneTemplate::rest_offset(i);
-        let [r0, r1, r2] = *rot;
-        let world = r0 * o.x + r1 * o.y + r2 * o.z + pos;
+        let world = rotate(rot, o) + pos;
         let inv_inertia = t.inv_inertia();
         let inertia = 1.0 / inv_inertia;
         let body = bodies.create(RigidBodyType::HumanBone, world, *rot, None, inertia, t.mass)?;
+
         if let Some(b) = bodies.get_mut(body) {
             b.owner = id as i32;
             b.part = i as i32;
@@ -51,6 +53,7 @@ pub fn create_human(humans: &mut Table<Human>, bodies: &mut RigidBodies, pos: Ve
     }
 
     let mut joints = Vec::with_capacity(JOINT_ORDER.len());
+
     for child in JOINT_ORDER {
         let t = &BONES[child];
         let anchor_b = t.joint - t.offset;
@@ -189,6 +192,7 @@ pub fn update_attachment_centroids(attachments: &mut Attachments, bodies: &Rigid
     for g in &mut attachments.groups {
         g.prev_centroid = g.centroid;
         let mut sum = Vec3::ZERO;
+
         for &(id, l) in &g.points {
             let Some(b) = bodies.get(id) else { continue };
             let ([r0, r1, r2], p) = (b.rot, b.pos);
@@ -196,6 +200,7 @@ pub fn update_attachment_centroids(attachments: &mut Attachments, bodies: &Rigid
             sum.y += ((r0.y * l.x + p.y) + r1.y * l.y) + r2.y * l.z;
             sum.z += ((r0.z * l.x + p.z) + r1.z * l.y) + r2.z * l.z;
         }
+
         let inv = 1.0 / g.points.len() as f32;
         g.centroid = sum * inv;
     }

@@ -32,6 +32,7 @@ impl Sim {
         }
 
         let people = self.players.iter().filter(|(_, p)| !p.is_bot).count();
+
         if people >= self.max_players as usize && !admin {
             return self.kick(conn, src, "Server is full");
         }
@@ -39,6 +40,7 @@ impl Sim {
         let Some(player_id) = self.alloc_player(accout_data.account_id, j) else {
             return self.kick(conn, src, "Server is full");
         };
+
         if let Some(p) = self.players.get_mut(player_id.idx()) {
             p.username = accout_data.name();
         }
@@ -124,6 +126,7 @@ impl Sim {
         }
 
         let mode = self.mode;
+
         if mode.on_menu(self, player_id, id, action.button) {
             return;
         }
@@ -167,6 +170,7 @@ impl Sim {
         let arg = message.trim_start_matches("/item").trim().to_lowercase();
         let kinds = (0..ItemKind::COUNT as u8).filter_map(|k| ItemKind::try_from(k).ok());
         let kind = kinds.clone().find(|k| arg.parse::<u8>().ok() == Some(*k as u8) || format!("{k:?}").to_lowercase() == arg);
+
         match kind {
             Some(k) => {
                 self.spawn_item_for(player_id, k, Vec3::Z);
@@ -194,13 +198,16 @@ impl Sim {
                 }
             },
         };
+
         if let Some(scale) = scale {
             self.bodies.gravity_scale = scale;
+
             for (_, item) in self.items.iter_mut() {
                 item.physics_settled = false;
                 item.settled_timer = 0;
             }
         }
+
         let g = self.bodies.gravity_scale * EARTH_GRAVITY;
         self.send_chat(&format!("Gravity is {g} m/s²"), ChatType::Announce, -1, 0);
     }
@@ -210,9 +217,11 @@ impl Sim {
         let Some(id) = self.spawn_item_for(player_id, ItemKind::Phone, Vec3::Z) else {
             return;
         };
+
         if let Some(p) = self.items.get_mut(id).and_then(|i| i.state.phone_mut()) {
             p.number = number;
         }
+
         self.send_chat(&format!("Phone {number} spawned"), ChatType::Announce, -1, 0);
     }
 

@@ -41,6 +41,7 @@ impl WireWrite for SteamAuthReply {
         w.byte(0x48);
         w.u32(self.game_auth);
         w.u32(self.master_auth);
+
         if let Some(phone) = self.phone_number {
             w.u32(phone);
         }
@@ -88,6 +89,7 @@ impl WireWrite for AuthConfirmReply {
     fn write(&self, w: &mut Writer) {
         w.byte(0x49);
         w.u32(self.accepted as u32);
+
         if let Some(phone) = self.phone_number {
             w.u32(phone);
         }

@@ -1,11 +1,12 @@
 use ferrosa_map::file_types::it3::It3Collision;
-use ferrosa_physics::RotMatrix;
+use ferrosa_physics::{RotMatrix, rotation::rotate};
 use glam::Vec3;
 
 use crate::{
     capsule::capsule_intersect_triangle,
     collide::{calculate_face_normal, segment_intersect_face},
     mesh::CUBE_FACES,
+    sphere::segment_intersect_plane_two_sided,
 };
 
 const BOX_EDGES: [[usize; 2]; 12] = [[0, 1], [1, 2], [2, 3], [3, 0], [0, 4], [1, 5], [2, 6], [3, 7], [4, 5], [5, 6], [6, 7], [7, 4]];
@@ -122,6 +123,7 @@ impl ConvexHull {
         }
 
         let mut faces = Vec::with_capacity(22);
+
         for ring in (0..PRISM_SIDES * 3).step_by(PRISM_SIDES) {
             for k in 0..PRISM_SIDES {
                 let next = (k + 1) % PRISM_SIDES;
@@ -133,6 +135,7 @@ impl ConvexHull {
         faces.extend(PRISM_CAPS);
 
         let mut edges = Vec::with_capacity(42);
+
         for ring in (0..PRISM_SIDES * 3).step_by(PRISM_SIDES) {
             for k in 0..PRISM_SIDES {
                 edges.push([ring + k, ring + PRISM_SIDES + k]);
@@ -150,8 +153,7 @@ impl ConvexHull {
 
     /// transform_collision_mesh_vertices: the hull's vertices placed at `pos` with orientation `rot`.
     pub fn world_verts(&self, pos: Vec3, rot: &RotMatrix) -> Vec<Vec3> {
-        let [r0, r1, r2] = *rot;
-        self.verts.iter().map(|v| v.x * r0 + v.y * r1 + v.z * r2 + pos).collect()
+        self.verts.iter().map(|&v| rotate(rot, v) + pos).collect()
     }
 
     /// capsule_intersect_hull_face_groups_max_distance: the face hit with the greatest axis distance (zero-distance hits never count).
@@ -174,31 +176,10 @@ impl ConvexHull {
     }
 }
 
-/// segment_intersect_plane_two_sided: where the segment crosses the plane through `p` with normal `n`, from either side.
-fn segment_intersect_plane_two_sided(n: Vec3, p: Vec3, start: Vec3, end: Vec3) -> Option<Vec3> {
-    let d_end = ((p.x - end.x) * n.x + (p.y - end.y) * n.y) + (p.z - end.z) * n.z;
-    let d_start = ((p.x - start.x) * n.x + (p.y - start.y) * n.y) + (p.z - start.z) * n.z;
-
-    if (d_start > 0.0 && d_end > 0.0) || (0.0 > d_start && 0.0 > d_end) {
-        return None;
-    }
-
-    let e = end - start;
-    let denom = n.dot(e);
-
-    if denom == 0.0 {
-        return None;
-    }
-
-    let t = d_start / denom;
-
-    Some(e * t + start)
-}
-
 /// segment_intersects_triangle_two_sided: whether the segment passes through the triangle `a`, `b`, `c` from either side.
 fn segment_intersects_triangle_two_sided(start: Vec3, end: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
     let n = calculate_face_normal(a, b, c);
-    let Some(p) = segment_intersect_plane_two_sided(n, a, start, end) else { return false };
+    let Some((_, p)) = segment_intersect_plane_two_sided(n, start, end, a) else { return false };
 
     let side = |v: Vec3, w: Vec3| {
         let (pv, wv) = (p - v, w - v);
@@ -269,8 +250,7 @@ pub struct HullContact {
 impl ConvexHull {
     /// The centre `c` of a face group placed at `pos` with orientation `rot`.
     fn world_center(c: Vec3, pos: Vec3, rot: &RotMatrix) -> Vec3 {
-        let [r0, r1, r2] = *rot;
-        r0 * c.x + r1 * c.y + r2 * c.z + pos
+        rotate(rot, c) + pos
     }
 
     /// trace_segment_item_mesh: the segment against each face of the hull placed as `world`, both triangles of a face
@@ -296,12 +276,10 @@ impl ConvexHull {
 
     /// segment_cast_hull_face_groups: the first face the segment enters, as the hit point and the face's world normal.
     pub fn segment_cast(&self, world: &[Vec3], rot: &RotMatrix, start: Vec3, end: Vec3) -> Option<(Vec3, Vec3)> {
-        let [r0, r1, r2] = *rot;
         let mut best = (1.0f32, Vec3::ZERO, Vec3::ZERO);
 
         for f in self.faces() {
-            let m = f.normal;
-            let n = r1 * m.y + r0 * m.x + r2 * m.z;
+            let n = rotate(rot, f.normal);
             let [a, b, c, d] = f.verts.map(|i| world[i]);
 
             for (p, q) in [(b, c), (c, d)] {

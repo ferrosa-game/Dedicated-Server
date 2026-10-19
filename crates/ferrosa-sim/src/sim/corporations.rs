@@ -115,6 +115,7 @@ impl Sim {
             }
 
             let Some(item) = self.items.get_mut(id) else { continue };
+
             if let Some(phone) = item.state.phone_mut() {
                 phone.status = PhoneStatus::Idle;
                 phone.connected = None;
@@ -150,6 +151,7 @@ impl Sim {
     /// A player stops managing the corporation they leave (in world mode after paying out its money).
     pub(crate) fn leave_corp_management(&mut self, pid: PlayerId, team: Team) {
         let Some(k) = team_index(team) else { return };
+
         if self.corp_state[k].manager != Some(pid) {
             return;
         }
@@ -194,11 +196,13 @@ impl Sim {
     pub(crate) fn team_door_probe(&mut self, player: Option<PlayerId>, start: Vec3, end: Vec3, pos: Vec3) {
         let map = &self.world.map;
         let Some(hit) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, start, end) else { return };
+
         if hit.area == -1 {
             return;
         }
 
         let word = map.level.area.collision_cell_resolved(hit.block.x, hit.block.y, hit.block.z) & 0xfcffffff;
+
         if self.gamestate != GameState::InGame || !self.rules.door_knocks {
             return;
         }
@@ -206,6 +210,7 @@ impl Sim {
         let Some(k) = self.players.get(player.unwrap_or(PlayerId(0)).idx()).and_then(|p| team_index(p.team)) else { return };
         let base = &map.level.bases[k];
         let (a, b) = (base.interior_min, base.interior_max);
+
         if pos.x < a.x - DOOR_REACH || b.x + DOOR_REACH <= pos.x || pos.z < a.z - DOOR_REACH || DOOR_REACH + b.z <= pos.z {
             return;
         }

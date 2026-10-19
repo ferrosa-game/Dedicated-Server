@@ -75,6 +75,7 @@ pub fn link_item_to_human(h: &mut Human, human_id: usize, bodies: &mut RigidBodi
     item.parent_item = -1;
 
     let n = h.inventory[slot].count;
+
     if n <= 7 {
         h.inventory[slot].count = n + 1;
         item.parent_human = human_id as i32;
@@ -102,10 +103,12 @@ pub(crate) fn detach_item(h: &mut Human, bodies: &mut RigidBodies, touch: &mut T
         let (p, r1) = (chest.pos, chest.rot[1]);
         // the binary also sets the item's previous position to the chest, which its next position sync overwrites
         let at = r1 * -0.25 + p;
+
         if let Some(item) = touch.items.get_mut(item_id) {
             if let Some(body) = bodies.get_mut(item.body) {
                 body.pos = at;
             }
+
             item.pos = at;
         }
     }
@@ -154,11 +157,13 @@ pub fn hand_grab_and_inventory(h: &mut Human, human_id: usize, bodies: &mut Rigi
         }
 
         let empty = h.inventory[slot].count == 0;
+
         if !empty {
             computer_and_disk(h, bodies, touch, slot);
         }
 
         let released = h.released(Input::LeftMouse);
+
         if slot == 0 && released && empty {
             grab_item(h, touch);
         }
@@ -214,6 +219,7 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
         let (p, [_, _, r2]) = (h.bones[0].pos, h.bones[0].rot);
         let end = r2 * COMPUTER_REACH + p;
         let clicked = h.released(Input::LeftMouse);
+
         if point_segment_distance(p, end, pos) > COMPUTER_HOLD || clicked {
             unlink_item(h, bodies, touch, item_id);
         }
@@ -229,6 +235,7 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
     let end = r2 * DISK_REACH + p;
     let mut best = DISK_RADIUS;
     let mut found = None;
+
     for (id, c) in touch.items.iter() {
         if c.item_type != ItemKind::Computer || c.parent_human != -1 {
             continue;
@@ -347,6 +354,7 @@ fn is_gun(touch: &Touchables, item: usize) -> bool {
 /// can take the mounted item off the item in the other hand.
 fn can_mount(h: &Human, touch: &Touchables, hand: usize) -> bool {
     let Some(other) = held(h, hand ^ 1) else { return false };
+
     match held(h, hand) {
         Some(item) => mounts_on(touch, item, other),
         None => touch.items.get(other).and_then(|o| o.children.first().copied()).is_some_and(|c| mounts_on(touch, c, other)),
@@ -605,6 +613,7 @@ fn drop(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchables, f: usiz
 
     if tp > min_angle && tp < max_angle {
         let s = &h.inventory[slot as usize];
+
         if s.count > 0 {
             let item = s.items[0] as usize;
             unlink_item(h, bodies, touch, item);
@@ -644,6 +653,7 @@ fn item_in_sight(h: &Human, touch: &Touchables, free: impl Fn(&Item) -> bool) ->
             found = Some(id);
         }
     }
+
     found
 }
 
@@ -656,6 +666,7 @@ fn grab_item(h: &mut Human, touch: &mut Touchables) {
 
     let item = touch.items.get(item_id).unwrap();
     let kind = item.item_type;
+
     if let Some(parent) = usize::try_from(item.parent_item).ok().filter(|&p| touch.items.get(p).is_some_and(|p| p.item_type == ItemKind::Computer)) {
         remove_link(touch.items, item_id, parent);
     }

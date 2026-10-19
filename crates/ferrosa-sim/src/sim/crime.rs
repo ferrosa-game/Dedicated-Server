@@ -34,6 +34,7 @@ impl Sim {
             if last_vehicle != -1 && attacker.idx() as i32 == owner && owner != -1 {
                 return;
             }
+
             if attacker_victim.team == Team::Spectator { cfg.crimecivciv } else { cfg.crimecivteam }
         } else if !(0..=5).contains(&a_team) {
             cfg.crimecivciv
@@ -41,9 +42,11 @@ impl Sim {
             if self.in_base(a_team, victim_pos) {
                 return;
             }
+
             if owner != -1 && self.players.get(owner as usize).is_some_and(|o| o.team as i32 == a_team) {
                 return;
             }
+
             if attacker_victim.team == Team::Spectator {
                 cfg.crimeteamciv
             } else if (0..=5).contains(&v_team) && self.in_base(v_team, victim_pos) {
@@ -53,6 +56,7 @@ impl Sim {
             }
         };
         let mut k = rate as f32 / 100.0;
+
         if attacker_victim.crim_rating > 0 {
             let f = attacker_victim.crim_rating as f32 / 100.0;
 
@@ -105,6 +109,7 @@ impl Sim {
         println!("[Sim] {}({}) team damage: {damage}", player.username, player.phone_number);
 
         let share = self.rules.team_damage;
+
         if let Some(h) = player.human.and_then(|h| self.humans.get_mut(h)) {
             damage_human(h, BoneId::Head, damage * share / 100);
         }

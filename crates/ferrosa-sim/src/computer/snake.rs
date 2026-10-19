@@ -80,18 +80,22 @@ impl Sim {
     /// computer_snake_new_game: the next level's board, 8 apples (2 a quarter) and the snake back at the start.
     fn snake_new_game(&mut self, id: usize, c: &mut Computer) {
         let s = &mut c.snake;
+
         for (y, row) in s.board.iter_mut().enumerate() {
             for (x, cell) in row.iter_mut().enumerate() {
                 let wall = y == WALL_ROW || y == 0 || (y < WALL_ROW && (x == 0 || x == WALL_COLUMN));
                 *cell = if wall { WALL } else { EMPTY };
             }
         }
+
         let level = (s.level & 7) as usize;
+
         for walls in LEVEL_WALLS.iter().take(level) {
             for &k in walls.iter() {
                 s.board[k / WIDTH][k % WIDTH] = WALL;
             }
         }
+
         for &(left, top) in &QUARTERS {
             for _ in 0..APPLES_PER_QUARTER {
                 let roll = || (rand::random_range(0..12) as i32 + left, rand::random_range(0..9) as i32 + top);
@@ -101,18 +105,22 @@ impl Sim {
                     if *s.cell(p) == EMPTY {
                         break true;
                     }
+
                     p = roll();
                     tries -= 1;
+
                     if tries == 0 {
                         break *s.cell(p) == EMPTY;
                     }
                 };
+
                 if free {
                     *s.cell(p) = APPLE;
                     s.apples += 1;
                 }
             }
         }
+
         s.head = 0;
         s.tail = 0;
         s.ring[0] = START;
@@ -132,15 +140,19 @@ impl Sim {
         if key & 0x100 != 0 {
             if (key as u8).eq_ignore_ascii_case(&b'X') {
                 c.mode = Mode::Shell;
+
                 for l in 0..SCREEN_LINES {
                     c.lines[l][0] = 0;
                     c.colors[l][..63].fill(WHITE);
                     self.register_line(id, c, l as i32);
                 }
             }
+
             return;
         }
+
         let h = &mut c.snake.heading;
+
         match key {
             KEY_RIGHT if *h != 2 => *h = 0,
             KEY_LEFT if *h != 0 => *h = 2,
@@ -154,74 +166,94 @@ impl Sim {
     /// grows it by 4, running into anything ends the game, and the level is done when the apples are gone.
     pub(crate) fn snake_tick(&mut self, id: usize, c: &mut Computer) {
         let s = &mut c.snake;
+
         if s.over != 0 {
             return;
         }
+
         s.countdown -= 1;
+
         if s.countdown > 0 {
             return;
         }
+
         if s.apples == 0 {
             return self.snake_new_game(id, c);
         }
+
         s.countdown = (16 - (s.level >> 3 << 2)).max(4);
         let (mut x, mut y) = s.ring[s.head & (RING - 1)];
         s.head = (s.head + 1) & (RING - 1);
+
         match s.heading {
             0 => {
                 x += 1;
+
                 if x >= WRAP_X {
                     x = 0;
                 }
             }
             1 => {
                 y += 1;
+
                 if y >= WRAP_Y {
                     y = 0;
                 }
             }
             2 => {
                 x -= 1;
+
                 if x < 0 {
                     x = WRAP_X - 1;
                 }
             }
             3 => {
                 y -= 1;
+
                 if y < 0 {
                     y = WRAP_Y - 1;
                 }
             }
             _ => {}
         }
+
         s.ring[s.head] = (x, y);
+
         if *s.cell((x, y)) == APPLE {
             *s.cell((x, y)) = EMPTY;
             s.score = ((s.score as u16).wrapping_add(APPLE_POINTS as u16)) as u32;
             s.apples -= 1;
+
             if s.apples <= 0 {
                 s.countdown = LEVEL_DONE_TICKS;
                 s.apples = 0;
             }
+
             let end = s.ring[s.tail];
+
             for _ in 0..GROWTH {
                 s.tail = (s.tail + RING - 1) & (RING - 1);
                 s.ring[s.tail] = end;
             }
         }
+
         let head = s.ring[s.head];
+
         if *s.cell(head) != EMPTY {
             s.over = 1;
         }
+
         let tail = s.ring[s.tail];
         *s.cell(tail) = EMPTY;
         s.tail = (s.tail + 1) & (RING - 1);
         let mut k = s.tail;
+
         while k != s.head {
             let p = s.ring[k];
             *s.cell(p) = BODY;
             k = (k + 1) & (RING - 1);
         }
+
         let head = s.ring[s.head];
         *s.cell(head) = HEAD;
         self.snake_render(id, c);
@@ -243,6 +275,7 @@ impl Sim {
                     _ => 0x2f,
                 };
             }
+
             c.lines[row][62] = 0;
         }
 

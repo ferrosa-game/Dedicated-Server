@@ -42,6 +42,7 @@ impl Sim {
     pub(crate) fn write_memo(&mut self, id: usize, text: &[u8]) {
         let Some(item) = self.items.get(id) else { return };
         let (mask, links) = (item.link_mask, item.links);
+
         for (k, &link) in links.iter().enumerate() {
             if mask & (1 << k) != 0 {
                 self.links.free(link);
@@ -53,6 +54,7 @@ impl Sim {
         item.link_mask = 0;
 
         let ItemState::Memo(buf) = &mut item.state else { return };
+
         for (k, b) in buf.iter_mut().enumerate().take(n) {
             *b = text.get(k).copied().unwrap_or(0);
         }
@@ -74,6 +76,7 @@ impl Sim {
         self.links.links[free] = Link { active: true, kind: KIND_MEMO, tick: self.tick as i32, item: id as i32, line: block as i32, text, colors: Vec::new() };
 
         let Some(slot) = (0..ITEM_SLOTS).find(|&k| item.link_mask & (1 << k) == 0) else { return };
+
         if let Some(item) = self.items.get_mut(id) {
             item.links[slot] = free as i32;
             item.link_mask |= 1 << slot;
@@ -95,13 +98,16 @@ impl Sim {
 
             while k < data.len() && lines.len() <= MAX_LINES {
                 let mut line = Vec::new();
+
                 while k < data.len() && data[k] != b'\n' && data[k] != b'\r' && line.len() < LINE_LEN - 1 {
                     line.push(data[k]);
                     k += 1;
                 }
+
                 while k < data.len() && (data[k] == b'\n' || data[k] == b'\r') {
                     k += 1;
                 }
+
                 lines.push(line);
             }
         }

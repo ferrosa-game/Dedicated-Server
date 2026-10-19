@@ -1,5 +1,6 @@
 //! A human in a vehicle seat: finding a seat, the seated pose, the driver's controls and getting out.
 
+use ferrosa_physics::rotation::rotate;
 use ferrosa_physics::{RigidBodies, RotMatrix, rotation::rotate_orientation};
 use ferrosa_protocol::clientbound::game::ItemKind;
 use glam::Vec3;
@@ -22,8 +23,7 @@ const SEAT_PARAMS: IkParams =
 
 /// A vehicle's seat offset in the world, in the order human_action_simulation adds it.
 fn seat_point(v: &Vehicle, s: Vec3) -> Vec3 {
-    let [r0, r1, r2] = v.rot;
-    v.pos + r0 * s.x + r1 * s.y + r2 * s.z
+    v.pos + rotate(&v.rot, s)
 }
 
 /// The pickup action with nothing in reach (human_action_simulation): the free seat nearest a point ahead of the head,
@@ -85,6 +85,7 @@ fn drive(h: &Human, touch: &mut Touchables, vid: usize) {
 fn orthonormalize(m: &mut RotMatrix, scale: f32) {
     let unit = |v: Vec3| {
         let len = v.length();
+
         if len == 0.0 {
             Vec3::ZERO
         } else {
@@ -157,6 +158,7 @@ const UP: Vec3 = Vec3::Y;
 /// a human holding something or getting out keeps its upper body free.
 fn pose_bones(h: &Human, bodies: &mut RigidBodies, map: &Map, has_item: bool, scale: f32) {
     let exit_angle = (h.seat_exit != 0).then(|| exit_leg_angle(h, map, scale));
+
     for j in 1..BONE_COUNT {
         if (has_item || h.seat_exit != 0) && j <= 9 {
             continue;

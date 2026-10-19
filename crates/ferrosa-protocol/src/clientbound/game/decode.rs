@@ -120,6 +120,7 @@ pub fn decode_quaternion(v: &[i32], bits: u32) -> [f32; 4] {
     let mut q = [0f32; 4];
     let mut left = 1.0f64;
     let mut k = 1;
+
     for i in [3usize, 1, 2, 0] {
         if i != largest {
             let c = v[k] as f64 / scale / std::f64::consts::FRAC_1_SQRT_2;
@@ -128,6 +129,7 @@ pub fn decode_quaternion(v: &[i32], bits: u32) -> [f32; 4] {
             k += 1;
         }
     }
+
     q[largest] = if left > 0.0 { left.sqrt() as f32 } else { 0.0 };
     let len = q.iter().map(|c| c * c).sum::<f32>().sqrt();
     if len > 0.0 { q.map(|c| c / len) } else { q }
@@ -157,9 +159,11 @@ impl ObjectDecoder {
     /// The pack entries from the applied one to the newest received in order, each filling or emptying its slot.
     fn apply_packs(&mut self) {
         let mut k = self.packs_applied;
+
         while k != self.packs_received {
             let pk = self.packs[k as usize];
             let slot = &mut self.slots[pk.slot as usize & (SLOTS - 1)];
+
             if !pk.unpack {
                 if pk.kind == 1
                     && let Some(t) = self.item_kinds.get_mut(pk.index as usize)
@@ -172,8 +176,10 @@ impl ObjectDecoder {
                 self.changes.push(SlotChange::Unpack { kind: slot.kind, index: slot.index });
                 slot.active = false;
             }
+
             k = (k + 1) & (PACKS as u16 - 1);
         }
+
         self.packs_applied = k;
     }
 
@@ -207,17 +213,23 @@ impl ObjectDecoder {
         let bleeding = r.bits(1)? != 0;
         let base = self.base(base_index).map_or([0; HUMAN_INTS], |f| f.humans[h]);
         let mut v = [0i32; HUMAN_INTS];
+
         for i in 0..3 {
             v[i] = r.delta(base[i], 28)?;
         }
+
         v[3] = r.bits(2)? as i32;
+
         for i in 4..7 {
             v[i] = self.delta_bits(r, base[i], 14)?;
         }
+
         for b in 0..BONES {
             let at = 7 + b * 4;
+
             if r.bits(1)? == 1 {
                 v[at] = r.bits(2)? as i32;
+
                 for i in at + 1..at + 4 {
                     v[i] = self.delta_bits(r, base[i], 12)?;
                 }
@@ -225,6 +237,7 @@ impl ObjectDecoder {
                 v[at..at + 4].copy_from_slice(&base[at..at + 4]);
             }
         }
+
         self.frame().humans[h] = v;
         Ok(ServerHumanObject {
             slot,
@@ -254,13 +267,17 @@ impl ObjectDecoder {
         let base_index = r.bits(8)?;
         let base = self.base(base_index).map_or([0; 7], |f| f.items[i]);
         let mut v = [0i32; 7];
+
         for k in 0..3 {
             v[k] = r.delta(base[k], 28)?;
         }
+
         v[3] = r.bits(2)? as i32;
+
         for k in 4..7 {
             v[k] = self.delta_bits(r, base[k], 14)?;
         }
+
         let tail = match kind {
             CASH_WORLD => ItemTail::Cash { bills: r.bits(4)? as i32, spread: r.bits(4)? as i32, codes: r.bits(30)? },
             RADIO => ItemTail::Radio(r.bits(1)? != 0),
@@ -280,20 +297,26 @@ impl ObjectDecoder {
         let base_index = r.bits(8)?;
         let base = self.base(base_index).map_or([0; 20], |f| f.vehicles[id]);
         let mut v = [0i32; 20];
+
         for k in 0..3 {
             v[k] = r.delta(base[k], 28)?;
         }
+
         v[3] = r.bits(2)? as i32;
+
         for k in 4..7 {
             v[k] = self.delta_bits(r, base[k], 14)?;
         }
+
         v[7] = self.delta_bits(r, base[7], 9)?;
+
         for w in 0..4 {
             let at = 8 + w * 3;
             v[at] = r.delta(base[at], 8)?;
             v[at + 1] = self.delta_bits(r, base[at + 1], 9)?;
             v[at + 2] = r.delta(base[at + 2], 8)?;
         }
+
         let engine_rpm = r.bits(13)? as i32;
         self.frame().vehicles[id] = v;
         Ok(ServerVehicleObject {
@@ -312,15 +335,18 @@ impl ObjectDecoder {
     fn read_traffic(&mut self, r: &mut Reader, count: usize) -> Result<Vec<TrafficEntry>, CodecError> {
         let mut out = Vec::new();
         let mut skip = 0i32;
+
         for i in 0..count.min(TRAFFIC) {
             if skip > 0 {
                 skip -= 1;
                 continue;
             }
+
             if r.bits(1)? != 1 {
                 skip = r.bits(10)? as i32 - 1;
                 continue;
             }
+
             let base_index = r.bits(8)?;
             let vehicle = r.bits(1)? != 0;
             let kind_color = if r.bits(1)? == 1 {
@@ -331,14 +357,17 @@ impl ObjectDecoder {
             };
             let base = self.base(base_index).map_or([0; 4], |f| f.traffic[i]);
             let mut v = [0i32; 4];
+
             for k in 0..3 {
                 v[k] = r.delta(base[k], 28)?;
             }
+
             v[3] = self.delta_bits(r, base[3], 9)?;
             self.frame().traffic[i] = v;
             let yaw = (v[3] as f32 as f64 * std::f64::consts::PI / 255.0) as f32;
             out.push(TrafficEntry { index: i as u16, vehicle, kind_color, pos: unpack_position(&v[0..3]), yaw });
         }
+
         Ok(out)
     }
 
@@ -355,6 +384,7 @@ impl ObjectDecoder {
         let count = r.bits(11)?;
         let mut at = r.bits(11)? as u16;
         p.pack_offset = at;
+
         for _ in 0..count {
             let pk = ObjectPack {
                 slot: r.bits(10)? as u16,
@@ -365,41 +395,54 @@ impl ObjectDecoder {
             };
             self.packs[at as usize] = pk;
             p.object_packs.push(pk);
+
             if self.packs_received == at {
                 self.packs_received = (self.packs_received + 1) & (PACKS as u16 - 1);
             }
+
             at = (at + 1) & (PACKS as u16 - 1);
         }
+
         self.apply_packs();
         let count = r.bits(8)?;
         let mut at = r.bits(8)? as u8;
         p.link_offset = at;
+
         for _ in 0..count {
             let index = r.bits(16)? as u16;
             let kind = r.bits(6)? as i32;
             let tick = r.bits(28)? as i32;
             let mut link = LineLinkEntry { index, kind, tick, item: 0, line: 0, text: Vec::new(), colors: Vec::new() };
+
             if kind == 0 || kind == 1 {
                 link.item = r.bits(12)? as i32;
                 link.line = r.bits(if kind == 0 { 6 } else { 5 })? as i32;
                 let len = r.bits(7)? as usize;
                 link.text = r.bytes(len)?.to_vec();
+
                 if kind == 1 {
                     link.colors = r.bytes(len)?.to_vec();
                 }
             }
+
             p.line_links.push(link);
+
             if self.links_received == at {
                 self.links_received = self.links_received.wrapping_add(1);
             }
+
             at = at.wrapping_add(1);
         }
+
         for s in 0..SLOTS {
             let slot = self.slots[s];
+
             if !slot.active || r.bits(1)? != 1 {
                 continue;
             }
+
             let index = slot.index as usize;
+
             match slot.kind {
                 0 if index < HUMANS => {
                     let h = self.read_human(r, s as u16, index)?;
@@ -412,11 +455,14 @@ impl ObjectDecoder {
                 _ => {}
             }
         }
+
         let count = r.bits(8)?;
+
         for _ in 0..count {
             let v = self.read_vehicle(r)?;
             p.vehicles.push(v);
         }
+
         r.bits(8)?;
         p.traffic_count = r.bits(10)? as i32;
         r.bits(8)?;
@@ -433,32 +479,40 @@ impl ServerGamePacket {
         d.changes.clear();
         let round_number = r.u32()?;
         let ticks_since_reset = r.u32()?;
+
         if !accept(round_number, ticks_since_reset) {
             return Ok(None);
         }
+
         let gamestate = GameState::try_from(r.bits(4)?)?;
         let ready_states = if gamestate == GameState::Intermission {
             let mut v = [false; 32];
+
             for b in &mut v {
                 *b = r.bits(1)? != 0;
             }
+
             Some(v)
         } else {
             None
         };
         let mut corp_round = [(0, 0); 3];
+
         if matches!(gamestate, GameState::Intermission | GameState::Restarting) {
             for c in &mut corp_round {
                 *c = (r.signed(16)?, r.signed(16)?);
             }
         }
+
         let game_timer = r.bits(24)? as i32;
         let game_timer_extra = r.bits(16)? as i32;
         let sun_time = r.bits(30)? as i32;
         let mut team_counts = [0; 5];
+
         for n in &mut team_counts {
             *n = r.bits(6)? as i32;
         }
+
         let client_id = r.bits(8)?;
         let human_id = r.nullable(10)?;
         let mut own_human = if human_id >= 0 {
@@ -468,9 +522,11 @@ impl ServerGamePacket {
             let action_type = r.nullable(8)?;
             let (action_duration, action_hand, action_slot, progress_bar) = (r.bits(7)? as i32, r.bits(4)? as i32, r.bits(4)? as i32, r.bits(8)? as i32);
             let mut health = [0; 7];
+
             for hp in &mut health {
                 *hp = r.bits(7)? as i32;
             }
+
             let (stamina, max_stamina) = (r.bits(8)? as i32, r.bits(8)? as i32);
             Some(OwnHumanData {
                 human_id,
@@ -495,9 +551,11 @@ impl ServerGamePacket {
             None
         };
         let head_vel = r.vec3()?;
+
         if let Some(h) = own_human.as_mut() {
             h.head_vel = head_vel;
         }
+
         let manager_tab = r.bits(1)? != 0;
         let menu_type = MenuType::try_from(r.bits(8)?)?;
         let menu_tab = r.bits(16)? as i32;
@@ -514,18 +572,22 @@ impl ServerGamePacket {
         r.bits(6)?;
         r.bits(8)?;
         let mut display_inventory: [Vec<i32>; 7] = Default::default();
+
         for slot in &mut display_inventory {
             let n = r.bits(4)?;
             *slot = (0..n).map(|_| r.bits(16).map(|t| t as i32)).collect::<Result<_, _>>()?;
         }
+
         let n = r.bits(8)?;
         let mut menu_buttons = Vec::new();
+
         for _ in 0..n {
             let id = r.i32()?;
             let len = r.bits(6)? as usize;
             let text = String::from_utf8_lossy(r.bytes(len)?).into_owned();
             menu_buttons.push(MenuButton { id, text, extra: r.i32()? });
         }
+
         r.bits(8)?;
         let mut p = ServerGamePacket {
             client_id,
@@ -574,26 +636,33 @@ impl ServerGamePacket {
             events: Vec::new(),
         };
         d.read_objects(r, &mut p)?;
+
         for v in &mut p.voice {
             if r.bits(1)? != 1 {
                 continue;
             }
+
             let (player_id, human_id, item_id) = (r.nullable(8)?, r.nullable(8)?, r.nullable(8)?);
             let mut frames: [VoiceFrame; 4] = Default::default();
+
             for f in &mut frames {
                 f.index = r.bits(6)? as u8;
                 f.size = r.bits(11)? as u16;
                 f.volume = r.bits(2)? as u8;
                 f.data = r.bytes(f.size as usize)?.to_vec();
             }
+
             *v = Some(ServerVoiceData { player_id, human_id, item_id, voice_frames: frames });
         }
+
         p.global_event_count = r.bits(16)?;
         let count = r.bits(6)?;
         p.first_event = r.bits(16)?;
+
         for k in 0..count {
             p.events.push((p.first_event.wrapping_add(k) & 0xffff, Event::read(r)?));
         }
+
         p.packet_sequence = r.u32()?;
         p.client_packet_count = r.u32()?;
         p.last_sdl_tick = r.u32()?;

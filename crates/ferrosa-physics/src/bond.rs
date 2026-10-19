@@ -1,3 +1,4 @@
+use crate::rotation::rotate;
 use glam::Vec3;
 
 use crate::{
@@ -353,6 +354,7 @@ impl Joint {
 
             a.ang_impulse = l;
         }
+
         if let Some(b) = bodies.get_mut(self.body_b) {
             b.impulse = wb_ * u + b.impulse;
 
@@ -368,6 +370,5 @@ impl Joint {
 }
 
 fn local_to_world(b: &RigidBody, l: Vec3) -> Vec3 {
-    let [r0, r1, r2] = b.rot;
-    r0 * l.x + r1 * l.y + r2 * l.z
+    rotate(&b.rot, l)
 }

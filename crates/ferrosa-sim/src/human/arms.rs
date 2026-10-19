@@ -1,3 +1,4 @@
+use ferrosa_physics::rotation::{rotate, unrotate};
 use crate::{
     items::{Touchables, logic::phone::PhoneStatus, state::ItemState, types::ItemType},
     world::{capsule::segment_closest_points, map::Map, trace::line_intersect_level},
@@ -54,19 +55,9 @@ fn half_turn(angle: f32) -> (f32, f32) {
     (a.sin() as f32, a.cos() as f32)
 }
 
-fn local(r: &RotMatrix, v: Vec3) -> Vec3 {
-    let [r0, r1, r2] = *r;
-    Vec3::new(r0.dot(v), r1.dot(v), r2.dot(v))
-}
-
-fn world(r: &RotMatrix, v: Vec3) -> Vec3 {
-    let [r0, r1, r2] = *r;
-    r0 * v.x + r1 * v.y + r2 * v.z
-}
-
 fn relative_spin_damping(h: &Human, parent: usize, child: usize) -> Vec3 {
     let (a, b) = (h.bones[parent].ang_vel, h.bones[child].ang_vel);
-    let l = local(&h.bones[parent].rot, a - b);
+    let l = unrotate(&h.bones[parent].rot, a - b);
 
     l * -0.25
 }
@@ -89,13 +80,13 @@ fn joint_turn(h: &Human, parent: usize, child: usize, pose: [f32; 4]) -> (Vec3, 
 fn drive_spine_joint(h: &Human, bodies: &mut RigidBodies, parent: usize, child: usize, pose: [f32; 4], damping: Vec3, frame: &mut RotMatrix) {
     let (axis, angle) = joint_turn(h, parent, child, pose);
     let t = axis * angle * 0.75 + damping;
-    let mut target = world(&h.bones[child].rot, t);
+    let mut target = rotate(&h.bones[child].rot, t);
 
     super::ik::clamp_bone_relative_correction(h, parent, child, &mut target, 1.125, 1.0);
 
     let len = target.length();
     let u = target.normalize_or_zero();
-    let axis = local(&h.bones[parent].rot, u);
+    let axis = unrotate(&h.bones[parent].rot, u);
 
     *frame = multiply_matrixes(&h.bones[parent].rot, &h.bones[child].rot);
 
@@ -111,7 +102,7 @@ fn drive_spine_joint(h: &Human, bodies: &mut RigidBodies, parent: usize, child: 
 
 fn aim_spine_joint(h: &Human, bodies: &mut RigidBodies, parent: usize, child: usize, pose: [f32; 4]) {
     let (axis, angle) = joint_turn(h, parent, child, pose);
-    let target = world(&h.bones[child].rot, axis * angle);
+    let target = rotate(&h.bones[child].rot, axis * angle);
     if let Some(id) = h.bones[child].joint
         && let Some(Bond::Joint(j)) = bodies.bond_mut(id)
     {
@@ -160,7 +151,9 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
     if h.action_type != 0 && h.has_input(Input::ThrowItem) {
         h.throw_pitch = 8.0 * h.free_look_pitch;
     }
+
     let mut arm_hp = [1.0f32; 2];
+
     if h.health.left_arm <= 99 {
         arm_hp[0] = h.health.left_arm as f32 / 100.0;
     }
@@ -179,9 +172,11 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
     };
     let has_gun = hand_type(0).is_some_and(|t| t.is_gun) || hand_type(1).is_some_and(|t| t.is_gun);
     let mut aim = if h.movement_mode == 2 { 45.0_f32.to_radians() } else { 22.5_f32.to_radians() };
+
     if h.has_input(Input::RightMouse) || !has_gun {
         aim = 0.0;
     }
+
     if hand_type(0).is_some_and(|t| t.mirrored_aim != 0) {
         aim = -aim;
     }
@@ -208,6 +203,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
     drive_spine_joint(h, bodies, 1, 2, pose, chest_damping, &mut frames[1]);
 
     let aim_poses = (has_gun && h.vehicle.is_none()).then(|| aim_orientations(h, aim));
+
     if let Some([waist, chest, _]) = aim_poses {
         aim_spine_joint(h, bodies, 0, 1, waist);
         aim_spine_joint(h, bodies, 1, 2, chest);
@@ -215,6 +211,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
 
     let mut frame = IDENTITY;
     let mut pose = add_turn(identity, &mut frame, 1, 0.5 * h.free_look_yaw - aim);
+
     if h.movement_mode == 2 && has_gun {
         let half = std::f32::consts::PI / 32.0;
         pose = quaternion_multiply(pose, [0.0, 0.0, -half.sin(), half.cos()]);
@@ -224,6 +221,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
     }
 
     let mut pose = add_turn(pose, &mut frame, 0, 0.5 * h.view_pitch + 0.25 * h.free_look_pitch);
+
     if let Some([_, _, aimed]) = aim_poses {
         pose = quaternion_multiply(aimed, pitch_turn(h.view_pitch));
         pose = quaternion_multiply(pose, yaw_turn(0.25 * h.free_look_yaw));
@@ -233,6 +231,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
     h.locomotion.spine_frames = frames;
 
     let state = h.movement_state;
+
     for (k, &hp) in arm_hp.iter().enumerate() {
         let first = 4 + 3 * k;
         let held = held_item(h, touch, k);
@@ -246,6 +245,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
         }
 
         let mut swing = (h.locomotion.stride_balance as f64 * 22.5_f64.to_radians()) as f32;
+
         if h.movement_mode > 0 {
             swing *= 0.5;
         }
@@ -284,8 +284,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
             (Some((m, v)), _) => 1.0 / 16.0 * m[1] + v - BONES[first].joint,
             (None, Some(p)) => p - BONES[first].joint,
             (None, None) if grab.holding && !pulling => {
-                let ([r0, r1, r2], d) = (h.bones[2].rot, grab.spot - h.bones[2].pos);
-                Vec3::new(r0.dot(d), r1.dot(d), r2.dot(d)) - BONES[first].joint
+                unrotate(&h.bones[2].rot, grab.spot - h.bones[2].pos) - BONES[first].joint
             }
             (None, None) if reaching => {
                 let push = if h.view_pitch > 0.0 { h.view_pitch * 0.125 } else { 0.0 };
@@ -330,6 +329,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
             }
 
             let mut spin_limit = [0.0; 3];
+
             if 1.0 > hp {
                 let v = (hp / 16.0) * 0.25 + (1.0 / 256.0);
                 spin_limit[0] = v;
@@ -339,6 +339,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
             let params = IkParams { length: 21.0 / 32.0, twist, max_turn, clamp_max: 16.875_f32.to_radians(), spin_limit, flags: 0x16 + (1.0 > hp) as u32 };
             three_bone_ik(h, bodies, 2, first, target, &IDENTITY, Vec3::ZERO, &params, &mut end_rot);
             attach_item_to_bone(h, bodies, touch, first + 2, item, hand);
+
             if touch.types[kind as usize].is_gun && k == 1 && !h.has_input(Input::ThrowItem) && h.action_type != 0 && h.vehicle.is_none() {
                 arm_item_collision(h, bodies, touch, item);
             }
@@ -348,6 +349,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
 
         let mut flags = 4 + (1.0 > hp) as u32;
         let one_arm = h.has_input(if k == 0 { Input::RightMouse } else { Input::LeftMouse });
+
         if one_arm {
             max_turn = 22.5_f32.to_radians();
         }
@@ -397,6 +399,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
             j.limit_active = false;
         }
     }
+
     if state == 2 {
         for (parent, child, spin_limit) in
             [(0, 1, 1.0 / 128.0), (1, 2, 1.0 / 128.0), (2, 3, 1.0 / 128.0), (2, 4, 1.0 / 32.0), (4, 5, 1.0 / 32.0), (2, 7, 1.0 / 32.0), (7, 8, 1.0 / 32.0)]
@@ -404,6 +407,7 @@ pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, 
             limit_joint(h, bodies, parent, child, spin_limit);
         }
     }
+
     if h.pain > 0 {
         let p = h.pain as f32 / 60.0;
         let limit = if p > 1.0 { 1.0 / 128.0 } else { 0.125 - (p * 0.125) * 15.0 / 16.0 };
@@ -489,6 +493,7 @@ fn held_item(h: &Human, touch: &Touchables, k: usize) -> Option<(usize, usize)> 
 
 fn arm_item(h: &Human, touch: &Touchables, k: usize) -> Option<(usize, usize)> {
     let slots = &h.inventory;
+
     if k == 1 || slots[1].count > 0 {
         let slot = &slots[if k == 1 { 0 } else { 1 }];
 
@@ -545,6 +550,7 @@ fn hold_frame(
     }
 
     let throwing = h.has_input(Input::ThrowItem) || h.action_type == 0;
+
     if throwing {
         let tp = h.throw_pitch;
         rotate_orientation(&mut m, Vec3::X, tp + tp);
@@ -576,14 +582,17 @@ fn hold_frame(
     }
 
     let paper = is_paper(item.item_type);
+
     if paper {
         v = if h.vehicle.is_none() { Vec3::ZERO } else { Vec3::new(0.0, -0.125, 0.0) };
     }
 
     let [_, m1, r2] = m;
+
     if throwing {
         let z = (h.throw_pitch as f64 + 67.5_f64.to_radians()) as f32;
         let mut k = -0.25f32;
+
         if z <= 0.0 {
             k -= ((((z * 3.0) as f64).sin()) * 0.375) as f32;
         }
@@ -607,6 +616,7 @@ fn hold_frame(
         if kind == ItemKind::Pistol && h.vehicle.is_none() {
             v = if h.movement_mode == 2 { -0.25 * r2 + v } else { m1 * -0.125 + v };
         }
+
         k == 0 && !paper
     };
 
@@ -620,7 +630,7 @@ fn hold_frame(
 
     if kind == ItemKind::Briefcase && !thrown && h.action_type != 0 {
         let up = if h.vehicle.is_some() { 0.125 } else { 0.0 };
-        v = Vec3::new(if k == 0 { -3.0 / 16.0 } else { 3.0 / 16.0 }, up + -21.0 / 32.0, 0.0 * 0.125 + 0.0 * -21.0 / 32.0);
+        v = Vec3::new(if k == 0 { -3.0 / 16.0 } else { 3.0 / 16.0 }, up - 21.0 / 32.0, 0.0);
         rotate_orientation(&mut m, Vec3::X, quarter);
 
         let axis = m[2];
@@ -679,6 +689,7 @@ fn hold_frame(
 
     // TODO: a door is held by its own frame (item_compute_position_in_human_bone2_frame) turned by the human's yaw
     let r = ty.hold_rot[hand];
+
     if r[3].abs() > 0.0 {
         let [m0, m1, m2] = m;
         let axis = m0 * r[0] + m1 * r[1] + m2 * r[2];
@@ -693,12 +704,15 @@ fn hold_frame(
 fn gun_hold_pos(h: &Human, ty: &ItemType, hand: usize, m: &RotMatrix) -> Vec3 {
     let j = BONES[7].joint;
     let mut y = j.y;
+
     if h.action_type != 1 && h.movement_mode <= 1 {
         y -= 0.25;
     }
+
     if h.vehicle.is_some() {
         y += 0.25;
     }
+
     let (g, p) = (ty.gun_hold_pos, ty.hold_pos[hand]);
     let along = |v: Vec3, k: [f32; 3]| m.iter().zip(k).fold(v, |v, (r, k)| v + r * k);
     along(along(Vec3::new(j.x - 1.0 / 16.0, y, j.z - 3.0 / 32.0), [-g.x, -g.y, -g.z]), [p.x, p.y, p.z])
@@ -714,6 +728,7 @@ fn arm_item_collision(h: &Human, bodies: &mut RigidBodies, touch: &Touchables, i
     let item_body = item.body;
     let g = ty.gun_hold_pos;
     let base = r2 * g.z + pos;
+
     for i in 0..4 {
         let bone = if i <= 1 { 7 } else { 2 };
         let (b, t) = (&h.bones[bone], &BONES[bone]);
@@ -733,9 +748,11 @@ fn arm_item_collision(h: &Human, bodies: &mut RigidBodies, touch: &Touchables, i
         let gy = if i & 1 != 0 { g.y + 1.0 / 16.0 } else { g.y - 1.0 / 16.0 };
         let grip = base + r1 * gy;
         let (hit, on_arm, on_gun, dist) = segment_closest_points(start, end, grip, pos, 1.0 / 8.0);
+
         if !hit {
             continue;
         }
+
         let d = on_arm - on_gun;
         let len = d.length();
         let n = if len != 0.0 {
@@ -765,6 +782,7 @@ fn attach_item_to_bone(h: &Human, bodies: &mut RigidBodies, touch: &Touchables, 
     let body_a = h.bones[bone].body;
 
     bodies.create_bond(Bond::ItemPoint(ItemPoint::new(body_a, item.body, Vec3::ZERO, grip_point(h, ty, kind, hand))));
+
     if kind == ItemKind::Door {
         return;
     }
@@ -793,20 +811,22 @@ fn attach_item_to_bone(h: &Human, bodies: &mut RigidBodies, touch: &Touchables, 
 /// shoulder.
 fn crouch_reach(h: &Human, map: &Map, first: usize) -> Vec3 {
     let chest = &h.bones[2];
-    let [r0, r1, r2] = chest.rot;
     let up = Vec3::Y;
-    let d = Vec3::new(r0.dot(up), r1.dot(up), up.dot(r2)).normalize_or_zero();
+    let d = unrotate(&chest.rot, up).normalize_or_zero();
     let j = BONES[first].joint;
     let p = chest.pos;
-    let shoulder = j.x * r0 + p + j.y * r1 + r2 * j.z;
+    let shoulder = p + rotate(&chest.rot, j);
     let end = shoulder - up;
     let mut k = -21.0 / 32.0;
+
     if let Some(hit) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, shoulder, end).map(|h| h.hit.pos) {
         let v = (shoulder.y - hit.y) + (1.0 / 256.0);
+
         if v <= 21.0 / 32.0 {
             k = -v;
         }
     }
+
     d * k
 }
 

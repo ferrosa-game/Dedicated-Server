@@ -372,6 +372,7 @@ fn solve_body_contact(bodies: &mut Table<RigidBody>, c: &BodyContact) {
     }
 
     let (wa_, nwb) = (c.weight_a, -c.weight_b);
+
     if let Some(a) = bodies.get_mut(c.body_a) {
         a.impulse = wa_ * j + a.impulse;
         let l = a.ang_impulse;

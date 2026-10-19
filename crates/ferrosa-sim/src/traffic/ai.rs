@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use super::{LOOP_STREET, LOOP_STREET_2, Traffic, grid::lane_clearance, lane_count, left_lanes, maxss, minss, random_street, route::plan_route};
+use super::{LOOP_STREET, LOOP_STREET_2, Traffic, grid::lane_clearance, lane_count, left_lanes, random_street, route::plan_route};
 use crate::{
     time::TICKS_PER_SECOND_F32,
     world::streets::{Lane, MapStreet, StreetMap},
@@ -56,14 +56,19 @@ fn sincos(yaw: f32) -> (f32, f32) {
 /// The steering angle that turns from `yaw` towards `target`, wrapped the short way and clamped.
 fn steer_toward(yaw: f32, target: f32, limit: f64, max: f32) -> f32 {
     let mut a = target;
+
     if ((yaw - a) as f64) >= 180.0_f64.to_radians() {
         a = (a as f64 + 360.0_f64.to_radians()) as f32;
     }
+
     let mut diff = a - yaw;
+
     if (diff as f64) >= 180.0_f64.to_radians() {
         diff = a - (yaw as f64 + 360.0_f64.to_radians()) as f32;
     }
+
     let d = diff as f64;
+
     if -limit > d {
         -max
     } else if d > limit {
@@ -84,9 +89,11 @@ fn update_stuck(traffic: &mut Traffic, id: usize) {
 
     if c.stuck > STUCK_TICKS {
         c.stuck += 1;
+
         if c.stuck > STUCK_RESET {
             c.stuck = 0;
         }
+
         return;
     }
 
@@ -103,12 +110,15 @@ fn update_stuck(traffic: &mut Traffic, id: usize) {
 /// Replans from `street` once the car reaches the end of its route; an aggressive car heads for a random street.
 fn replan(traffic: &mut Traffic, map: &StreetMap, id: usize, street: i32, mut dest: i32) {
     let n = map.streets.len() as i32;
+
     if traffic.cars[id].is_aggressive != 0 {
         dest = 0;
+
         if n != 0 {
             dest = random_street(map);
         }
     }
+
     let r = rand::random_range(0..2);
     let c = &mut traffic.cars[id];
     let end = c.step(c.route_index).end;
@@ -122,19 +132,25 @@ fn roundcity_flip(traffic: &mut Traffic, map: &StreetMap, id: usize, street: i32
     let c = &mut traffic.cars[id];
     c.lane = lane_count(map, street) - c.lane - 1;
     let ri = c.route_index as usize;
+
     if let Some(step) = c.route.get_mut(ri) {
         step.end = end;
     }
+
     let mut dest = other;
+
     if !rand::random::<bool>() {
         dest = rand::random_range(0..n);
     }
+
     if traffic.cars[id].is_aggressive != 0 {
         dest = n;
+
         if n != 0 {
             dest = random_street(map);
         }
     }
+
     let r = rand::random_range(0..2);
     let c = &mut traffic.cars[id];
     let e = c.step(c.route_index).end;
@@ -144,10 +160,12 @@ fn roundcity_flip(traffic: &mut Traffic, map: &StreetMap, id: usize, street: i32
 /// The lane a car moves to on its street, kept to the lanes heading its way (not the outermost).
 fn clamp_lane(map: &StreetMap, street: i32, reverse: bool, mut nl: i32) -> i32 {
     let left = left_lanes(map, street);
+
     if reverse {
         if nl <= 0 {
             nl = 1;
         }
+
         if !(left > nl) {
             nl = left - 1;
         }
@@ -155,11 +173,14 @@ fn clamp_lane(map: &StreetMap, street: i32, reverse: bool, mut nl: i32) -> i32 {
         if left > nl {
             nl = left;
         }
+
         let n = lane_count(map, street);
+
         if n - 1 <= nl {
             nl = n - 2;
         }
     }
+
     nl
 }
 
@@ -167,13 +188,17 @@ fn clamp_lane(map: &StreetMap, street: i32, reverse: bool, mut nl: i32) -> i32 {
 fn pick_lane(traffic: &mut Traffic, map: &StreetMap, id: usize, street: i32) -> i32 {
     let c = &mut traffic.cars[id];
     let mut nl = c.next_lane;
+
     if rand::random_ratio(127, 128) {
         return nl;
     }
+
     let turn = c.step(c.route_index + 1).turn;
+
     if turn == 0 && rand::random_ratio(1, 256) {
         nl += if rand::random::<bool>() { 1 } else { -1 };
     }
+
     let reverse = c.step(c.route_index).end != 0;
     nl = match (turn, reverse) {
         (-1, true) | (1, false) => nl + 1,
@@ -191,6 +216,7 @@ pub fn ai_traffic_car(traffic: &mut Traffic, map: &StreetMap, id: usize) {
     update_stuck(traffic, id);
 
     let street = traffic.cars[id].street;
+
     if street == -1 {
         return cross_intersection(traffic, map, id);
     }
@@ -225,6 +251,7 @@ fn keep_route(traffic: &mut Traffic, map: &StreetMap, id: usize, street: i32) {
         let c = &traffic.cars[id];
         let end = c.step(c.route_index).end;
         let wrong_way = if street == LOOP_STREET { end != 0 } else { end == 0 };
+
         if wrong_way {
             roundcity_flip(traffic, map, id, street);
         }
@@ -260,7 +287,7 @@ fn steer_along_lane(traffic: &mut Traffic, map: &StreetMap, id: usize, street: i
     if lane != nl {
         let p = c.lane_change;
         let s = (p * p) * (3.0 - (p + p));
-        let np = minss(c.vel.length() * LANE_CHANGE_RATE, LANE_CHANGE_MAX) + p;
+        let np = (c.vel.length() * LANE_CHANGE_RATE).min(LANE_CHANGE_MAX) + p;
         c.lane_change = np;
 
         if np > 1.0 {
@@ -275,7 +302,7 @@ fn steer_along_lane(traffic: &mut Traffic, map: &StreetMap, id: usize, street: i
     let d = if reverse { -st.dir } else { st.dir };
     let pos = c.pos;
     let off = (from - pos).dot(st.side).abs();
-    let a = d * maxss(0.0, LOOK_AHEAD - off * LOOK_FALLOFF) + pos;
+    let a = d * (LOOK_AHEAD - off * LOOK_FALLOFF).max(0.0) + pos;
     let proj = (a - from).dot(d);
     let aim_z = proj * d.z + from.z - pos.z;
     let aim_x = from.x + d.x * proj - pos.x;
@@ -338,7 +365,7 @@ fn slow_for_signal(traffic: &mut Traffic, id: usize, remaining: f32, junction: u
     let fast = aggressive && (remaining > FAST_DISTANCE || next_turn == 0);
     let base = if fast { coop_speed(traffic, 8) } else { CRUISE };
     let c = &mut traffic.cars[id];
-    let mut approach = maxss(0.0, ((remaining - STOP_LINE) * 0.5) / TICKS_PER_SECOND_F32);
+    let mut approach = (((remaining - STOP_LINE) * 0.5) / TICKS_PER_SECOND_F32).max(0.0);
 
     if remaining < BRAKING {
         approach = 0.0;
@@ -379,7 +406,7 @@ fn slow_for_queue(traffic: &mut Traffic, id: usize, remaining: f32, mut approach
         }
 
         if aggressive {
-            approach = maxss(AGGRESSIVE_MIN, approach);
+            approach = AGGRESSIVE_MIN.max(approach);
         }
 
         let o = &cars[j];
@@ -421,8 +448,9 @@ fn slow_for_clearance(traffic: &mut Traffic, map: &StreetMap, id: usize, st: &Ma
         let dot = ((co * sd.x) + sd.y * 0.0) + s * sd.z;
         let mask = (1 << (c.next_lane & 31)) | c.lane_mask;
         let mut clr = lane_clearance(traffic, map, id, ps, mask, 0.0 > dot, c.front_proj);
+
         if aggressive {
-            clr = maxss(AGGRESSIVE_MIN, clr);
+            clr = AGGRESSIVE_MIN.max(clr);
         }
 
         let c = &mut traffic.cars[id];
@@ -430,6 +458,7 @@ fn slow_for_clearance(traffic: &mut Traffic, map: &StreetMap, id: usize, st: &Ma
         if c.target_speed > clr {
             c.target_speed = clr;
             limited = true;
+
             if ahead == -1 {
                 return aggressive.then_some(true);
             }
@@ -446,7 +475,7 @@ fn slow_for_clearance(traffic: &mut Traffic, map: &StreetMap, id: usize, st: &Ma
     let dot = (co * d2.x + d2.y * 0.0) + s * d2.z;
     let c = &traffic.cars[id];
     let (pmin, pmax) = ((c.bounds_min - w).dot(d2), (c.bounds_max - w).dot(d2));
-    let p = if dot > 0.0 { maxss(pmin, pmax) } else { minss(pmin, pmax) };
+    let p = if dot > 0.0 { pmin.max(pmax) } else { pmin.min(pmax) };
     let clr = lane_clearance(traffic, map, id, ahead, 1 << (c.next_lane & 31), 0.0 > dot, p);
     let c = &mut traffic.cars[id];
 
@@ -458,7 +487,7 @@ fn slow_for_clearance(traffic: &mut Traffic, map: &StreetMap, id: usize, st: &Ma
         return None;
     }
 
-    let clr = maxss(AGGRESSIVE_MIN, clr);
+    let clr = AGGRESSIVE_MIN.max(clr);
 
     if c.target_speed > clr {
         c.target_speed = clr;
@@ -622,7 +651,7 @@ fn cross_intersection(traffic: &mut Traffic, map: &StreetMap, id: usize) {
     let (mn, mx) = (c.bounds_min, c.bounds_max);
     let pmax = ((mx.x - w.x) * dn.x + (mx.y - w.y) * dn.y) + (mx.z - w.z) * dn.z;
     let pmin = ((mn.x - w.x) * dn.x + (mn.y - w.y) * dn.y) + (mn.z - w.z) * dn.z;
-    let p = if e2 != 0 { if pmax > pmin { pmin } else { pmax } } else { maxss(pmin, pmax) };
+    let p = if e2 != 0 { if pmax > pmin { pmin } else { pmax } } else { pmin.max(pmax) };
     let clr = lane_clearance(traffic, map, id, nxt.street, 1 << (c.target_lane & 31), e2 != 0, p);
     let c = &mut traffic.cars[id];
 

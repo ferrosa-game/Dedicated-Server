@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ferrosa_map::file_types::sis::ItemSetFile;
-use ferrosa_physics::rotation::{IDENTITY, RotMatrix, rotate_orientation};
+use ferrosa_physics::rotation::{IDENTITY, RotMatrix, rotate, rotate_orientation};
 use ferrosa_protocol::clientbound::game::ItemKind;
 use glam::{IVec3, Vec3};
 
@@ -143,9 +143,7 @@ pub fn entry_pose(e: &SetEntry, cell: IVec3, s: f32, turn: u32) -> (Vec3, RotMat
     let mut m = IDENTITY;
     rotate_orientation(&mut m, Vec3::Y, angle);
 
-    let [r0, r1, r2] = m;
-    let p = e.pos;
-    let pos = r0 * p.x + base + r1 * p.y + r2 * p.z;
+    let pos = base + rotate(&m, e.pos);
 
     let mut rot = e.rot;
     rotate_orientation(&mut rot, Vec3::Y, angle);

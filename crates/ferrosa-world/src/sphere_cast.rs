@@ -4,39 +4,14 @@ use glam::{IVec3, Vec3};
 use crate::{
     area::{AreaGrid, CUBE, FOOTPRINT, MESH, TYPE_MASK, cell_index},
     city_objects::{object_pose, sphere_intersect_object},
-    collide::{calculate_face_normal, segment_intersect_face},
+    collide::{Best, calculate_face_normal, cell_point, footprint_origin, open_faces, segment_intersect_face, wall_skipped},
     item_sets::entry_pose,
-    mesh::{CUBE_CORNERS, CUBE_FACES, CUBE_NORMALS},
     meshes::BlockMeshes,
     trace::{AreaFrame, cvtt},
 };
 
-const NO_HIT: f32 = 65536.0;
 
-/// The nearest contact so far: point, normal and distance from the centre.
-struct Best {
-    pos: Vec3,
-    normal: Vec3,
-    dist: f32,
-}
 
-impl Best {
-    fn new() -> Self {
-        Self { pos: Vec3::ZERO, normal: Vec3::ZERO, dist: NO_HIT }
-    }
-
-    fn take(&mut self, hit: Option<(Vec3, Vec3, f32)>) {
-        if let Some((pos, normal, dist)) = hit
-            && dist < self.dist
-        {
-            *self = Self { pos, normal, dist };
-        }
-    }
-
-    fn hit(self) -> Option<(Vec3, Vec3, f32)> {
-        (NO_HIT > self.dist).then_some((self.pos, self.normal, self.dist))
-    }
-}
 
 /// sphere_project_onto_triangle_face: a centre in front of the face within `radius` touches it where it drops onto the
 /// face along the normal. Returns the point and its distance.
@@ -109,20 +84,10 @@ fn quad(best: &mut Best, center: Vec3, n: Vec3, [a, b, c, d]: [Vec3; 4], radius:
 
 /// sphere_intersect_voxel_cube_faces: the cube's open faces (those the cell word marks).
 fn cube_faces(center: Vec3, cell: IVec3, s: f32, v: u32, radius: f32) -> Option<(Vec3, Vec3, f32)> {
-    let base = Vec3::new(cell.x as f32 * s, cell.y as f32 * s, cell.z as f32 * s);
+    let mut best = Best::default();
 
-    let corner = |i: usize| {
-        let c = CUBE_CORNERS[i];
-        c * s + base
-    };
-
-    let mut best = Best::new();
-
-    for r in 0..6 {
-        if v & (1 << r) == 0 || v & (64 << r) == 0 {
-            continue;
-        }
-        quad(&mut best, center, CUBE_NORMALS[r], CUBE_FACES[r].map(corner), radius);
+    for (n, corners) in open_faces(cell, s, v) {
+        quad(&mut best, center, n, corners, radius);
     }
 
     best.hit()
@@ -131,19 +96,16 @@ fn cube_faces(center: Vec3, cell: IVec3, s: f32, v: u32, radius: f32) -> Option<
 /// sphere_intersect_voxel_custom_shape: a custom block's faces, then its walls from whichever side the centre is on.
 fn custom_shape(meshes: &BlockMeshes, center: Vec3, cell: IVec3, s: f32, v: u32, radius: f32) -> Option<(Vec3, Vec3, f32)> {
     let mesh = meshes.get(v & 65535)?;
-    let base = Vec3::new(cell.x as f32 * s, cell.y as f32 * s, cell.z as f32 * s);
-    let sc = |p: Vec3| p * s + base;
-    let mut best = Best::new();
+    let sc = cell_point(cell, s);
+    let mut best = Best::default();
 
     for q in &mesh.quads {
         let [a, b, c, d] = q.map(|i| sc(mesh.verts[i as usize]));
         quad(&mut best, center, calculate_face_normal(a, b, c), [a, b, c, d], radius);
     }
 
-    let skip = (v >> 16) & 1023;
-
     for (i, w) in mesh.walls.iter().enumerate() {
-        if skip & (1 << (i & 31)) != 0 {
+        if wall_skipped(v, i) {
             continue;
         }
 
@@ -164,7 +126,7 @@ fn custom_shape(meshes: &BlockMeshes, center: Vec3, cell: IVec3, s: f32, v: u32,
 /// (both triangles of a face under the first one's normal).
 fn sphere_intersect_item(hull: &crate::hull::ConvexHull, pos: Vec3, rot: &RotMatrix, center: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
     let world = hull.world_verts(pos, rot);
-    let mut best = Best::new();
+    let mut best = Best::default();
 
     for f in hull.faces() {
         let [a, b, c, d] = f.verts.map(|i| world[i]);
@@ -191,7 +153,7 @@ pub fn collision_cast_area(area: &AreaGrid, meshes: &BlockMeshes, center: Vec3, 
     let la = lc.to_array();
     let lo = la.map(|v| cvtt((v - radius) * f.inv));
     let hi = la.map(|v| cvtt((v + radius) * f.inv));
-    let mut best = Best::new();
+    let mut best = Best::default();
 
     for y in lo[1]..=hi[1] {
         for z in lo[2]..=hi[2] {
@@ -225,14 +187,14 @@ pub fn collision_cast_area(area: &AreaGrid, meshes: &BlockMeshes, center: Vec3, 
                 }
 
                 for layer in 0..2 {
-                    let v = if layer == 0 { rec.layer0[idx] } else { rec.layer1[idx] };
+                    let v = rec.layer(layer)[idx];
 
                     let hit = match v & TYPE_MASK {
                         CUBE => cube_faces(lc, cell, f.size, v, radius),
                         MESH => custom_shape(meshes, lc, cell, f.size, v, radius),
                         FOOTPRINT => {
-                            let o = cell - IVec3::new((v & 255) as i32, ((v >> 16) & 255) as i32, ((v >> 8) & 255) as i32);
-                            let w = if layer == 0 { area.layer0(o.x, o.y, o.z) } else { area.layer1(o.x, o.y, o.z) };
+                            let o = footprint_origin(cell, v);
+                            let w = area.layer(layer, o);
                             custom_shape(meshes, lc, o, f.size, w, radius)
                         }
                         _ => None,
@@ -253,7 +215,7 @@ pub fn collision_cast_area(area: &AreaGrid, meshes: &BlockMeshes, center: Vec3, 
 /// sphere_cast_level: a sphere at rest against the level's areas (not the terrain). Returns the contact point, normal and
 /// distance from the centre.
 pub fn sphere_cast_level(area: &AreaGrid, meshes: &BlockMeshes, center: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
-    let mut best = Best::new();
+    let mut best = Best::default();
 
     best.take(collision_cast_area(area, meshes, center, radius));
     best.hit()

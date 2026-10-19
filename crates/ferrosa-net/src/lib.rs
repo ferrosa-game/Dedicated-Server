@@ -205,11 +205,14 @@ impl Edge {
 /// next packet id (send_packet_to_server).
 pub async fn send_all(socket: Arc<UdpSocket>, mut out_rx: mpsc::UnboundedReceiver<(Vec<u8>, SocketAddr)>) {
     let mut id = 0u16;
+
     while let Some((buf, addr)) = out_rx.recv().await {
         let datagrams = fragment::split(&buf, id);
+
         if datagrams.len() > 1 {
             id = id.wrapping_add(1);
         }
+
         for d in datagrams {
             let _ = socket.send_to(&d, addr).await;
         }

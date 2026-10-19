@@ -3,7 +3,7 @@ use ferrosa_protocol::{
 };
 
 use super::Sim;
-use crate::{PlayerId, human::InventorySlot, items::{self, state::ItemState}};
+use crate::{PlayerId, human::InventorySlot, items::{self, state::ItemState}, sim::corporations::team_index};
 
 /// The vehicle stock the corporations buy from in round mode.
 pub const VEHICLE_STOCK: usize = 8;
@@ -56,10 +56,6 @@ pub struct VehicleOffer {
     pub kind: ferrosa_protocol::clientbound::game::VehicleKind,
     pub color: i32,
     pub price: i32,
-}
-
-fn team_index(team: Team) -> Option<usize> {
-    Team::CORPORATIONS.iter().position(|&t| t == team)
 }
 
 fn menu_type(id: u8) -> MenuType {
@@ -158,6 +154,7 @@ impl Sim {
         let Some(p) = self.players.get_mut(pid.idx()) else { return };
 
         let b = packed & 255;
+
         if (p.human.is_some() || p.ghost_human) && (TAB..TAB + 6).contains(&b) {
             p.menu = menu_type((b - TAB + 14) as u8);
         }
@@ -178,6 +175,7 @@ impl Sim {
             (16, 7) => self.round_buy_item(pid, human, ItemKind::Briefcase),
             (16, 1..=3) => {
                 let (suit, price) = SUITS[b as usize - 1];
+
                 if p.money > price - 1 {
                     p.money -= price;
                     p.customization.suit_color = suit;
@@ -186,6 +184,7 @@ impl Sim {
             }
             (16, 4 | 5) => {
                 let (necklace, price, enough) = if b == 4 { (1, 10000, p.money > 9999) } else { (2, 1000000, p.money >= 1000000) };
+
                 if enough {
                     p.money -= price;
                     p.customization.necklace = necklace;
@@ -243,6 +242,7 @@ impl Sim {
         }
 
         let Some(pos) = self.buyer_pos(pid, human) else { return };
+
         if !self.world.map.level.bases[team_idx].contains(pos) {
             return;
         }
@@ -286,12 +286,14 @@ impl Sim {
         }
 
         let Some(pos) = self.buyer_pos(pid, human) else { return };
+
         if !self.world.map.level.bases[k].contains(pos) || self.corp_state[k].fired.len() >= MAX_FIRED || target == pid.i32() {
             return;
         }
 
         let tid = PlayerId(target as u32);
         let Some(t) = self.players.get(tid.idx()) else { return };
+
         if t.team != p.team {
             return;
         }
@@ -299,6 +301,7 @@ impl Sim {
         self.corp_state[k].fired.push(t.account_id);
 
         let mut ghost = None;
+
         if let Some(h) = t.human {
             ghost = self.humans.get(h).map(|g| GhostHuman { id: h, pos: g.pos, inventory: Default::default() });
             self.strip_fired_human(h);
@@ -343,6 +346,7 @@ impl Sim {
 
         for slot in slots {
             let count = ghost.inventory[slot].count;
+
             if count > 1 || (slot <= 1 && count == 1) || (slot == 2 && !is_gun) || (slot > 2 && is_gun) {
                 continue;
             }

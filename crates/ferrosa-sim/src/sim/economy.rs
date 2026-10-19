@@ -45,6 +45,7 @@ impl Sim {
         let Some(c) = corporation_of(player.team) else { return };
 
         let held = player.stocks;
+
         if held < n {
             return;
         }
@@ -59,6 +60,7 @@ impl Sim {
                 price -= m.provided_cash.max(0) as f32 / shares as f32;
             }
         }
+
         player.stocks = held - n;
         player.money = ((price * self.rules.stock_sell_rate) * n as f32 + player.money as f32) as i32;
         corp.shares = shares - n;
@@ -79,6 +81,7 @@ impl Sim {
 
         let money = player.money as f32;
         let cost = count * self.corporations[c].price;
+
         if money > cost {
             self.corporations[c].shares += n;
             player.stocks = held + n;
@@ -97,12 +100,15 @@ pub fn corporation_of(team: Team) -> Option<usize> {
 pub fn wealth_tax(player: &mut Player, corps: &mut [Corporation; CORPORATIONS]) {
     let money = player.money;
     let excess = money - TAX_FREE;
+
     if excess > 0 {
         player.money = money - (excess as f32 * TAX_RATE) as i32;
     }
+
     let Some(c) = corporation_of(player.team) else { return };
     let price = corps[c].price;
     let over = ((player.stocks as f32 * price - STOCK_TAX_FREE) / price) as i32;
+
     if over > 0 {
         let sold = over / 20;
         corps[c].shares -= sold;
@@ -114,6 +120,7 @@ pub fn wealth_tax(player: &mut Player, corps: &mut [Corporation; CORPORATIONS]) 
 pub fn account_wealth_tax(account: &mut SrkPlayerData) {
     let money = account.money as i32;
     let excess = money - TAX_FREE;
+
     if excess > 0 {
         account.money = (money - (excess as f32 * TAX_RATE) as i32) as u32;
     }
@@ -176,27 +183,36 @@ impl Sim {
     pub(crate) fn set_player_team(&mut self, pid: PlayerId, team: Team) {
         let Some(player) = self.players.get_mut(pid.idx()) else { return };
         let old = player.team;
+
         if old == team {
             return;
         }
+
         self.leave_corp_management(pid, old);
         let Some(player) = self.players.get_mut(pid.idx()) else { return };
         player.team = team;
         let look = &mut player.customization;
+
         if let Some(c) = corporation_of(team) {
             look.model = SUIT_MODEL;
+
             if !keeps_suit(look.suit_color) {
                 look.suit_color = SUIT_COLORS[c];
             }
+
             look.tie_color = TIE_COLORS[c];
         } else if team == Team::Spectator {
             look.model = CASUAL_MODEL;
+
             if !keeps_suit(look.suit_color) {
                 look.suit_color = 0;
             }
+
             look.tie_color = 0;
         }
+
         let look = player.customization;
+
         if let Some(h) = player.human.and_then(|id| self.humans.get_mut(id)) {
             h.customization.model = look.model;
             h.customization.suit_color = look.suit_color;
@@ -225,14 +241,18 @@ impl Sim {
             total as i32,
             average as i32
         );
+
         for (i, a) in accounts.iter().enumerate() {
             let line = format!("{i}:{}:{} ({})", a.name(), (a.play_time / 10) as i32, a.account_id as i32);
             out += &line;
+
             if a.ban_time != 0 {
                 out += &format!(" BANNED {}", a.ban_time as i32);
             }
+
             out += "\r\n";
         }
+
         if let Err(e) = std::fs::write("stats.txt", out) {
             println!("[Sim] Could not save stats: {e:?}");
         }
@@ -249,6 +269,7 @@ impl Sim {
         }
 
         let Some(player) = self.players.get_mut(pid.idx()) else { return };
+
         if real {
             wealth_tax(player, &mut self.corporations);
             self.events.push(player.make_update_round_event(tick));
@@ -262,6 +283,7 @@ impl Sim {
             if !self.modes.world.cfg.respawnteam {
                 self.set_player_team(pid, Team::Spectator);
             }
+
             let Some(player) = self.players.get_mut(pid.idx()) else { return };
             player.spawn_timer = player.crim_rating * WORLD_RESPAWN_PER_CRIME + WORLD_RESPAWN_BASE;
         }
@@ -277,6 +299,7 @@ impl Sim {
     /// master server says about them.
     pub(crate) fn join_account(&mut self, auth: &ferrosa_protocol::masterserver::AuthPacket) -> SrkPlayerData {
         let accounts = &mut self.saved_accounts;
+
         if !accounts.players.iter().any(|a| a.account_id == auth.account_id) {
             let mut a = SrkPlayerData::new(auth.account_id, &auth.player_name, auth.phone_number, auth.steam_id);
             a.money = if self.rules.world_start_cash { self.modes.world.cfg.startcash as u32 } else { NEW_ACCOUNT_MONEY };
@@ -287,12 +310,15 @@ impl Sim {
             accounts.players.push(a);
             accounts.player_count = accounts.players.len() as u32;
         }
+
         let a = accounts.players.iter_mut().find(|a| a.account_id == auth.account_id).unwrap();
         a.phone_number = auth.phone_number;
         a.steam_id = auth.steam_id;
+
         if self.admin.steam_bans.contains(&a.steam_id) {
             a.ban_time = STEAM_BAN_TIME;
         }
+
         a.player_name = account_name_bytes(&auth.player_name);
         a.clone()
     }
@@ -305,9 +331,11 @@ impl Sim {
             && let Some(a) = self.saved_accounts.get_player_data(player.account_id)
         {
             player.money = a.money as i32;
+
             if (a.corp_rating as i32) < 0 {
                 a.corp_rating = 0;
             }
+
             player.corp_rating = a.corp_rating as i32;
             player.crim_rating = a.crim_rating as i32;
             player.spawn_timer = self.account_spawn_timers.get(&player.account_id).copied().unwrap_or(0);
@@ -315,6 +343,7 @@ impl Sim {
         self.reclaim_humans(pid);
         let Some(money) = self.players.get(pid.idx()).map(|p| p.money) else { return };
         let money = self.mode.joining_money(self, money);
+
         if let Some(player) = self.players.get_mut(pid.idx()) {
             player.money = money;
         }
@@ -352,12 +381,15 @@ impl Sim {
     pub(crate) fn settle_leave(&mut self, pid: PlayerId) {
         if let Some(p) = self.players.get(pid.idx()).filter(|p| p.is_bot) {
             let (human, account) = (p.human, p.account_id);
+
             if let Some(h) = human.and_then(|h| self.humans.get_mut(h)).filter(|h| h.player == Some(pid)) {
                 h.player = None;
                 h.account = Some(account);
             }
+
             return;
         }
+
         self.remove_player_from_corps(pid);
 
         self.sell_all_stocks(pid);
@@ -366,18 +398,23 @@ impl Sim {
             if self.corp_state[k].manager != Some(pid) {
                 continue;
             }
+
             if self.rules.world_corporations {
                 self.update_corp_player_ratings(k);
             }
+
             self.corp_state[k].manager = None;
             self.corp_state[k].fired.clear();
         }
+
         let Some(player) = self.players.get_mut(pid.idx()) else { return };
+
         if let Some(a) = self.saved_accounts.get_player_data(player.account_id) {
             a.money = player.money as u32;
             a.corp_rating = player.corp_rating as u32;
             a.crim_rating = player.crim_rating as u32;
         }
+
         self.account_spawn_timers.insert(player.account_id, player.spawn_timer);
         let account = player.account_id;
         if let Some(h) = player.human.and_then(|id| self.humans.get_mut(id))

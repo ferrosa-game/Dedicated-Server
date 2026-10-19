@@ -1,4 +1,4 @@
-use ferrosa_physics::{body::SolverStep, rotation::{IDENTITY, rot_matrix_to_quaternion, rotate_orientation}};
+use ferrosa_physics::{body::SolverStep, rotation::{IDENTITY, rot_matrix_to_quaternion, rotate, rotate_orientation}};
 use ferrosa_protocol::clientbound::game::{
     ServerVehicleObject, VehicleKind,
     events::{Event, ServerEvent, chat::ChatType, update_vehicle::EventUpdateVehicle, update_vehicle_type_color::EventUpdateVehicleTypeColor},
@@ -71,9 +71,11 @@ pub(crate) fn vehicle_section(
         let speed = s.vel.length();
         let k = if MOVING <= speed { MOVING_WEIGHT } else { speed * 60.0 * 4.0 + 1.0 };
         let mut p = (((1.0 - (near / k) * PRIORITY_FALLOFF) * PRIORITY_SCALE) as i32).max(PRIORITY_MIN);
+
         if dist < CLOSE || (s.train && dist < TRAIN_CLOSE) {
             p = CLOSE_PRIORITY;
         }
+
         priority[o.vehicle_id as usize] += p;
     }
 
@@ -94,9 +96,11 @@ pub(crate) fn vehicle_section(
             } else {
                 2
             };
+
             if tier < 2 {
                 priority[o.vehicle_id as usize] = 0;
             }
+
             ServerVehicleObject { tier, ..o.clone() }
         })
         .collect();
@@ -158,7 +162,7 @@ impl Sim {
         let ground = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, ahead + Vec3::Y * 8.0, ahead - Vec3::Y * 256.0);
         let pos = ground.map_or(ahead, |g| Vec3::new(ahead.x, g.hit.pos.y + 1.0, ahead.z));
         let com = self.vehicle_types[kind as usize].center_of_mass;
-        let pos = pos - (rot[0] * com.x + rot[1] * com.y + rot[2] * com.z);
+        let pos = pos - rotate(&rot, com);
 
         match self.spawn_vehicle(kind, color, pos, rot) {
             Some(id) => println!("[Sim] Spawned vehicle {kind:?} #{id} at {pos:?}"),
@@ -213,6 +217,7 @@ impl Sim {
     pub(crate) fn update_vehicle_bounds(&mut self) {
         for id in self.vehicles.ids() {
             let Some(v) = self.vehicles.get_mut(id) else { continue };
+
             if self.bodies.get(v.body).is_none() {
                 continue;
             }
@@ -291,6 +296,7 @@ impl Sim {
         }
 
         let Some(v) = self.vehicles.remove(id) else { return };
+
         for w in &v.wheels {
             self.bodies.remove(w.body);
         }

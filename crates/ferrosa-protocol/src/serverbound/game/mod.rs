@@ -172,9 +172,11 @@ impl WireWrite for ClientGamePacket {
         w.f32(self.camera_pos.z);
         w.bits(self.packet_action_count as i32, 4);
         w.bits(self.total_actions as i32, 8);
+
         for a in &self.actions {
             a.write(w);
         }
+
         self.voice_data.write(w);
         w.bits(self.spectating_human_id as i32, 8);
         w.bits(self.pack_ack as i32, 11);

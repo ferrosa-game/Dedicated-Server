@@ -82,7 +82,6 @@ const SUCCESS_RATING: i32 = 10;
 /// Each rating point a member gains also pays 10.
 const RATING_MONEY: i32 = 10;
 
-/// The mission globals.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MissionGlobals {
     /// Deals made since the reset.
@@ -109,33 +108,43 @@ impl Sim {
         let (vpos, vrot) = (v.pos, v.rot);
         let counter = self.missions.counter;
         let Some((driver, driver_human)) = self.create_mission_bot(deadline, Some(counter), vpos, vrot, vid, 0) else { return };
+
         if let Some(key) = self.create_item(ItemKind::Key, CHASE_ITEMS_POS, None, IDENTITY) {
             self.items.get_mut(key).unwrap().state = ItemState::Key { vehicle: Some(vid) };
+
             if let Some(h) = driver_human {
                 self.link_to_slot(h, key, KEY_SLOT);
             }
         }
+
         let case = self.create_item(ItemKind::Briefcase, CHASE_ITEMS_POS, None, IDENTITY);
+
         if let Some(case) = case {
             self.items.get_mut(case).unwrap().item_type = ItemKind::BriefcaseOpen;
         }
+
         let id = self.create_item(disk, CHASE_ITEMS_POS, None, IDENTITY);
         self.missions.last_disks[0] = id.map_or(-1, |i| i as i32);
         self.missions.target_location = CHASE_LOCATION;
+
         if let Some(case) = case {
             if let Some(id) = id {
                 super::items::attach_child(&mut self.items, &self.item_types, case, id);
             }
+
             self.items.get_mut(case).unwrap().item_type = ItemKind::Briefcase;
+
             if let Some(h) = driver_human {
                 self.link_to_slot(h, case, CASE_SLOT);
             }
         }
+
         if let Some(p) = self.players.get_mut(driver.idx()) {
             p.team = Team::Mission;
             p.bot.waypoint = 0;
             p.bot.waypoint_count = 0;
         }
+
         self.create_guards(deadline, Some(counter), vpos, vrot, vid);
     }
 
@@ -162,19 +171,24 @@ impl Sim {
         self.missions.chase_car = car as i32;
         let streets = &self.world.map.streets;
         let mut to = if streets.streets.is_empty() { 0 } else { random_street(streets) };
+
         if let Some(min) = min_distance {
             let corner = |s: i32| usize::try_from(s).ok().and_then(|s| streets.streets.get(s)).map_or(Vec3::ZERO, |s| s.bounds_min);
             let from = corner(self.traffic.cars[car].street);
+
             for _ in 0..1024 {
                 let d = from - corner(to);
+
                 if d.length() >= min {
                     break;
                 }
+
                 if !streets.streets.is_empty() {
                     to = random_street(streets);
                 }
             }
         }
+
         let to_slot = rand::random_range(0..2);
         let c = &mut self.traffic.cars[car];
         let from = c.street;
@@ -200,9 +214,11 @@ impl Sim {
     /// The chase car's guards: one in the front passenger seat, each back seat taken at even odds.
     pub(crate) fn create_guards(&mut self, deadline: i32, mission: Option<i32>, pos: Vec3, rot: RotMatrix, vehicle: usize) {
         self.create_guard(deadline, mission, pos, rot, vehicle, 1);
+
         if !rand::random::<bool>() {
             self.create_guard(deadline, mission, pos, rot, vehicle, 2);
         }
+
         if !rand::random::<bool>() {
             self.create_guard(deadline, mission, pos, rot, vehicle, 3);
         }
@@ -260,9 +276,11 @@ impl Sim {
     pub(crate) fn create_player(&mut self) -> Option<PlayerId> {
         let head = rand::random_range(0..5);
         let mut skin = rand::random_range(0..6);
+
         if rand::random_ratio(3, 4) {
             skin = 2;
         }
+
         let hair_color = rand::random_range(0..6);
         let hair_style = rand::random_range(0..9);
         let eye_color = rand::random_range(0..8);
@@ -289,12 +307,15 @@ impl Sim {
     pub(crate) fn give_weapon(&mut self, h: usize, gun: ItemKind, magazines: i32) {
         let Some((pos, rot)) = self.humans.get(h).map(|hu| (hu.bones[0].pos, hu.bones[0].rot)) else { return };
         let mag = ItemKind::try_from(gun as u8 + 1).unwrap();
+
         if let Some(id) = self.create_item(gun, pos, None, rot) {
             self.link_to_slot(h, id, 0);
         }
+
         if let Some(id) = self.create_item(mag, pos, None, rot) {
             self.link_to_slot(h, id, 1);
         }
+
         for i in 0..magazines - 1 {
             if let Some(id) = self.create_item(mag, pos, None, rot) {
                 self.link_to_slot(h, id, (i >> 1) as usize + 3);
@@ -346,12 +367,15 @@ impl Sim {
         for k in 0..self.corp_state.len() {
             for slot in 0..MISSION_SLOTS {
                 let m = self.corp_state[k].missions[slot];
+
                 if !m.active || m.done || m.id != id {
                     continue;
                 }
+
                 if let Some(item) = usize::try_from(m.item).ok().and_then(|i| self.items.get_mut(i)) {
                     item.despawn_time = 0;
                 }
+
                 self.corp_state[k].missions[slot].item = -1;
             }
         }
@@ -368,6 +392,7 @@ impl Sim {
             0 | 1 => (if success { m.value / 10 } else { FAILED_RATING }) + tenth,
             2 => {
                 let r = tenth - m.provided_cash / 10;
+
                 if r >= 0 {
                     r + SELLER_RATING + if success { SUCCESS_RATING } else { 0 }
                 } else if !success {
@@ -387,6 +412,7 @@ impl Sim {
             if rating > 0 {
                 p.money += rating * RATING_MONEY;
             }
+
             p.corp_rating += rating;
         }
 

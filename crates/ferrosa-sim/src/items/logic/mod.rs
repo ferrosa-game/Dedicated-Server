@@ -44,6 +44,7 @@ impl Sim {
                 ItemKind::Key => self.key_logic(id),
                 ItemKind::Radio => {
                     let pressed = self.items.get(id).is_some_and(|i| i.has_input(ItemInput::Use));
+
                     if let Some(ItemState::Radio { transmitting, .. }) = self.items.get_mut(id).map(|i| &mut i.state) {
                         *transmitting = pressed;
                     }
@@ -265,6 +266,7 @@ impl Sim {
 
             return;
         }
+
         if !was_pressed {
             let toggled = match kind {
                 ItemKind::Briefcase => Some(ItemKind::BriefcaseOpen),
@@ -303,6 +305,7 @@ impl Sim {
         }
 
         let p = self.items.get_mut(item_id).unwrap().state.phone_mut().unwrap();
+
         if p.status != PhoneStatus::Dialing || p.cooldown != 0 || !(0..=9).contains(&key) {
             return;
         }

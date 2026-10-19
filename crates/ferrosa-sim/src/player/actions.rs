@@ -16,6 +16,7 @@ impl ActionQueue {
     /// A client game packet: its count becomes the base, and its actions go in from there.
     pub(crate) fn ingest(&mut self, start: u8, actions: Vec<GameAction>) {
         self.write = start % 64;
+
         for action in actions {
             self.ring[self.write as usize] = Some(action);
             self.write = (self.write + 1) % 64;

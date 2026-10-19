@@ -108,6 +108,7 @@ impl Sim {
         let (pos, _) = entry_pose(e, o.cell, area.block_size, (o.word >> 24) & 3);
         let d = pos - at;
         let dist = d.length();
+
         if dist >= RETURN_REACH {
             return;
         }

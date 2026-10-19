@@ -20,6 +20,7 @@ impl Writer {
         if self.full() {
             return;
         }
+
         self.raw_bits(value, count);
     }
 
@@ -29,13 +30,16 @@ impl Writer {
         }
 
         let mut value = value as u32;
+
         if count < 32 {
             value &= (1u32 << count) - 1;
         }
 
         let mut remaining = count;
+
         while remaining > 0 {
             let byte_index = self.bit_pos / 8;
+
             if byte_index >= self.buf.len() {
                 self.buf.push(0);
             }
@@ -53,6 +57,7 @@ impl Writer {
 
     pub fn pad_to_byte(&mut self) {
         let off = self.bit_pos % 8;
+
         if off != 0 {
             self.raw_bits(0, (8 - off) as u32)
         }
@@ -65,7 +70,9 @@ impl Writer {
         if self.full() {
             return;
         }
+
         self.pad_to_byte();
+
         for &b in bytes {
             self.raw_bits(b as i32, 8);
         }

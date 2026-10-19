@@ -273,24 +273,29 @@ impl ServerItemObject {
     fn write_body(&self, w: &mut Writer) {
         w.bits(1, 1);
         w.bits(self.header.is_some() as i32, 1);
+
         if let Some(h) = &self.header {
             w.bits(self.item_type as i32, 8);
             w.bits(h.parent_item, 10);
             w.bits(h.parent_human, 10);
             w.bits(h.parent_slot, 4);
+
             if let Some((current, top)) = h.screen {
                 w.bits(current, 5);
                 w.bits(top, 5);
             }
         }
+
         w.bits(0, 8);
 
         let p = self.pos;
+
         for v in [(p.x + 4096.0) * 4096.0, p.y * 4096.0, (p.z + 4096.0) * 4096.0] {
             write_absolute(w, v as i32, 28);
         }
 
         write_quaternion(w, self.rot, 14);
+
         match self.tail {
             ItemTail::None => {}
             ItemTail::Cash { bills, spread, codes } => {
@@ -321,6 +326,7 @@ impl LineLinkEntry {
         w.bits(self.index as i32, 16);
         w.bits(self.kind, 6);
         w.bits(self.tick, 28);
+
         match self.kind {
             0 => {
                 w.bits(self.item, 12);
@@ -362,16 +368,20 @@ impl ServerVehicleObject {
         w.bits(self.traffic_car, 10);
         w.bits(0, 8);
         let p = self.pos;
+
         for v in [(p.x + 4096.0) * 4096.0, (0.0 + p.y) * 4096.0, (p.z + 4096.0) * 4096.0] {
             write_absolute(w, v as i32, 28);
         }
+
         write_quaternion(w, self.rot, 14);
         write_absolute(w, self.steer, 9);
+
         for [height, spin, skid] in self.wheels {
             write_absolute(w, height, 8);
             write_absolute(w, spin, 9);
             write_absolute(w, skid, 8);
         }
+
         w.bits(self.engine_rpm, 13);
     }
 }
@@ -393,14 +403,18 @@ impl TrafficEntry {
         w.bits(0, 8);
         w.bits(self.vehicle as i32, 1);
         w.bits(self.kind_color.is_some() as i32, 1);
+
         if let Some((kind, color)) = self.kind_color {
             w.bits(kind as i32, 6);
             w.bits(color, 4);
         }
+
         let p = self.pos;
+
         for v in [(p.x + 4096.0) * 4096.0, (p.y + 0.0) * 4096.0, (p.z + 4096.0) * 4096.0] {
             write_absolute(w, v as i32, 28);
         }
+
         let yaw = ((self.yaw as f64 / std::f64::consts::PI * 255.0) as i32).clamp(-255, 255);
         write_absolute(w, yaw, 9);
     }
@@ -434,6 +448,7 @@ impl ServerHumanObject {
     fn write_body(&self, w: &mut Writer) {
         w.bits(1, 1);
         w.bits(self.appearance.is_some() as i32, 1);
+
         if let Some(a) = &self.appearance {
             let c = &a.customization;
             w.bits(a.player_id, 8);
@@ -457,10 +472,13 @@ impl ServerHumanObject {
         w.bits(self.bleeding as i32, 1);
 
         let p = self.pos;
+
         for v in [(4096.0 + p.x) * 4096.0, (0.0 + p.y) * 4096.0, (4096.0 + p.z) * 4096.0] {
             write_absolute(w, v as i32, 28);
         }
+
         write_quaternion(w, self.rot, 14);
+
         for bone in self.bones {
             w.bits(1, 1);
             write_quaternion(w, bone, 12);
@@ -471,6 +489,7 @@ impl ServerHumanObject {
 fn write_quaternion(w: &mut Writer, q: [f32; 4], bits: u32) {
     let (largest, rest) = pack_quaternion(q, bits);
     w.bits(largest, 2);
+
     for v in rest {
         write_absolute(w, v, bits);
     }
@@ -486,22 +505,27 @@ fn pack_quaternion(q: [f32; 4], bits: u32) -> (i32, [i32; 3]) {
     let scale = (1 << (bits - 1)) as f64 - 1.0;
     let mut c = q;
     let mut largest = 0;
+
     for i in 1..4 {
         if c[i].abs() > c[largest].abs() {
             largest = i;
         }
     }
+
     if c[largest] < 0.0 {
         c = c.map(|v| -v);
     }
+
     let mut out = [0i32; 3];
     let mut k = 0;
+
     for i in [3usize, 1, 2, 0] {
         if i != largest {
             out[k] = (c[i] as f64 * std::f64::consts::FRAC_1_SQRT_2 * scale) as i32;
             k += 1;
         }
     }
+
     (largest as i32, out)
 }
 
@@ -638,6 +662,7 @@ impl WireWrite for ServerGamePacket {
                 for v in [h.view_yaw, h.view_pitch, h.yaw_offset, h.pitch_offset, h.body_yaw] {
                     w.f32(v);
                 }
+
                 w.bits(h.is_standing as i32, 1);
                 w.bits(h.pain, 8);
                 w.bits(h.action_type, 8);
@@ -645,9 +670,11 @@ impl WireWrite for ServerGamePacket {
                 w.bits(h.action_hand, 4);
                 w.bits(h.action_slot, 4);
                 w.bits(h.progress_bar, 8);
+
                 for hp in h.health {
                     w.bits(hp, 7);
                 }
+
                 w.bits(h.stamina, 8);
                 w.bits(h.max_stamina, 8);
                 h.head_vel
@@ -661,8 +688,10 @@ impl WireWrite for ServerGamePacket {
         w.bits(self.manager_tab as i32, 1);
         w.bits(self.menu_type as i32, 8);
         w.bits(self.menu_tab, 16);
+
         if self.menu_type == MenuType::WorldStore {
             w.bits(self.shop.len() as i32, 8);
+
             for &(kind, price, extra) in &self.shop {
                 w.bits(kind, 8);
                 w.bits(price, 24);
@@ -685,12 +714,14 @@ impl WireWrite for ServerGamePacket {
 
         for slot in &self.display_inventory {
             w.bits(slot.len() as i32, 4);
+
             for &t in slot {
                 w.bits(t, 16);
             }
         }
 
         w.bits(self.menu_buttons.len() as i32, 8);
+
         for b in &self.menu_buttons {
             let text = &b.text.as_bytes()[..b.text.len().min(63)];
             w.i32(b.id);
@@ -698,6 +729,7 @@ impl WireWrite for ServerGamePacket {
             w.bytes(text);
             w.i32(b.extra);
         }
+
         w.bits(0, 8);
         w.bits(4, 4);
         w.bits(8, 4);
@@ -708,12 +740,14 @@ impl WireWrite for ServerGamePacket {
 
         w.bits(self.object_packs.len() as i32, 11);
         w.bits(self.pack_offset as i32, 11);
+
         for pack in &self.object_packs {
             pack.write(w);
         }
 
         w.bits(self.line_links.len() as i32, 8);
         w.bits(self.link_offset as i32, 8);
+
         for link in &self.line_links {
             link.write(w);
         }
@@ -721,11 +755,13 @@ impl WireWrite for ServerGamePacket {
         for human in &self.humans {
             human.write_body(w);
         }
+
         for item in &self.items {
             item.write_body(w);
         }
 
         w.bits(self.vehicles.len() as i32, 8);
+
         for vehicle in &self.vehicles {
             vehicle.write_body(w);
         }
@@ -734,21 +770,26 @@ impl WireWrite for ServerGamePacket {
         w.bits(self.traffic_count, 10);
         w.bits(self.traffic.len() as i32, 8);
         let mut next = 0;
+
         for car in &self.traffic {
             let skip = car.index as i32 - next;
+
             if skip > 0 {
                 w.bits(0, 1);
                 w.bits(skip, 10);
             }
+
             car.write_body(w);
             next = car.index as i32 + 1;
         }
+
         if self.traffic_count > next {
             w.bits(0, 1);
             w.bits(self.traffic_count - next, 10);
         }
 
         w.bits(self.signal.0, 10);
+
         for light in self.signal.1 {
             w.bits(light, 2);
         }
@@ -776,6 +817,7 @@ impl WireWrite for ServerGamePacket {
         w.bits(self.global_event_count as i32, 16);
         w.bits(self.events.len() as i32, 6);
         w.bits(self.first_event as i32, 16);
+
         for (_, e) in &self.events {
             e.write(w)
         }

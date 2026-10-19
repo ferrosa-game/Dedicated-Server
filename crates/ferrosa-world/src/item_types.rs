@@ -77,6 +77,7 @@ pub fn inverse_inertia(b: Vec3) -> Vec3 {
 
 fn collision(glb: &Glb, root: usize) -> Result<Option<It3Collision>, String> {
     let pieces = numbered(glb, root, "COL")?;
+
     if pieces.is_empty() {
         return Ok(None);
     }
@@ -149,12 +150,14 @@ fn from_model(path: &Path, kinds: &dyn Fn(&str) -> Option<usize>) -> Result<Item
     t.gun_hold_pos = Vec3::from_array(p!("gun_hold_pos").unwrap_or([0.0; 3]));
 
     let mounts: Vec<String> = p!("mounts_to").unwrap_or_default();
+
     for m in mounts {
         let k = kinds(&m).ok_or(format!("mounts_to: no item model {m}"))?;
         t.can_mount_to[k] = 1;
     }
 
     let inertia: Option<[f32; 3]> = p!("inertia");
+
     if let Some(inertia) = inertia {
         t.inv_inertia = Vec3::ONE / Vec3::from_array(inertia);
     }

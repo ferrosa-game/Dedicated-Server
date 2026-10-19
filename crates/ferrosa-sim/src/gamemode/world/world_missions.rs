@@ -94,6 +94,7 @@ fn pick_name(used: &mut Vec<bool>, take: bool) -> usize {
     while used[k] {
         k = rand::random_range(0..32) as usize;
         tries -= 1;
+
         if tries == 0 {
             break;
         }
@@ -118,6 +119,7 @@ fn pick_volume(vols: &[i32]) -> i32 {
 /// create_world_mode_mission_string: what the INTEL file says about a mission.
 fn mission_string(file: &str, a: &str, b: &str, project: &str, high_value: bool) -> String {
     let mut new_str = String::new();
+
     match rand::random_range(0..3) {
         0 => new_str += "We have received reports that ",
         1 => new_str += "Reports indicate that ",
@@ -226,9 +228,11 @@ impl Sim {
     pub(crate) fn start_world_missions(&mut self) {
         self.modes.world.missions.names_used = vec![false; NAME_FLAGS];
         self.modes.world.missions.boosted = rand::random_range(0..DAILY_MISSIONS) as i32;
+
         for _ in 0..DAILY_MISSIONS {
             self.create_world_mission();
         }
+
         self.distribute_documents();
     }
 
@@ -236,8 +240,10 @@ impl Sim {
     /// their reward plus the new manager's bonus.
     pub(crate) fn scale_missions_for_manager(&mut self, t: usize, rating: i32) {
         let bonus = ((rating - 1000) / 100).clamp(0, 1000);
+
         for m in self.modes.world.missions.missions.iter_mut().take(DAILY_MISSIONS as usize) {
             let v = &mut m.teams[t].value;
+
             if m.state == 0 && *v > 0 {
                 *v = bonus.wrapping_mul(m.reward) / 100 + m.reward;
             }
@@ -256,8 +262,10 @@ impl Sim {
         let bonus = self.manager_bonus(t);
         let members = self.corp_state[t].player_count;
         let rate = bonus + if members < MAX_MEMBERS { members * MEMBER_BONUS } else { MAX_MEMBERS * MEMBER_BONUS };
+
         for m in self.modes.world.missions.missions.iter_mut().take(DAILY_MISSIONS as usize) {
             let v = &mut m.teams[t].value;
+
             if m.state == 0 && *v > 0 {
                 *v = m.reward.wrapping_mul(rate) / 100 + m.reward;
             }
@@ -272,25 +280,32 @@ impl Sim {
     /// reward for three corporations (raised by their manager's corporate rating) and its INTEL file.
     fn create_world_mission(&mut self) {
         let w = &mut self.modes.world.missions;
+
         if w.missions.len() < MISSIONS {
             w.missions.resize(MISSIONS, WorldMission::default());
         }
+
         let Some(idx) = w.missions.iter().position(|m| !m.active) else { return };
         w.missions[idx] = WorldMission { active: true, ..Default::default() };
         let n = w.spots.len();
+
         if n == 0 {
             return;
         }
+
         let least = w.spots.iter().map(|s| s.used).fold(65536, i32::min);
         let mut r = rand::random_range(0..n as u32) as usize;
         let mut tries = PICK_TRIES;
+
         while w.spots[r].used > least {
             r = rand::random_range(0..n as u32) as usize;
             tries -= 1;
+
             if tries == 0 {
                 break;
             }
         }
+
         w.spots[r].used += 1;
         let building = w.spots[r].building;
         let Some(content) = self.fs.contents.iter().position(|c| !c.active) else { return };
@@ -303,27 +318,34 @@ impl Sim {
         self.fs.add_file(vol, 0, &format!("{doc}.DOC"), content as i32);
         let high_value = rand::random_ratio(1, 5);
         let mut reward = rand::random_range(0..5) as i32 * REWARD_STEP + REWARD_BASE;
+
         if self.modes.world.missions.boosted == idx as i32 {
             reward *= BOOST;
         }
+
         self.modes.world.missions.missions[idx].reward = reward;
+
         for _ in 0..3 {
             let t = rand::random_range(0..6) as usize;
             self.modes.world.missions.missions[idx].teams[t].value = self.manager_bonus(t) * reward / 100 + reward;
         }
+
         let (a, b) = self.world.map.level.buildings.get(building).map_or((0, 0), |b| b.streets);
         let (a, b) = (self.street_name(a), self.street_name(b));
         let intel = idx as i32 + INTEL_CONTENT;
         let text = mission_string(doc, &a, &b, NAMES.get(idx).copied().unwrap_or(""), high_value);
+
         if let Some(c) = self.fs.content_mut(intel) {
             c.text = text.into_bytes();
         }
+
         self.fs.encipher(intel);
         let m = &mut self.modes.world.missions.missions[idx];
         m.intel = intel;
         m.filename = format!("INTEL{idx:02}.CDE");
         m.names = [doc.to_string(), a, b, doc.to_string()];
         m.high_value = high_value;
+
         for t in &mut m.teams {
             t.word = "Open".into();
         }
@@ -337,18 +359,22 @@ impl Sim {
                 let vol = pick_volume(&self.modes.world.missions.spots[s].volumes);
                 let k = pick_name(&mut self.modes.world.missions.names_used, false);
                 let name = format!("{}.DOC", NAMES[PROJECTS + k]);
+
                 if self.fs.find_file(vol, 0, &name) == -1 {
                     let c = self.fs.alloc_content();
                     self.fs.add_file(vol, 0, &name, c);
                 }
             }
         }
+
         for s in 0..self.modes.world.missions.spots.len() {
             for v in self.modes.world.missions.spots[s].volumes.clone() {
                 let n = self.fs.volume(v).map_or(0, |x| x.files.len());
+
                 if n <= 1 {
                     continue;
                 }
+
                 for _ in 0..SHUFFLES {
                     let a = rand::random_range(0..n as u32) as usize;
                     let b = rand::random_range(0..n as u32) as usize;
@@ -369,27 +395,35 @@ impl Sim {
     /// and each corporation the mission is worth something to is told, by status line and memo.
     pub(crate) fn file_trade(&mut self, m: usize, team: usize) {
         self.modes.world.missions.missions[m].teams[team].uploaded = true;
+
         if self.modes.world.missions.missions[m].state > 1 {
             return;
         }
+
         let value = self.modes.world.missions.missions[m].teams[team].value;
+
         if value <= 0 {
             {
                 let t = &mut self.modes.world.missions.missions[m].teams[team];
                 t.lines = vec!["TRADE".into()];
                 t.word = "Trade".into();
             }
+
             for i in 0..6 {
                 let mission = &mut self.modes.world.missions.missions[m];
+
                 if i == team || mission.teams[i].value <= 0 {
                     continue;
                 }
+
                 let state = mission.state;
                 let v = mission.teams[i].value;
                 let ti = &mut mission.teams[i];
+
                 if state == 0 {
                     ti.lines.clear();
                 }
+
                 ti.lines.push(format!("{} HAS THE FILE  VALUE: ${}", Team::CORPORATION_NAMES[team], v));
                 ti.word = "Trade".into();
                 let memo = format!(
@@ -401,11 +435,14 @@ impl Sim {
                 mission.teams[team].lines.push(format!("{} WANTS THE FILE", Team::CORPORATION_NAMES[i]));
                 self.place_corporation_memo(i, memo.as_bytes());
             }
+
             self.modes.world.missions.missions[m].state = 1;
             return;
         }
+
         self.corp_state[team].money += value;
         let mission = &mut self.modes.world.missions.missions[m];
+
         for (i, t) in mission.teams.iter_mut().enumerate() {
             if i == team {
                 t.lines = vec!["MISSION SUCCESS".into(), format!("VALUE: ${value}")];
@@ -415,7 +452,9 @@ impl Sim {
                 t.word = "Closed".into();
             }
         }
+
         mission.state = 2;
+
         if self.corp_state[team].intel > 0 {
             self.corp_state[team].intel = 1;
         }
@@ -462,6 +501,7 @@ fn worth_part(boosted: bool) -> &'static str {
     if boosted {
         return if rand::random_range(0..2) == 1 { "this is a high priority project. " } else { "this project is extremely high value. " };
     }
+
     match rand::random_range(0..4) {
         1 => "the company picnic is next saturday. ",
         2 => "next friday is hawaiian shirt day. ",
@@ -477,39 +517,49 @@ impl Sim {
     pub(crate) fn generate_team_mission_memo(&mut self, t: usize) {
         let daily = DAILY_MISSIONS as usize;
         let missions = &self.modes.world.missions.missions;
+
         if missions.len() < daily {
             return;
         }
 
         let least_asked = missions[..daily].iter().map(|m| m.teams[t].status).fold(256, i32::min);
         let least_state = missions[..daily].iter().map(|m| m.state).fold(256, i32::min);
+
         if least_state > 0 {
             return;
         }
 
         let list: Vec<usize> = (0..daily).filter(|&i| missions[i].teams[t].status == least_asked && missions[i].state == least_state).collect();
+
         if list.is_empty() {
             return;
         }
+
         let mut m = 0;
+
         for tries in 1.. {
             m = list[rand::random_range(0..list.len() as i32) as usize];
             let wanted = (0..6).any(|j| self.corp_state[j].player_count > 0 && self.modes.world.missions.missions[m].teams[j].value > 0);
+
             if wanted || tries >= MEMO_TRIES {
                 break;
             }
         }
+
         let mut order = [0, 1, 2];
+
         for _ in 0..PART_SHUFFLES {
             let a = rand::random_range(0..3) as usize;
             let b = rand::random_range(0..3) as usize;
             order.swap(a, b);
         }
+
         self.modes.world.missions.missions[m].teams[t].status += 1;
         self.corp_state[t].intel = INTEL_FAXED;
         let boosted = self.modes.world.missions.boosted == m as i32;
         let names = self.modes.world.missions.missions[m].names.clone();
         let mut text = String::new();
+
         for part in order {
             text += &match part {
                 0 => streets_part(&names[1], &names[2]),
@@ -517,16 +567,21 @@ impl Sim {
                 _ => worth_part(boosted).to_string(),
             };
         }
+
         let content = self.fs.alloc_content();
+
         if let Some(c) = self.fs.content_mut(content) {
             c.text = text.into_bytes();
         }
+
         self.fs.encipher(content);
         self.modes.world.missions.intel_files += 1;
         let file = format!("INTEL{:02}.CDE", self.modes.world.missions.intel_files);
+
         if rand::random::<bool>() {
             return self.intel_disk_memo(t, &file, content);
         }
+
         let expiry = self.world_time + INTEL_TIME;
         let Some(car) = self.spawn_mission_intel_car(&file, content, expiry) else { return };
         let (hour, minute, pm) = memos::clock_time(expiry);
@@ -536,12 +591,15 @@ impl Sim {
         };
         let (Some(&first), Some(&last)) = (route.first(), route.last()) else { return };
         let mut memo = String::from("There is in a town car driving around the city with\nvaluable information.\n");
+
         if let Some((a, b)) = self.route_corner(first) {
             memo += &format!("The car will be driving from {a} and {b}\n");
         }
+
         if let Some((a, b)) = self.route_corner(last) {
             memo += &format!("to {a} and {b}.\n");
         }
+
         memo += &format!("This mission expires at {hour}:{minute:02} {}.\n", if pm { "PM" } else { "AM" });
         self.place_corporation_memo(t, memo.as_bytes());
     }
@@ -559,16 +617,20 @@ impl Sim {
     /// The intel left on a blue disk in a random lab's lobby, and the memo saying where.
     fn intel_disk_memo(&mut self, t: usize, file: &str, content: i32) {
         let spots = self.modes.world.missions.spots.len() as i32;
+
         if spots == 0 {
             return;
         }
+
         let building = self.modes.world.missions.spots[rand::random_range(0..spots) as usize].building;
         let (lobby, (a, b)) = self.world.map.level.buildings.get(building).map_or((Vec3::ZERO, (-1, -1)), |b| (b.lobby, b.streets));
+
         if let Some(disk) = self.create_item(ferrosa_protocol::clientbound::game::ItemKind::DiskBlue, lobby, None, ferrosa_physics::rotation::IDENTITY) {
             let vol = self.fs.alloc_volume(DISK_CAPACITY);
             self.items.get_mut(disk).unwrap().volume = vol;
             self.fs.add_file(vol, 0, file, content);
         }
+
         let memo = format!(
             "We have intercepted communications\nThe disk with the info in the lobby of the lab at\n{} and {}\nFilename: {file}",
             self.street_name(a),
@@ -583,33 +645,41 @@ impl Sim {
     pub(crate) fn spawn_mission_intel_car(&mut self, file: &str, content: i32, expiry: i32) -> Option<usize> {
         use ferrosa_physics::rotation::IDENTITY;
         use ferrosa_protocol::{Team, clientbound::game::ItemKind};
+
         if self.world.map.streets.streets.is_empty() {
             return None;
         }
+
         let (car, vid) = self.spawn_chase_car(Some(INTEL_CAR_DISTANCE));
         let Some(vid) = vid else { return Some(car) };
         let v = self.vehicles.get(vid).unwrap();
         let (vpos, vrot) = (v.pos, v.rot);
         let Some((driver, driver_human)) = self.create_mission_bot(expiry, None, vpos, vrot, vid, 0) else { return Some(car) };
+
         if let Some(key) = self.create_item(ItemKind::Key, INTEL_ITEMS_POS, None, IDENTITY) {
             self.items.get_mut(key).unwrap().state = ItemState::Key { vehicle: Some(vid) };
+
             if let Some(h) = driver_human {
                 self.link_to_slot(h, key, INTEL_KEY_SLOT);
             }
         }
+
         if let Some(disk) = self.create_item(ItemKind::DiskRed, INTEL_ITEMS_POS, None, IDENTITY) {
             let vol = self.fs.alloc_volume(DISK_CAPACITY);
             self.items.get_mut(disk).unwrap().volume = vol;
             self.fs.add_file(vol, 0, file, content);
+
             if let Some(h) = driver_human {
                 self.link_to_slot(h, disk, INTEL_DISK_SLOT);
             }
         }
+
         if let Some(p) = self.players.get_mut(driver.idx()) {
             p.team = Team::Mission;
             p.bot.waypoint = 0;
             p.bot.waypoint_count = 0;
         }
+
         self.create_guards(expiry, None, vpos, vrot, vid);
         Some(car)
     }

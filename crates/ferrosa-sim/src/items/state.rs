@@ -20,7 +20,6 @@ pub enum ItemState {
     Gun { rounds: i32, cooldown: i32, trigger_ticks: i32 },
     /// Uses left and how far the current patching has got (done past 255).
     Bandage { usage_left: i32, progress: i32 },
-    /// Bites left.
     Burger { bites_left: i32 },
     /// The pin (1 while in), the fuse (240 while held unpinned, counting down once thrown) and the
     /// player who pulled the pin.
@@ -31,19 +30,16 @@ pub enum ItemState {
     Radio { channel: i32, transmitting: bool },
     /// An arcade machine's screen: the frame counter and top line.
     Arcade { frame: i32, top_line: i32 },
-    /// A car key and its vehicle.
     Key { vehicle: Option<usize> },
     /// A stack of world cash.
     Cash(Cash),
     /// A computer's screen, shell and programs.
     Computer(Box<crate::computer::Computer>),
-    /// A memo's text.
     Memo(Box<[u8; memos::MEMO_LEN]>),
     /// A door on its hinges: its axis and the two points it hangs from.
     Door { axis: glam::Vec3, hinges: [glam::Vec3; 2] },
 }
 
-/// What each bill code is worth.
 pub const BILL_VALUES: [i32; 8] = [1, 5, 10, 20, 50, 100, 1000, 0];
 
 /// A stack of up to ten bills: one less than the count, which bill is picked out and each bill's
@@ -56,12 +52,10 @@ pub struct Cash {
 }
 
 impl Cash {
-    /// The code of bill `k`.
     pub(crate) fn code(&self, k: i32) -> u32 {
         (self.codes >> ((k * 3) & 31)) & 7
     }
 
-    /// What the stack is worth.
     pub(crate) fn value(&self) -> i32 {
         (0..=self.bills).map(|k| BILL_VALUES[self.code(k) as usize]).sum()
     }
@@ -70,6 +64,7 @@ impl Cash {
     /// stack holds ten.
     pub(crate) fn insert(&mut self, index: i32, code: u32) -> bool {
         let bills = self.bills;
+
         if bills > 8 {
             return false;
         }

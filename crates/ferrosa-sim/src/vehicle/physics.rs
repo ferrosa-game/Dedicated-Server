@@ -1,7 +1,7 @@
 use ferrosa_physics::{
     RigidBodies, RigidBody, RotMatrix, Table,
     bond::Bond,
-    rotation::{multiply_matrixes, quaternion_to_rotation_vector, rot_matrix_to_quaternion, rotate_vector_about_axis},
+    rotation::{multiply_matrixes, quaternion_to_rotation_vector, rot_matrix_to_quaternion, rotate, rotate_vector_about_axis},
 };
 use ferrosa_protocol::clientbound::game::VehicleKind;
 
@@ -69,9 +69,7 @@ pub fn update_vehicle_bounds(v: &mut Vehicle, bodies: &RigidBodies, types: &[Veh
         v.prev_rot = v.rot;
 
         let c = t.centroid_offset;
-        let [r0, r1, r2] = b.rot;
-
-        v.pos = c.x * r0 + b.pos + c.y * r1 + c.z * r2;
+        v.pos = b.pos + rotate(&b.rot, c);
         v.rot = b.rot;
         v.vel = b.vel;
         v.ang_vel = b.ang_vel;
@@ -335,6 +333,7 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
     };
 
     let (w0, w1) = if steer > 0.0 { (outer, a) } else { (-a, -outer) };
+
     if let Some(w) = v.wheels.get_mut(0) {
         w.steer = w0;
     }
@@ -397,13 +396,14 @@ fn wheel_collision(map: &Map, bodies: &mut RigidBodies, v: &Vehicle, k: usize) {
 /// position and velocity kept.
 fn step_wheels(map: &Map, bodies: &mut RigidBodies, v: &mut Vehicle) {
     let Some(c) = bodies.get(v.body) else { return };
-    let ([r0, r1, r2], pos) = (c.rot, c.pos);
+    let (rot, pos) = (c.rot, c.pos);
+    let r1 = rot[1];
 
     for k in 0..v.wheels.len() {
         let w = &v.wheels[k];
         let l = w.local_pos;
 
-        let anchor = l.x * r0 + pos + l.y * r1 + l.z * r2;
+        let anchor = pos + rotate(&rot, l);
 
         let Some(wb) = bodies.get(w.body) else { continue };
         let d = wb.pos - anchor;
@@ -451,6 +451,7 @@ fn sweep_chassis(map: &mut Map, bodies: &mut RigidBodies, v: &Vehicle, t: &Vehic
         };
 
         let broke = physics::add_bullet_hole(map, hole, end, v.vel, &mut glass);
+
         if hit.set.is_some() {
             continue;
         }
@@ -533,6 +534,7 @@ fn update_train(v: &mut Vehicle, bodies: &mut RigidBodies, track: &crate::world:
 
     for seg in candidates {
         let Some(m) = track.meshes.get(seg as usize) else { continue };
+
         if m.kind != 0 || m.box_min.x > hi.x || m.box_min.z > hi.z || lo.x > m.box_max.x || lo.z > m.box_max.z {
             continue;
         }
@@ -541,12 +543,12 @@ fn update_train(v: &mut Vehicle, bodies: &mut RigidBodies, track: &crate::world:
 
         for &(bogie, _) in &v.bogies {
             for (cx, cz) in BOGIE_CORNERS {
-                let Some((pos, [r0, r1, r2])) = bodies.get(bogie).map(|b| (b.pos, b.rot)) else { continue };
+                let Some((pos, rot)) = bodies.get(bogie).map(|b| (b.pos, b.rot)) else { continue };
                 let a = (cx - 0.5) * BOGIE_GAUGE;
                 let d = cz - 0.5;
                 let d = d + d;
                 let h = BOGIE_DROP;
-                let end = a * r0 + pos + d * r2 + h * r1;
+                let end = pos + rotate(&rot, Vec3::new(a, h, d));
                 let Some((_, hp, n)) = crate::world::track::segment_intersect_triangles(&tris, pos, end) else { continue };
                 let depth = ((hp.x - end.x) * n.x + (hp.y - end.y) * n.y) + n.z * (hp.z - end.z);
                 bodies.add_world_contact(bogie, end - pos, n, depth, 0.0, RAIL_DEPTH_SCALE, RAIL_SOFTNESS);
@@ -590,7 +592,7 @@ fn drive_train(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, track: &cra
     } else {
         let m = track.meshes.get(v.train_segment as usize);
         let (p, n) = m.map_or((0, 0), |m| (m.prev, m.next));
-        let w = minss(weight(n), minss(weight(p), weight(v.train_segment)));
+        let w = weight(n).min(weight(p).min(weight(v.train_segment)));
         w * (w * TRAIN_CRUISE)
     };
 
@@ -662,10 +664,6 @@ fn set_door(v: &mut Vehicle, open: bool) {
     if let Some(d) = v.broken_windows.get_mut(TRAIN_DOOR) {
         *d = open;
     }
-}
-
-fn minss(a: f32, b: f32) -> f32 {
-    if a < b { a } else { b }
 }
 
 /// The rotor winds up 10 RPM a step to 2000 while a driver sits in an unlocked, unwrecked helicopter, and down 10 a
@@ -848,9 +846,8 @@ pub fn step_wheel_constraints(vehicles: &mut Table<Vehicle>, bodies: &mut Table<
             let (mc, mw) = (c.mass, wb.mass);
             let total = mc + mw;
             let share = mc / total;
-            let [r0, r1, r2] = c.rot;
-            let l = w.local_pos;
-            let a = r0 * l.x + l.y * r1 + r2 * l.z;
+            let [r0, r1, _] = c.rot;
+            let a = rotate(&c.rot, w.local_pos);
             let (cp, wp) = (c.pos, wb.pos);
             let e = (cp + a - wp) * w.spring;
             let d = wp - cp;
@@ -1018,6 +1015,7 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
         v.engine_speed = es_new + pull;
 
         let mut accum = 0.0f32;
+
         if !v.driven.is_empty() {
             let mut sum = 0.0f32;
 
@@ -1054,11 +1052,13 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
         v.gearbox_speed += accum;
 
         let es = v.engine_speed.abs();
+
         if es > 0.0 && TINY > es {
             v.engine_speed = 0.0;
         }
 
         let gs = v.gearbox_speed.abs();
+
         if gs > 0.0 && TINY > gs {
             v.gearbox_speed = 0.0;
         }
@@ -1073,6 +1073,7 @@ pub fn capsule_intersect_vehicle(v: &Vehicle, t: &VehicleType, start: Vec3, end:
     }
 
     let (s, e, mn, mx) = (start.to_array(), end.to_array(), v.bounds_min.to_array(), v.bounds_max.to_array());
+
     if (0..3).any(|k| mn[k] > s[k] + radius && mn[k] > e[k] + radius) || (0..3).any(|k| s[k] - radius > mx[k] && e[k] - radius > mx[k]) {
         return None;
     }
@@ -1108,6 +1109,7 @@ pub fn capsule_intersect_vehicle(v: &Vehicle, t: &VehicleType, start: Vec3, end:
 /// unbroken window from both sides (its two triangles share the first one's normal, negated for the back).
 fn capsule_intersect_train(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
     let (s, e, mn, mx) = (start.to_array(), end.to_array(), v.bounds_min.to_array(), v.bounds_max.to_array());
+
     if (0..3).any(|k| mn[k] > s[k] + radius && mn[k] > e[k] + radius) || (0..3).any(|k| s[k] - radius > mx[k] && e[k] - radius > mx[k]) {
         return None;
     }
@@ -1154,8 +1156,7 @@ fn capsule_intersect_train(v: &Vehicle, t: &VehicleType, start: Vec3, end: Vec3,
 
 /// The vehicle's position plus `p` turned by its orientation, in the order the collision traces add them.
 fn to_world(v: &Vehicle, p: Vec3) -> Vec3 {
-    let (pos, [r0, r1, r2]) = (v.pos, v.rot);
-    p.x * r0 + pos + p.y * r1 + p.z * r2
+    v.pos + rotate(&v.rot, p)
 }
 
 /// The part of a vehicle a trace hit.

@@ -23,6 +23,7 @@ impl WireWrite for VoiceData {
             w.bits(f.volume as i32, 2);
             w.bytes(&f.data[..(f.size as usize).min(f.data.len())]);
         }
+
         w.bits(self.is_silenced as i32, 1);
     }
 }

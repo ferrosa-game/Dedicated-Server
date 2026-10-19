@@ -25,6 +25,7 @@ impl TickStats {
             self.starts.pop_front();
             self.work.pop_front();
         }
+
         self.starts.push_back(start);
         self.work.push_back(work);
     }
@@ -33,9 +34,11 @@ impl TickStats {
     fn summary(&self) -> Option<(f64, f64, f64)> {
         let (first, last) = (self.starts.front()?, self.starts.back()?);
         let span = last.duration_since(*first).as_secs_f64();
+
         if self.starts.len() < 2 || span == 0.0 {
             return None;
         }
+
         let tps = (self.starts.len() - 1) as f64 / span;
         let ms = |d: &Duration| d.as_secs_f64() * 1000.0;
         let mean = self.work.iter().map(ms).sum::<f64>() / self.work.len() as f64;

@@ -56,16 +56,20 @@ impl WireRead for ServerInfo {
         let server_name = String::from_utf8_lossy(&r.text(32)?).into_owned();
         let id = r.i32()?;
         let (mut address, mut port) = ([0; 4], 0);
+
         if build > 0x1a {
             address = r.bytes(4)?.try_into().unwrap();
             port = r.u16()?;
         }
+
         let password_protected = build > 0x1d && r.bits(1)? == 1;
         let mut sub_version = 0;
+
         if build > 0x21 {
             sub_version = r.bits(8)? as u8;
             r.bits(8)?;
         }
+
         Ok(Self { server_name, timestamp, current_players, max_players, build, gamemode, address, port, password_protected, id, sub_version })
     }
 }

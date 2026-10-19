@@ -26,6 +26,11 @@ pub struct BlockRecord {
 }
 
 impl BlockRecord {
+    /// A layer's cell words: 0 for blocks, 1 for the layer above.
+    pub fn layer(&self, layer: usize) -> &[u32; CELLS] {
+        if layer == 0 { &self.layer0 } else { &self.layer1 }
+    }
+
     fn new() -> Box<Self> {
         Box::new(Self {
             layer0: [0; CELLS],
@@ -164,9 +169,14 @@ impl AreaGrid {
         self.record(x, y, z).map_or(0, |r| r.layer1[cell_index(x, y, z)])
     }
 
+    pub fn layer(&self, layer: usize, at: IVec3) -> u32 {
+        self.record(at.x, at.y, at.z).map_or(0, |r| r.layer(layer)[cell_index(at.x, at.y, at.z)])
+    }
+
     /// area_get_collision_cell_resolved: the layer 1 word of a cell, a footprint's resolved to its origin cell.
     pub fn collision_cell_resolved(&self, x: i32, y: i32, z: i32) -> u32 {
         let v = self.layer1(x, y, z);
+
         if v & TYPE_MASK != FOOTPRINT {
             return v;
         }

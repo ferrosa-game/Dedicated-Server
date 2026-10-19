@@ -96,9 +96,11 @@ impl FileSystem {
     /// computer_fs_add_program: a file in `dir` holding `data`; none past 256. Returns its index.
     pub(crate) fn add_file(&mut self, v: i32, dir: i32, name: &str, data: i32) -> i32 {
         let Some(vol) = self.volume_mut(v) else { return -1 };
+
         if vol.files.len() >= MAX_FILES {
             return -1;
         }
+
         vol.files.push(File { data, name: name.chars().take(NAME_LEN).collect(), dir });
         vol.files.len() as i32 - 1
     }
@@ -118,6 +120,7 @@ impl FileSystem {
         let Some(content) = self.content_mut(c) else { return };
         content.encrypted = true;
         content.cipher = std::array::from_fn(|i| i as i32);
+
         for _ in 0..1024 {
             let a = rand::random_range(0..26) as usize;
             let b = rand::random_range(0..26) as usize;

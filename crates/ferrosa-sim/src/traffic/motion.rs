@@ -36,12 +36,15 @@ pub fn update_signals(traffic: &mut Traffic, map: &StreetMap) {
 
         if sg.timer > CYCLE - 1 {
             sg.phase = (sg.phase + 1) & 3;
+
             if i.streets[sg.phase as usize] == -1 {
                 sg.phase = (sg.phase + 1) & 3;
+
                 if i.streets[sg.phase as usize] == -1 {
                     sg.phase = (sg.phase + 1) & 3;
                 }
             }
+
             sg.timer = 0;
         }
 
@@ -163,6 +166,7 @@ pub fn move_virtual_car(traffic: &mut Traffic, map: &Map, types: &[VehicleType],
     let p = c.pos;
     let rear = rot[2] * back + p;
     let end = rear + up * GROUND_DEPTH;
+
     if let Some(h) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, rear, end) {
         let hy = ride + h.hit.pos.y;
         let pitch = -((((hy - p.y) as f64).atan2(c.wheelbase as f64)) as f32);

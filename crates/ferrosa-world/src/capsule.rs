@@ -3,15 +3,13 @@ use glam::{IVec3, Vec3};
 use crate::{
     area::{AreaGrid, CUBE, FOOTPRINT, MESH, TYPE_MASK, cell_index},
     city_objects::{capsule_intersect_object, object_pose},
-    collide::{calculate_face_normal, segment_intersect_face},
+    collide::{Best, NO_HIT, calculate_face_normal, cell_point, footprint_origin, open_faces, segment_intersect_face, wall_skipped},
     ground::{Ground, ORIGIN},
     item_sets::{SetHit, entry_pose},
-    mesh::{CUBE_CORNERS, CUBE_FACES},
     meshes::BlockMeshes,
     trace::{AreaFrame, cvtt},
 };
 
-const NO_HIT: f32 = 65536.0;
 const MAX_MESH_VERTS: usize = 2048;
 const MAX_MESH_FACES: usize = 1024;
 
@@ -42,6 +40,7 @@ pub fn segment_closest_points(p0: Vec3, p1: Vec3, q0: Vec3, q1: Vec3, radius: f3
 
     let (s, bs) = if denom != 0.0 {
         let s = (b * f - c * e) / denom;
+
         if 0.0 > s {
             (0.0, b * 0.0)
         } else if s <= 1.0 {
@@ -96,9 +95,11 @@ pub fn capsule_intersect_triangle(start: Vec3, end: Vec3, a: Vec3, b: Vec3, c: V
 pub fn capsule_intersect_triangle_facing(start: Vec3, end: Vec3, a: Vec3, b: Vec3, c: Vec3, n: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
     let d0 = ((start.y - a.y) * n.y + (start.x - a.x) * n.x) + (start.z - a.z) * n.z;
     let d1 = ((end.x - a.x) * n.x + (end.y - a.y) * n.y) + (end.z - a.z) * n.z;
+
     if d0 >= radius && d1 >= radius {
         return None;
     }
+
     if 0.0 > d0 && 0.0 > d1 {
         return None;
     }
@@ -107,6 +108,7 @@ pub fn capsule_intersect_triangle_facing(start: Vec3, end: Vec3, a: Vec3, b: Vec
         if let Some((_, p)) = segment_intersect_face(n, start, end, a, b, c) {
             return Some((p, n, 0.0));
         }
+
         if let Some((_, p)) = segment_intersect_face(n, end, start, a, b, c) {
             return Some((p, n, 0.0));
         }
@@ -115,6 +117,7 @@ pub fn capsule_intersect_triangle_facing(start: Vec3, end: Vec3, a: Vec3, b: Vec
         let push = n * k;
         let from = if d1 > d0 { start } else { end };
         let to = push + from;
+
         if let Some((_, p)) = segment_intersect_face(n, from, to, a, b, c) {
             return Some((p, n, p.distance(from)));
         }
@@ -122,8 +125,10 @@ pub fn capsule_intersect_triangle_facing(start: Vec3, end: Vec3, a: Vec3, b: Vec
 
     let mut best = NO_HIT;
     let mut out = (Vec3::ZERO, Vec3::ZERO);
+
     for (p, q) in [(a, b), (b, c), (c, a)] {
         let (hit, on_edge, on_axis, d) = segment_closest_points(p, q, start, end, radius);
+
         if hit && best > d {
             let v = on_axis - on_edge;
             let nrm = v.normalize_or_zero();
@@ -131,6 +136,7 @@ pub fn capsule_intersect_triangle_facing(start: Vec3, end: Vec3, a: Vec3, b: Vec
             best = d;
         }
     }
+
     (NO_HIT > best).then_some((out.0, out.1, best))
 }
 
@@ -143,12 +149,15 @@ pub struct TerrainMesh {
 impl TerrainMesh {
     fn vertex(&mut self, v: Vec3) -> usize {
         let tol = 1.0 / 16384.0;
+
         if let Some(i) = self.verts.iter().position(|p| tol > (v.x - p.x).abs() && tol > (v.y - p.y).abs() && tol > (v.z - p.z).abs()) {
             return i;
         }
+
         if self.verts.len() == MAX_MESH_VERTS {
             return MAX_MESH_VERTS - 1;
         }
+
         self.verts.push(v);
         self.verts.len() - 1
     }
@@ -157,16 +166,20 @@ impl TerrainMesh {
         let mut mesh = Self::default();
         let (x0, x1) = (cvtt(min.x - ORIGIN), cvtt(max.x - ORIGIN));
         let (z0, z1) = (cvtt(min.z - ORIGIN), cvtt(max.z - ORIGIN));
+
         for iz in z0..=z1 {
             for ix in x0..=x1 {
                 if !ground.cell_ok(ix, iz) {
                     continue;
                 }
+
                 let p = |dx: i32, dz: i32| Vec3::new((ix + dx) as f32 + ORIGIN, ground.vertex(ix + dx, iz + dz), (iz + dz) as f32 + ORIGIN);
                 let (a, b, c, d) = (p(0, 0), p(1, 0), p(1, 1), p(0, 1));
+
                 if mesh.faces.len() > MAX_MESH_FACES - 2 {
                     continue;
                 }
+
                 if a.y > min.y || b.y > min.y || c.y > min.y || d.y > min.y {
                     let (ia, ib, ic, id) = (mesh.vertex(a), mesh.vertex(b), mesh.vertex(c), mesh.vertex(d));
                     mesh.faces.push([ia, ib, ic]);
@@ -174,12 +187,14 @@ impl TerrainMesh {
                 }
             }
         }
+
         mesh
     }
 
     fn intersect(&self, start: Vec3, end: Vec3, radius: f32) -> Option<(Vec3, Vec3, f32)> {
         let mut best: Option<(Vec3, Vec3, f32)> = None;
         let mut best_d = NO_HIT;
+
         for f in &self.faces {
             let [a, b, c] = f.map(|i| self.verts[i]);
             if let Some(h) = capsule_intersect_triangle(start, end, a, b, c, radius)
@@ -189,81 +204,55 @@ impl TerrainMesh {
                 best = Some(h);
             }
         }
+
         best
     }
 }
 
-struct Best {
-    dist: f32,
-    pos: Vec3,
-    normal: Vec3,
-}
-
-impl Best {
-    fn new() -> Self {
-        Self { dist: NO_HIT, pos: Vec3::ZERO, normal: Vec3::ZERO }
-    }
-
-    fn take(&mut self, h: Option<(Vec3, Vec3, f32)>) -> bool {
-        match h {
-            Some((p, n, d)) if self.dist > d => {
-                *self = Self { dist: d, pos: p, normal: n };
-                true
-            }
-            _ => false,
-        }
-    }
-}
-
 fn cube_faces(start: Vec3, end: Vec3, cell: IVec3, s: f32, v: u32, radius: f32) -> Option<(Vec3, Vec3, f32)> {
-    let base = Vec3::new(cell.x as f32 * s, cell.y as f32 * s, cell.z as f32 * s);
-    let corner = |i: usize| {
-        let c = CUBE_CORNERS[i];
-        c * s + base
-    };
+    let mut best = Best::default();
 
-    let mut best = Best::new();
-    for (r, item) in CUBE_FACES.iter().enumerate() {
-        if v & (1 << r) == 0 || v & (64 << r) == 0 {
-            continue;
-        }
-
-        let [a, b, c, d] = item.map(corner);
+    for (_, [a, b, c, d]) in open_faces(cell, s, v) {
         best.take(capsule_intersect_triangle(start, end, a, b, c, radius));
         best.take(capsule_intersect_triangle(start, end, a, c, d, radius));
     }
 
-    (NO_HIT > best.dist).then_some((best.pos, best.normal, best.dist))
+    best.hit()
 }
 
 fn custom_shape(meshes: &BlockMeshes, start: Vec3, end: Vec3, cell: IVec3, s: f32, v: u32, radius: f32) -> Option<(Vec3, Vec3, f32, u32)> {
     let mesh = meshes.get(v & 65535)?;
-    let base = Vec3::new(cell.x as f32 * s, cell.y as f32 * s, cell.z as f32 * s);
-    let sc = |p: Vec3| p * s + base;
-    let mut best = Best::new();
+    let sc = cell_point(cell, s);
+    let mut best = Best::default();
     let mut attr = 0;
+
     for (i, q) in mesh.quads.iter().enumerate() {
         let [a, b, c, d] = q.map(|i| sc(mesh.verts[i as usize]));
+
         if best.take(capsule_intersect_triangle(start, end, a, b, c, radius)) {
             attr = i as u32;
         }
+
         if best.take(capsule_intersect_triangle(start, end, a, c, d, radius)) {
             attr = i as u32;
         }
     }
-    let skip = (v >> 16) & 1023;
+
     for (i, w) in mesh.walls.iter().enumerate() {
-        if skip & (1 << (i & 31)) != 0 {
+        if wall_skipped(v, i) {
             continue;
         }
+
         let [a, b, c, d] = w.map(sc);
+
         for (p, q, r) in [(a, b, c), (a, c, d), (d, c, b), (d, b, a)] {
             if best.take(capsule_intersect_triangle(start, end, p, q, r, radius)) {
                 attr = i as u32 | 0x10000;
             }
         }
     }
-    (NO_HIT > best.dist).then_some((best.pos, best.normal, best.dist, attr))
+
+    best.hit().map(|(pos, normal, dist)| (pos, normal, dist, attr))
 }
 
 pub type CapsuleAreaHit = (Vec3, Vec3, f32, IVec3, u32, Option<SetHit>);
@@ -272,19 +261,23 @@ pub type CapsuleAreaHit = (Vec3, Vec3, f32, IVec3, u32, Option<SetHit>);
 pub fn capsule_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, start: Vec3, end: Vec3, radius: f32, face_attr: &mut u32) -> Option<CapsuleAreaHit> {
     let f = AreaFrame::new(area);
     let (s3, e3, mn, mx) = (start.to_array(), end.to_array(), f.min.to_array(), f.max.to_array());
+
     for k in 0..3 {
         if mn[k] > radius + s3[k] && mn[k] > radius + e3[k] {
             return None;
         }
     }
+
     for k in 0..3 {
         if s3[k] - radius > mx[k] && e3[k] - radius > mx[k] {
             return None;
         }
     }
+
     let (ls, le) = (f.to_local(start), f.to_local(end));
     let (la, lb) = (ls.to_array(), le.to_array());
     let (mut lo, mut hi) = ([0i32; 3], [0i32; 3]);
+
     for k in 0..3 {
         let small = if lb[k] > la[k] { la[k] } else { lb[k] };
         let big = if la[k] > lb[k] { la[k] } else { lb[k] };
@@ -292,11 +285,12 @@ pub fn capsule_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, start: Vec3
         hi[k] = cvtt((big + radius) * f.inv);
     }
 
-    let mut best = Best::new();
+    let mut best = Best::default();
     let mut block = IVec3::ZERO;
     let mut word = 0u32;
     let mut set: Option<SetHit> = None;
     let mut raw = false;
+
     for y in lo[1]..=hi[1] {
         for z in lo[2]..=hi[2] {
             for x in lo[0]..=hi[0] {
@@ -308,10 +302,12 @@ pub fn capsule_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, start: Vec3
                     && let Some(items) = area.item_sets.set(sw)
                 {
                     let turn = (sw >> 24) & 3;
+
                     for (i, e) in items.entries.iter().enumerate() {
                         if rec.taken[idx] & 1u32.wrapping_shl(i as u32) != 0 {
                             continue;
                         }
+
                         let (pos, rot) = entry_pose(e, cell, f.size, turn);
                         let Some(hull) = area.item_sets.hull(e.kind) else { continue };
                         if let Some((p, n, d)) = hull.intersect_capsule(&hull.world_verts(pos, &rot), ls, le, radius)
@@ -326,14 +322,17 @@ pub fn capsule_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, start: Vec3
                     }
                 }
                 let object = rec.object[idx];
+
                 if object as i32 > 0 {
                     let (kind, pos, rot) = object_pose(object, cell, f.size);
+
                     if let Some((p, n, d)) = capsule_intersect_object(kind, pos, &rot, ls, le, radius) {
                         return Some((p, n, d, IVec3::new(-1, block.y, block.z), word, set));
                     }
                 }
+
                 for layer in 0..2 {
-                    let v = if layer == 0 { rec.layer0[idx] } else { rec.layer1[idx] };
+                    let v = rec.layer(layer)[idx];
                     let mut shape = |at: IVec3, w: u32| {
                         let h = custom_shape(meshes, ls, le, at, f.size, w, radius)?;
                         *face_attr = h.3;
@@ -343,12 +342,13 @@ pub fn capsule_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, start: Vec3
                         CUBE => (cube_faces(ls, le, cell, f.size, v, radius), cell, v),
                         MESH => (shape(cell, v), cell, v),
                         FOOTPRINT => {
-                            let o = cell - IVec3::new((v & 255) as i32, ((v >> 16) & 255) as i32, ((v >> 8) & 255) as i32);
-                            let v2 = if layer == 0 { area.layer0(o.x, o.y, o.z) } else { area.layer1(o.x, o.y, o.z) };
+                            let o = footprint_origin(cell, v);
+                            let v2 = area.layer(layer, o);
                             (shape(o, v2), o, v2)
                         }
                         _ => (None, cell, v),
                     };
+
                     if best.take(hit) {
                         block = at;
                         word = w;
@@ -359,12 +359,15 @@ pub fn capsule_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, start: Vec3
             }
         }
     }
+
     if NO_HIT <= best.dist {
         return None;
     }
+
     if raw {
         return Some((best.pos, best.normal, best.dist, block, word, set));
     }
+
     let p = f.rotate_back(best.pos);
     let pos = p + f.origin;
     Some((pos, f.rotate_back(best.normal), best.dist, block, word, set))
@@ -375,21 +378,25 @@ pub fn capsule_intersect_level(ground: &Ground, area: &mut AreaGrid, meshes: &Bl
     let (emin, emax) = (end - radius, end + radius);
     let (mut min, mut max) = (smin.to_array(), smax.to_array());
     let (emin, emax) = (emin.to_array(), emax.to_array());
+
     for k in 0..3 {
         if min[k] > emin[k] {
             min[k] = emin[k];
         }
     }
+
     for k in 0..3 {
         if emin[k] > max[k] {
             max[k] = emin[k];
         }
     }
+
     for k in 0..3 {
         if min[k] > emax[k] {
             min[k] = emax[k];
         }
     }
+
     for k in 0..3 {
         if emax[k] > max[k] {
             max[k] = emax[k];

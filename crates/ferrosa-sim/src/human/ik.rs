@@ -22,6 +22,7 @@ pub fn clamp_bone_relative_correction(h: &Human, a: usize, b: usize, v: &mut Vec
     let d = (wa - wb) * k;
     let c = *v - d;
     let len = c.length();
+
     if len > max {
         let n = c.normalize_or_zero();
         *v = d + n * max;
@@ -45,6 +46,7 @@ fn clamp_turn(axis: Vec3, angle: f32, max: f32) -> Vec3 {
 
 fn set_joint(h: &Human, bodies: &mut RigidBodies, bone: usize, target: Vec3, spin_limit: f32) {
     let Some(id) = h.bones[bone].joint else { return };
+
     if let Some(Bond::Joint(j)) = bodies.bond_mut(id) {
         j.target_ang_vel = target;
         j.limit_active = false;
@@ -71,6 +73,7 @@ pub fn three_bone_ik(
     let c = (if l_abs < t_len { l_abs } else { t_len }) / p.length;
     let a = -(c as f64).acos();
     let mut bend = (a + a) as f32;
+
     if p.flags & 4 != 0 {
         bend = -bend;
     }
@@ -103,6 +106,7 @@ pub fn three_bone_ik(
     rotate_orientation(&mut r, Vec3::X, half);
     let q = rot_matrix_to_quaternion(&r);
     let mut q_plane = q;
+
     if p.flags & 8 != 0 {
         let mut r2 = IDENTITY;
         rotate_orientation(&mut r2, Vec3::Y, p.twist);
@@ -118,16 +122,20 @@ pub fn three_bone_ik(
     let [b0, b1, b2] = h.bones[first].rot;
     let t = b2 * av.z + (b0 * av.x + b1 * av.y);
     let (mut x, mut y, mut z) = half_corr(correction, t);
+
     if first == 10 || first == 13 {
         let ft = h.locomotion.foot_torque[if first == 10 { 0 } else { 1 }];
         x += ft.x;
         y += ft.y;
         z += ft.z;
     }
+
     let mut t1 = Vec3::new(x, y, z);
+
     if p.flags & 16 != 0 {
         clamp_bone_relative_correction(h, root, first, &mut t1, p.clamp_max, 1.0);
     }
+
     set_joint(h, bodies, first, t1, p.spin_limit[0]);
 
     let mid = first + 1;
@@ -151,18 +159,23 @@ pub fn three_bone_ik(
     let mut qf = [0.0, 0.0, 0.0, 1.0];
     let conj2 = [-s, -0.0, -0.0, c];
     let conj_plane = [-q_plane[0], -q_plane[1], -q_plane[2], q_plane[3]];
+
     if p.flags & 2 != 0 {
         qf = quaternion_multiply(conj2, conj_plane);
+
         if 0.0 > dot4(qf, *end_rot) {
             *end_rot = end_rot.map(|c| -c);
         }
+
         qf = quaternion_multiply(qf, *end_rot);
+
         if p.flags & 8 != 0 {
             qf = quaternion_multiply([s, 0.0, 0.0, c], q_plane);
         }
     } else if p.flags & 8 != 0 {
         qf = quaternion_multiply(conj2, conj_plane);
     }
+
     let qm2 = conjugate_towards(qm, 0.0 > dot4(qf, qm));
     let (axis, angle) = quaternion_to_axis_angle(quaternion_multiply(qm2, qf));
     let av = clamp_turn(axis, angle, p.max_turn);

@@ -129,9 +129,19 @@ pub fn quaternion_to_rotation_vector(q: [f32; 4]) -> Vec3 {
     axis * angle
 }
 
+/// `local`, given along the frame's own axes, as a world direction.
+pub fn rotate(rot: &RotMatrix, local: Vec3) -> Vec3 {
+    rot[0] * local.x + rot[1] * local.y + rot[2] * local.z
+}
+
+/// A world direction given along the frame's own axes.
+pub fn unrotate(rot: &RotMatrix, world: Vec3) -> Vec3 {
+    Vec3::new(rot[0].dot(world), rot[1].dot(world), rot[2].dot(world))
+}
+
 /// multiply_matrixes: out[c] = (a[0]·b[c], a[1]·b[c], a[2]·b[c]).
 pub fn multiply_matrixes(a: &RotMatrix, b: &RotMatrix) -> RotMatrix {
-    b.map(|c| Vec3::new(a[0].dot(c), a[1].dot(c), a[2].dot(c)))
+    b.map(|c| unrotate(a, c))
 }
 
 /// vector_clamp_horizontal_and_vertical: limits the XZ length to `horizontal` and Y to ±`vertical`.

@@ -2,7 +2,7 @@ use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::clientbound::game::VehicleKind;
 use glam::Vec3;
 
-use super::{DRIVEN, HIDDEN_STREET, LOOP_STREET, MAX_ROUTE, PARKED, RouteStep, Traffic, TrafficCar, maxss, route::plan_route};
+use super::{DRIVEN, HIDDEN_STREET, LOOP_STREET, MAX_ROUTE, PARKED, RouteStep, Traffic, TrafficCar, route::plan_route};
 use crate::{vehicle::types::VehicleType, world::map::Map};
 
 /// The rounded pi the binary turns a new car with: std's pi gives a different last bit (checked by the traffic
@@ -117,7 +117,7 @@ pub fn create_traffic_car(
 
     let pos = dir * p + from;
     let ends = st.intersections.map(|i| streets.intersections[i].world_pos.y);
-    let top = maxss(ends[1], maxss(ends[0], pos.y)) + TRACE_LIFT;
+    let top = ends[1].max(ends[0].max(pos.y)) + TRACE_LIFT;
     let up = Vec3::Y;
     let start = Vec3::new(pos.x, top, pos.z);
     let end = Vec3::new(pos.x + up.x * TRACE_DEPTH, top + up.y * TRACE_DEPTH, TRACE_DEPTH * up.z + pos.z);

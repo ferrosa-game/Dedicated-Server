@@ -147,6 +147,7 @@ impl WorldConfig {
         {
             eprintln!("[World] could not write {}: {e}", path.display());
         }
+
         if let Ok(text) = std::fs::read_to_string(path) {
             let num = |key: &str| text.lines().find_map(|l| l.trim().strip_prefix(key)).and_then(|v| v.trim().parse::<i32>().ok());
             c.traffic = num("traffic=").unwrap_or(c.traffic).clamp(0, 512);
@@ -164,6 +165,7 @@ impl WorldConfig {
             c.showjoinexit = num("showjoinexit=").map_or(c.showjoinexit, |v| v != 0);
             c.respawnteam = num("respawnteam=").map_or(c.respawnteam, |v| v != 0);
         }
+
         c
     }
 }
@@ -230,6 +232,7 @@ impl Sim {
         let b = rand::random_range(0..2);
         let base = a + b + GUARDS_MIN;
         let count = (rand::random_range(0..2) + base).min(n as i32);
+
         if count <= 0 {
             return;
         }
@@ -413,6 +416,7 @@ impl Sim {
         for k in 0..CORPORATIONS {
             for slot in 0..missions::MISSION_SLOTS {
                 let m = self.corp_state[k].missions[slot];
+
                 if !m.active {
                     continue;
                 }
@@ -430,18 +434,23 @@ impl Sim {
     /// getaway car back to the traffic).
     fn expire_world_bots(&mut self) {
         let clock = self.world_time;
+
         for pid in self.players.iter().filter(|(_, p)| p.is_bot).map(|(i, _)| i).collect::<Vec<_>>() {
             let Some(p) = self.players.get(pid) else { continue };
             let (human, deadline) = (p.human, p.bot_deadline);
+
             if deadline == 0 || deadline >= clock {
                 if human.is_none() {
                     self.players.remove(pid);
                 }
+
                 continue;
             }
+
             if let Some(h) = human {
                 self.release_bot_human(h);
             }
+
             self.players.remove(pid);
         }
     }
@@ -455,17 +464,21 @@ impl Sim {
             c.is_aggressive = 0;
         }
         let held: Vec<usize> = hu.inventory.iter().flat_map(|s| s.items[..s.count.max(0) as usize].iter().map(|&i| i as usize)).collect();
+
         for id in held {
             if let Some(&child) = self.items.get(id).and_then(|i| i.children.first()) {
                 if let Some(c) = self.items.get_mut(child) {
                     c.despawn_time = 0;
                 }
+
                 items::remove_link(&mut self.items, child, id);
             }
+
             if let Some(i) = self.items.get_mut(id) {
                 i.despawn_time = 0;
             }
         }
+
         if let Some(hu) = self.humans.get_mut(h) {
             hu.despawn_ticks = 0;
             hu.player = None;
@@ -500,14 +513,17 @@ impl Sim {
                 h.max_stamina = if h.max_stamina == STAMINA_FLOOR + 1 { STAMINA_FLOOR } else { h.max_stamina - STAMINA_DROP };
             }
         }
+
         self.restock_dealerships();
         self.stock_gun_stores();
         self.save_accounts();
+
         for (_, p) in self.players.iter() {
             if let Some(a) = self.saved_accounts.get_player_data(p.account_id) {
                 a.play_time += PLAY_TIME_STEP;
             }
         }
+
         self.save_stats();
         self.events.push(economy::stock_event(&self.corporations, self.tick));
     }
@@ -519,30 +535,39 @@ impl Sim {
                 a.crim_rating = (a.crim_rating as i32 - ACCOUNT_CRIME_DECAY as i32).max(0) as u32;
             }
         }
+
         for c in &mut self.corp_state {
             c.prints = 0;
         }
+
         let nobuy = self.modes.world.cfg.crimenobuy;
+
         for pid in self.players.iter().map(|(i, _)| i).collect::<Vec<_>>() {
             let Some(p) = self.players.get_mut(pid) else { continue };
             let mut crim = p.crim_rating;
             p.items_bought = 0;
+
             if crim > 0 {
                 let account = p.account_id;
                 let alive = p.human.is_some();
+
                 if p.vehicles_bought > 0 {
                     p.vehicles_bought -= 1;
                 }
+
                 crim -= 1;
                 p.crim_rating = crim;
+
                 if alive && let Some(a) = self.saved_accounts.get_player_data(account) {
                     a.crim_rating += ACCOUNT_CRIME_GAIN;
                 }
             } else if p.vehicles_bought > 0 {
                 p.vehicles_bought -= 1;
             }
+
             let Some(p) = self.players.get_mut(pid) else { continue };
             p.bills_withdrawn = 0;
+
             if crim >= nobuy {
                 p.items_bought = NO_BUY_ITEMS;
                 p.vehicles_bought = NO_BUY_VEHICLES;
@@ -570,7 +595,9 @@ impl Sim {
         for k in 0..CORPORATIONS {
             self.update_corp_player_ratings(k);
         }
+
         self.modes.world.state.saved_vehicles.clear();
+
         for pid in self.players.iter().map(|(i, _)| PlayerId(i as u32)).collect::<Vec<_>>() {
             self.save_inventory(pid);
             let Some(p) = self.players.get(pid.idx()) else { continue };
@@ -580,10 +607,12 @@ impl Sim {
                 vehicle: h.vehicle.map_or(-1, |v| v as i32),
                 seat: h.seat,
             });
+
             if let Some(p) = self.players.get_mut(pid.idx()) {
                 p.saved_body = body;
             }
         }
+
         self.save_accounts();
         self.reset_game();
     }
@@ -591,9 +620,11 @@ impl Sim {
     /// The world part of reset_game: everyone back without a human (bots gone), the world emptied and the round counted.
     pub(crate) fn reset_world_players(&mut self) {
         let bots: Vec<usize> = self.players.iter().filter(|(_, p)| p.is_bot).map(|(i, _)| i).collect();
+
         for i in bots {
             self.players.remove(i);
         }
+
         for (_, p) in self.players.iter_mut() {
             p.items_bought = 0;
             p.human = None;
@@ -601,6 +632,7 @@ impl Sim {
             p.is_ready = false;
             p.menu = MenuType::Empty;
         }
+
         self.clear_world();
         self.round_number += 1;
     }
@@ -612,18 +644,22 @@ impl Sim {
             let sv = self.modes.world.state.saved_vehicles[k];
             self.modes.world.state.saved_vehicles[k].new_id = self.spawn_vehicle(sv.kind, sv.color, sv.pos, sv.rot);
         }
+
         for pid in self.players.iter().map(|(i, _)| PlayerId(i as u32)).collect::<Vec<_>>() {
             let Some(body) = self.players.get(pid.idx()).and_then(|p| p.saved_body) else { continue };
             let mut rot = IDENTITY;
             let axis = rot[1];
             rotate_orientation(&mut rot, axis, body.yaw);
             let Some(h) = self.spawn_human(body.pos, &rot, Some(pid)) else { continue };
+
             if let Some(hu) = self.humans.get_mut(h) {
                 hu.view_yaw = body.yaw;
             }
+
             if let Some(p) = self.players.get_mut(pid.idx()) {
                 p.human = Some(h);
             }
+
             self.init_player_inventory(pid);
             if body.vehicle != -1
                 && let Some(v) = self.modes.world.state.saved_vehicles.iter().find(|s| s.old_id as i32 == body.vehicle).and_then(|s| s.new_id)
@@ -633,6 +669,7 @@ impl Sim {
                 hu.seat = body.seat;
             }
         }
+
         for k in 0..CORPORATIONS {
             if let Some(m) = self.corp_state[k].manager.take()
                 && self.players.get(m.idx()).is_some()
@@ -658,20 +695,25 @@ impl Sim {
     /// their spawn wait is over and while their criminal rating is under crimenospawn.
     pub(crate) fn enter_city_menu(&mut self, pid: PlayerId, button: u32) -> bool {
         let Some(p) = self.players.get(pid.idx()) else { return false };
+
         if p.menu as u32 != ENTER_CITY_MENU || p.human.is_some() {
             return false;
         }
+
         if p.spawn_timer != 0 {
             return true;
         }
+
         match button {
             ENTER_AS_CIVILIAN => self.set_player_team(pid, Team::Spectator),
             ENTER_AS_TEAM => {}
             _ => return true,
         }
+
         if self.players.get(pid.idx()).is_some_and(|p| p.crim_rating < self.modes.world.cfg.crimenospawn) {
             self.enter_city(pid);
         }
+
         true
     }
 
@@ -705,9 +747,11 @@ impl Sim {
         let tick = self.tick;
         let Some(p) = self.players.get_mut(pid.idx()) else { return };
         p.human = h;
+
         if let Some(hu) = h.and_then(|h| self.humans.get_mut(h)) {
             hu.view_yaw = yaw;
         }
+
         let e = p.make_update_player_event(tick);
         let r = p.make_update_round_event(tick);
         p.menu = MenuType::Empty;
@@ -796,6 +840,7 @@ impl super::ModeHooks for Hooks {
         if let Some(pos) = outside {
             sim.corp_base_menu(pid, pos);
         }
+
         sim.corp_tab_menu(pid);
     }
 
@@ -805,9 +850,11 @@ impl super::ModeHooks for Hooks {
 
     fn on_menu(&self, sim: &mut Sim, pid: PlayerId, menu: u8, button: u32) -> bool {
         let open = sim.players.get(pid.idx()).is_some_and(|p| p.menu as u8 == menu && p.human.is_some());
+
         if !open || !(CORP_MENUS_FIRST..=CORP_MENUS_LAST).contains(&menu) {
             return false;
         }
+
         sim.corp_menu_action(pid, menu, button as i32);
         true
     }

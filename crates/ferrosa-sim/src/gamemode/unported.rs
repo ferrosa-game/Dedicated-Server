@@ -42,6 +42,7 @@ impl ModeHooks for Unported {
 
     fn rules(&self, sim: &Sim) -> ModeRules {
         let base = ModeRules::default();
+
         match self.0 {
             GameMode::Racing => ModeRules { reset_traffic: None, intermission_lobby: true, ..base },
             GameMode::CoOp => ModeRules { coop_traffic: true, intermission_lobby: true, ..base },

@@ -3,16 +3,13 @@ use glam::{IVec3, Vec3};
 use super::{
     area::{AreaGrid, CUBE, FOOTPRINT, MESH, TYPE_MASK, cell_index},
     capsule::TerrainMesh,
-    collide::calculate_face_normal,
+    collide::{NO_HIT, calculate_face_normal, cell_point, footprint_origin, open_faces},
     ground::Ground,
-    mesh::{CUBE_CORNERS, CUBE_FACES, CUBE_NORMALS},
     meshes::BlockMeshes,
     trace::{AreaFrame, cvtt},
 };
 
 const PARALLEL: f32 = 1.0 / 65536.0;
-const NO_HIT: f32 = 65536.0;
-
 /// Where a wheel disc touched the level: the contact point, the normal pushing the disc away and the distance from
 /// the disc's centre.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -171,20 +168,11 @@ fn face_hit(centre: Vec3, axis: Vec3, radius: f32, normal: Vec3, a: Vec3, b: Vec
 /// sphere_intersect_voxel_cube_with_direction: the disc against the open faces of a cube cell, each face's two
 /// triangles under the face's normal.
 fn cube_faces(centre: Vec3, axis: Vec3, radius: f32, cell: IVec3, s: f32, v: u32) -> Option<DiscHit> {
-    let base = Vec3::new(cell.x as f32 * s, cell.y as f32 * s, cell.z as f32 * s);
-
-    let corner = |i: usize| {
-        let c = CUBE_CORNERS[i];
-        c * s + base
-    };
-
     let (mut best, mut best_dist) = (None, NO_HIT);
 
-    for r in (0..6).filter(|&r| v & (1 << r) != 0 && v & (64 << r) != 0) {
-        let [a, b, c, d] = CUBE_FACES[r].map(corner);
-
-        take(&mut best, &mut best_dist, face_hit(centre, axis, radius, CUBE_NORMALS[r], a, b, c));
-        take(&mut best, &mut best_dist, face_hit(centre, axis, radius, CUBE_NORMALS[r], a, c, d));
+    for (n, [a, b, c, d]) in open_faces(cell, s, v) {
+        take(&mut best, &mut best_dist, face_hit(centre, axis, radius, n, a, b, c));
+        take(&mut best, &mut best_dist, face_hit(centre, axis, radius, n, a, c, d));
     }
 
     best
@@ -194,8 +182,7 @@ fn cube_faces(centre: Vec3, axis: Vec3, radius: f32, cell: IVec3, s: f32, v: u32
 /// triangles under their own normals.
 fn custom_shape(meshes: &BlockMeshes, centre: Vec3, axis: Vec3, radius: f32, cell: IVec3, s: f32, v: u32) -> Option<DiscHit> {
     let mesh = meshes.get(v & 65535)?;
-    let base = Vec3::new(cell.x as f32 * s, cell.y as f32 * s, cell.z as f32 * s);
-    let sc = |p: Vec3| p * s + base;
+    let sc = cell_point(cell, s);
     let (mut best, mut best_dist) = (None, NO_HIT);
 
     for q in &mesh.quads {
@@ -230,14 +217,13 @@ fn sphere_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, centre: Vec3, ax
                 let Some(rec) = area.record(x, y, z) else { continue };
                 let cell = IVec3::new(x, y, z);
                 let idx = cell_index(x, y, z);
-                let footprint = |v: u32| cell - IVec3::new((v & 255) as i32, ((v >> 16) & 255) as i32, ((v >> 8) & 255) as i32);
                 let v = rec.layer0[idx];
 
                 let hit = match v & TYPE_MASK {
                     CUBE => cube_faces(local, axis, radius, cell, f.size, v),
                     MESH => custom_shape(meshes, local, axis, radius, cell, f.size, v),
                     FOOTPRINT => {
-                        let o = footprint(v);
+                        let o = footprint_origin(cell, v);
                         custom_shape(meshes, local, axis, radius, o, f.size, area.layer0(o.x, o.y, o.z))
                     }
                     _ => None,
@@ -249,7 +235,7 @@ fn sphere_intersect_area(area: &AreaGrid, meshes: &BlockMeshes, centre: Vec3, ax
                 let hit = match v & TYPE_MASK {
                     MESH => custom_shape(meshes, local, axis, radius, cell, f.size, v),
                     FOOTPRINT => {
-                        let o = footprint(v);
+                        let o = footprint_origin(cell, v);
                         custom_shape(meshes, local, axis, radius, o, f.size, area.layer1(o.x, o.y, o.z))
                     }
                     _ => None,
