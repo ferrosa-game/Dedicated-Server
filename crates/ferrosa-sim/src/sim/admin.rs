@@ -227,7 +227,7 @@ impl Sim {
             self.admin.reset_requested = true;
 
             if msg.as_bytes().get(10) == Some(&b' ')
-                && let Some(mode) = msg[11..].split_whitespace().next().and_then(crate::gamemode::by_name)
+                && let Some(mode) = msg[11..].split_whitespace().next().and_then(|name| crate::gamemode::find(&self.available_modes, name))
             {
                 self.admin.next_mode = Some(mode);
 
@@ -463,7 +463,7 @@ impl Sim {
             return;
         }
 
-        if let Some(mode) = self.admin.next_mode.filter(|m| m.switchable() && m.name() != self.mode.name()) {
+        if let Some(mode) = self.admin.next_mode.filter(|m| m.name() != self.mode.name()) {
             for (_, p) in self.players.iter_mut() {
                 p.team = Team::Spectator;
             }

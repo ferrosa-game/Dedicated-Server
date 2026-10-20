@@ -936,10 +936,6 @@ impl super::ModeHooks for Hooks {
         super::ModeSync { weekly_enabled: sim.modes.round.cfg.weekly, weekday: sim.modes.round.weekday as u8, versus_movedelay: None }
     }
 
-    fn switchable(&self) -> bool {
-        true
-    }
-
     fn on_admin_select(&self, sim: &mut Sim) {
         sim.modes.round.weekday = WEEK_DAYS;
     }

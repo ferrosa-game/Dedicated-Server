@@ -1,0 +1,99 @@
+package ferrosa:plugin@0.1.0;
+
+interface types {
+    type player-id = u32;
+
+    type body-id = u32;
+
+    record vec3 {
+        x: f32,
+        y: f32,
+        z: f32,
+    }
+
+    enum game-state {
+        idle,
+        intermission,
+        in-game,
+        restarting,
+        paused,
+    }
+
+    /// The game's own modes. Clients only know these.
+    enum client-mode {
+        driving,
+        racing,
+        round,
+        %world,
+        eliminator,
+        coop,
+        versus,
+        none,
+    }
+
+    /// A rigid body: a bone of a human, an item or a part of a vehicle. Velocities are per tick.
+    record body {
+        id: body-id,
+        pos: vec3,
+        vel: vec3,
+        ang-vel: vec3,
+        mass: f32,
+        settled: bool,
+    }
+
+    /// Game mode rules, determines how the server behaves.
+    record rules {
+        /// The share of a teammate's damage that comes back on the attacker's head.
+        team-damage: s32,
+        /// The share of the price a sale of shares pays.
+        stock-sell-rate: f32,
+        /// The amount of traffic cars a reset asks for; none for modes that make theirs when they start.
+        reset-traffic: option<u32>,
+        /// Some traffic is parked in the third lane of flat three lane streets.
+        parked-cars: bool,
+        /// The traffic drives as in co-op.
+        coop-traffic: bool,
+        /// Dead humans stay on the ground.
+        keep-bodies: bool,
+        /// Loose items never despawn.
+        keep-items: bool,
+        /// Is the criminal rating system implemented
+        crime: bool,
+        /// Hurting a teammate hurts the attacker too.
+        punish-team-kills: bool,
+        /// Corporations run as in world mode.
+        world-corporations: bool,
+        /// The base buy menus open inside a corporation's base.
+        corp-buy-menus: bool,
+        /// Corporation members count towards the player counts without a human.
+        count-humanless-members: bool,
+        /// The base computers and labs get their mission volumes.
+        mission-spots: bool,
+        /// Garage doors open and close when a teammate knocks on them.
+        door-knocks: bool,
+        /// Joining players get their saved money and ratings back.
+        saved-accounts: bool,
+        /// New accounts start with the world config's startcash.
+        world-start-cash: bool,
+        /// Shares are sold when the human dies and bought back when a returning player takes it over.
+        shares-follow-human: bool,
+        /// A saved key keeps its own vehicle for the next day.
+        keys-keep-vehicles: bool,
+        /// A death waits out a respawn timer that grows with criminal rating.
+        respawn-wait: bool,
+        /// Teams can be picked in the lobby however late it is.
+        free-team-switch: bool,
+        /// A player without a human sees the lobby menu during intermission.
+        intermission-lobby: bool,
+        /// Bots join with the lobby menu open during intermission.
+        bot-lobby: bool,
+        /// The round starts once everyone is ready.
+        ready-start: bool,
+        /// Nobody can walk for this many ticks after the round starts.
+        move-delay: option<s32>,
+        /// Buying a vehicle sends the round money update.
+        round-money-updates: bool,
+        /// Everyone may use the test commands (/human, /guns, ...).
+        test-commands: bool,
+    }
+}

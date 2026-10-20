@@ -137,6 +137,9 @@ pub struct Sim {
     pub(crate) ticks_since_reset: u32,
     pub(crate) round_number: u32,
     pub(crate) mode: crate::gamemode::Mode,
+    /// Every mode /resetgame can switch to: the plugins' modes and the built-in ones.
+    pub(crate) available_modes: Vec<crate::gamemode::Mode>,
+    pub(crate) plugins: crate::plugin::Plugins,
     pub(crate) gamestate: GameState,
     in_rx: mpsc::UnboundedReceiver<Inbound>,
     out_tx: Outbound,
@@ -203,6 +206,7 @@ impl Sim {
         drop_tx: Dropped,
         map_name: String,
         mode: crate::gamemode::Mode,
+        available_modes: Vec<crate::gamemode::Mode>,
         max_players: u8,
     ) -> Self {
         let srk_data = SrkData::load(Path::new("server.srk")).unwrap();
@@ -218,6 +222,8 @@ impl Sim {
             drop_tx,
             world: World::new(mode.map().map_or(map_name, str::to_string)),
             mode,
+            available_modes,
+            plugins: &crate::plugin::NoPlugins,
             gamestate: GameState::Intermission,
             round_number: 0,
             saved_accounts: srk_data,
@@ -397,6 +403,9 @@ impl Sim {
         let mode = self.mode;
         timed!(self, "mode", mode.tick(self));
 
+        let plugins = self.plugins;
+        timed!(self, "plugins", plugins.tick(self));
+
         self.spawn_pending_traffic();
 
         if self.gamestate == GameState::InGame {
@@ -405,6 +414,7 @@ impl Sim {
         }
 
         timed!(self, "mode (after traffic)", mode.tick_after_traffic(self));
+        timed!(self, "plugins (after traffic)", plugins.tick_after_traffic(self));
 
         timed!(self, "player simulation", self.player_simulation());
 

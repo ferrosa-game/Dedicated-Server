@@ -1,24 +1,26 @@
 use std::net::SocketAddr;
 
 use ferrosa_protocol::{
-    masterserver::AuthPacket,
-    serverbound::{game::ClientGamePacket, join_request::JoinRequest},
+    clientbound::game, masterserver::AuthPacket, serverbound::{game::ClientGamePacket, join_request::JoinRequest},
 };
 use tokio::sync::mpsc::UnboundedSender;
 
+mod api;
 pub(crate) mod computer;
 pub(crate) mod gamemode;
 pub(crate) mod human;
 pub(crate) mod input;
 pub(crate) mod items;
 pub(crate) mod player;
+mod plugin;
 pub(crate) mod sim;
 pub(crate) mod time;
 pub(crate) mod traffic;
 pub(crate) mod vehicle;
 pub(crate) use ferrosa_world as world;
 
-pub use gamemode::{Mode, ModeHooks, ModeSync, by_name, rules::ModeRules};
+pub use gamemode::{MODES, Mode, ModeHooks, ModeSync, find, rules::ModeRules};
+pub use plugin::{NoPlugins, PluginHooks, Plugins};
 pub use sim::Sim;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -71,11 +73,11 @@ pub struct Client {
     spectating: Option<usize>,
     /// The client's object slot ring (2048 entries): what was queued, how far, and how far the client has
     /// acknowledged (the 11 bits after the spectated human in its game packet).
-    pack_ring: Vec<ferrosa_protocol::clientbound::game::ObjectPack>,
+    pack_ring: Vec<game::ObjectPack>,
     pack_count: u16,
     pack_ack: u16,
     /// What each slot holds as far as the queued entries go.
-    packed: std::collections::HashMap<u16, ferrosa_protocol::clientbound::game::ObjectPack>,
+    packed: std::collections::HashMap<u16, game::ObjectPack>,
     /// How overdue each traffic car is for this client, and which intersection's lights it gets
     /// next.
     traffic_priority: Vec<i32>,

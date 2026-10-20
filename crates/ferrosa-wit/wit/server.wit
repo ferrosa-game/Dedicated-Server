@@ -1,0 +1,25 @@
+package ferrosa:plugin@0.1.0;
+
+interface server {
+    use types.{body, body-id, client-mode, game-state, rules, vec3};
+
+    /// Makes this plugin a game mode, named for config.toml's gamemode and /resetgame. Only from init, and only once: a
+    /// plugin that registers a mode is that mode, and only its mode hooks are called. `map` is the map it plays; none
+    /// keeps config.toml's.
+    register-mode: func(name: string, aliases: list<string>, client-mode: client-mode, %map: option<string>);
+
+    get-game-state: func() -> game-state;
+    set-game-state: func(state: game-state);
+
+    default-rules: func() -> rules;
+
+    get-gravity: func() -> f32;
+    set-gravity: func(scale: f32);
+
+    bodies: func() -> list<body>;
+    get-body: func(id: body-id) -> option<body>;
+    set-body-pos: func(id: body-id, pos: vec3);
+    set-body-vel: func(id: body-id, vel: vec3);
+    set-body-ang-vel: func(id: body-id, ang-vel: vec3);
+    add-impulse: func(id: body-id, offset: vec3, impulse: vec3);
+}

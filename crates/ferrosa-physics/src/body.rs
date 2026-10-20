@@ -75,20 +75,17 @@ pub struct GroundContact {
     pub lift: f32,
 }
 
-/// Where a solver iteration is when `RigidBodies::solve_bonds_with` calls its step.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SolverStep {
     BeforeBonds,
     AfterBonds,
 }
 
-/// How much a free body's vertical speed drops each tick: 9.8 / 60².
 pub const GRAVITY: f32 = 9.8 / (60.0 * 60.0);
 
 pub struct RigidBodies {
     bodies: Table<RigidBody>,
     bonds: Table<Bond>,
-    /// A multiplier on gravity (1 as in the game), changed by the /gravity command.
     pub gravity_scale: f32,
 }
 
@@ -134,6 +131,10 @@ impl RigidBodies {
 
     pub fn remove(&mut self, id: usize) -> Option<RigidBody> {
         self.bodies.remove(id)
+    }
+
+    pub fn ids(&self) -> Vec<usize> {
+        self.bodies.ids()
     }
 
     pub fn get(&self, id: usize) -> Option<&RigidBody> {

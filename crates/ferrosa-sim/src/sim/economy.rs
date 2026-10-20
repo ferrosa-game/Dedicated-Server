@@ -277,6 +277,9 @@ impl Sim {
 
         if real {
             self.mode.on_death(self, pid);
+
+            let plugins = self.plugins;
+            plugins.on_death(self, pid);
         }
 
         if self.rules.respawn_wait {
@@ -343,6 +346,7 @@ impl Sim {
         self.reclaim_humans(pid);
         let Some(money) = self.players.get(pid.idx()).map(|p| p.money) else { return };
         let money = self.mode.joining_money(self, money);
+        let money = self.plugins.joining_money(self, money);
 
         if let Some(player) = self.players.get_mut(pid.idx()) {
             player.money = money;

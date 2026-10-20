@@ -1,0 +1,35 @@
+package ferrosa:plugin@0.1.0;
+
+interface hooks {
+    use types.{player-id, rules};
+
+    /// Once, when the plugin is loaded, before the server starts. A plugin that is a game mode calls
+    /// server.register-mode here; nothing else in server can be used yet.
+    init: func();
+    on-start: func();
+
+    /// A mode's settings for the shared code, taken at every reset. Only asked of the mode; the server can't be
+    /// changed from here.
+    get-rules: func() -> rules;
+    /// A reset, after the corporations' missions are cleared.
+    reset: func();
+
+    tick: func();
+    tick-after-traffic: func();
+    before-physics: func();
+    after-physics: func();
+
+    menus-done: func();
+
+    /// A menu button pressed; true takes it. The mode is asked first, then each plugin, then the shared menus.
+    on-menu: func(player: player-id, menu: u8, button: u32) -> bool;
+    on-join: func(player: player-id);
+    on-leave: func(player: player-id);
+    /// A real player's human has died.
+    on-death: func(player: player-id);
+    /// The money a joining player starts with: the mode is given what their account has, then each plugin the last
+    /// answer. The server can't be changed from here.
+    joining-money: func(money: s32) -> s32;
+    /// /resetgame has named this plugin's mode. Only asked of the mode.
+    on-admin-select: func();
+}

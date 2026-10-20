@@ -88,15 +88,17 @@ impl Sim {
 
         self.send_initial_sync(src);
 
-        let mode = self.mode;
+        let (mode, plugins) = (self.mode, self.plugins);
         mode.on_join(self, player_id);
+        plugins.on_join(self, player_id);
     }
 
     pub(crate) fn on_leave(&mut self, conn: ConnId) {
         let client = self.clients.remove(&conn).unwrap();
         self.drop_conn(conn);
-        let mode = self.mode;
+        let (mode, plugins) = (self.mode, self.plugins);
         mode.on_leave(self, client.player_id);
+        plugins.on_leave(self, client.player_id);
         self.settle_leave(client.player_id);
 
         let player = self.players.remove(client.player_id.idx());
@@ -125,9 +127,9 @@ impl Sim {
             return;
         }
 
-        let mode = self.mode;
+        let (mode, plugins) = (self.mode, self.plugins);
 
-        if mode.on_menu(self, player_id, id, action.button) {
+        if mode.on_menu(self, player_id, id, action.button) || plugins.on_menu(self, player_id, id, action.button) {
             return;
         }
 

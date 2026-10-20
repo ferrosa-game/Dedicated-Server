@@ -82,6 +82,9 @@ impl Sim {
 
         self.mode.reset(self);
 
+        let plugins = self.plugins;
+        plugins.reset(self);
+
         self.traffic.coop = self.rules.coop_traffic;
         self.world.map.level.area.reset_dynamic();
 

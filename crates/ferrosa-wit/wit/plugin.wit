@@ -1,0 +1,6 @@
+package ferrosa:plugin@0.1.0;
+
+world plugin {
+    import server;
+    export hooks;
+}

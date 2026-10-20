@@ -188,8 +188,6 @@ impl Sim {
                 let [r0, r1, r2] = rot;
                 let hinge = |up: f32| r0 * DOOR_HINGE_ACROSS + pos + r1 * up;
                 item.state = ItemState::Door { axis: r2, hinges: [hinge(-DOOR_HINGE_UP), hinge(DOOR_HINGE_UP)] };
-                // TODO: each hinge pins the door to the level with a type 4 bond (create_bond_rigidbody_level: body
-                // point (-0.4375, ∓0.5, 0) held at the hinge, 0.125 and 0.25), which rosa-physics lacks
             }
             ItemKind::PhonePay => {
                 if let Some(p) = item.state.phone_mut() {
@@ -319,8 +317,11 @@ impl Sim {
 
     /// Main physics logic, step the physics then solve bonds, cleanup items and vehicles.
     pub(crate) fn physics_tick(&mut self) {
+        let plugins = self.plugins;
+        plugins.before_physics(self);
         self.physics_step();
         self.physics_solve();
+        plugins.after_physics(self);
     }
 
     /// The first part of physics_simulation: the bodies moved, then vehicles, humans and items simulated.

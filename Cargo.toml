@@ -1,6 +1,6 @@
 [workspace]
 resolver="3"
-members = ["crates/ferrosa-bin", "crates/ferrosa-map", "crates/ferrosa-net", "crates/ferrosa-physics", "crates/ferrosa-protocol", "crates/ferrosa-sim", "crates/ferrosa-world"]
+members = ["crates/ferrosa-bin", "crates/ferrosa-map", "crates/ferrosa-net", "crates/ferrosa-physics", "crates/ferrosa-plugins", "crates/ferrosa-protocol", "crates/ferrosa-sim", "crates/ferrosa-wit", "crates/ferrosa-world"]
 
 [workspace.package]
 version = "0.2.1"
@@ -12,7 +12,7 @@ inherits = "release"
 debug = true
 
 [workspace.dependencies]
-tokio = { version = "1.53.3", features = ["full"] }
+tokio = { version = "1.54.0", features = ["full"] }
 serde = { version = "1.0.229", features = [ "derive" ] }
 rayon = "1.12.0"
 # THIS IS KEPT OUT OF DATE FOR A REASON
@@ -30,4 +30,5 @@ ferrosa-sim = { path = "crates/ferrosa-sim", default-features = false }
 ferrosa-net = { path = "crates/ferrosa-net", default-features = false }
 ferrosa-protocol = { path = "crates/ferrosa-protocol", default-features = false }
 ferrosa-physics = { path = "crates/ferrosa-physics", default-features = false }
+ferrosa-plugins = { path = "crates/ferrosa-plugins", default-features = false }
 ferrosa-world = { path = "crates/ferrosa-world", default-features = false }

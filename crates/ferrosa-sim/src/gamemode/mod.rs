@@ -11,10 +11,8 @@ pub mod sandbox;
 pub mod unported;
 pub mod world;
 
-/// A game mode: its hooks. Modes are compared by name.
 pub type Mode = &'static dyn ModeHooks;
 
-/// Every game mode the server can run. A new mode is a type implementing ModeHooks and an entry here.
 pub static MODES: [Mode; 9] = [
     &round::Hooks,
     &eliminator::Hooks,
@@ -27,12 +25,10 @@ pub static MODES: [Mode; 9] = [
     &unported::NONE,
 ];
 
-/// The mode with this name or alias, in any case (config.toml's gamemode, /resetgame's argument).
-pub fn by_name(name: &str) -> Option<Mode> {
-    MODES.iter().copied().find(|m| m.name().eq_ignore_ascii_case(name) || m.aliases().iter().any(|a| a.eq_ignore_ascii_case(name)))
+pub fn find(modes: &[Mode], name: &str) -> Option<Mode> {
+    modes.iter().copied().find(|m| m.name().eq_ignore_ascii_case(name) || m.aliases().iter().any(|a| a.eq_ignore_ascii_case(name)))
 }
 
-/// Each game mode's own state and config. All of them are kept across mode switches, as the binary keeps its globals.
 #[derive(Clone, Debug)]
 pub struct Modes {
     pub round: round::RoundMode,
@@ -41,13 +37,11 @@ pub struct Modes {
 }
 
 impl Modes {
-    /// The modes' configs read from config_round.txt, config_versus.txt and config_world.txt.
     pub(crate) fn load() -> Self {
         Self { round: round::RoundMode::load(), world: world::WorldMode::load(), eliminator: Default::default() }
     }
 }
 
-/// What the initial sync tells clients about the mode.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ModeSync {
     pub weekly_enabled: bool,
@@ -120,11 +114,6 @@ pub trait ModeHooks: Sync {
     /// What the initial sync says about the mode.
     fn sync(&self, sim: &Sim) -> ModeSync {
         ModeSync { weekly_enabled: false, weekday: sim.world.weekday as u8, versus_movedelay: None }
-    }
-
-    /// Whether /resetgame may switch to this mode.
-    fn switchable(&self) -> bool {
-        false
     }
 
     /// /resetgame has named this mode (whether or not it switches to it).

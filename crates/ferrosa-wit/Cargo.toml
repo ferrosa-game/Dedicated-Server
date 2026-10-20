@@ -1,0 +1,8 @@
+[package]
+name = "ferrosa-wit"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+wit-bindgen = "0.63.0"

@@ -1,0 +1,12 @@
+[package]
+name = "sandbox"
+version = "1.0.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ferrosa-wit = { path = "../../crates/ferrosa-wit" }
+
+[workspace]

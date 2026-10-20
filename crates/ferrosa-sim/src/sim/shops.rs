@@ -84,6 +84,9 @@ impl Sim {
         }
 
         mode.menus_done(self);
+
+        let plugins = self.plugins;
+        plugins.menus_done(self);
     }
 
     /// One player's shop menu. Returns None for a player without a human, and the human's position when it is in no

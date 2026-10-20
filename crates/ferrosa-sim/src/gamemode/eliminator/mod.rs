@@ -639,8 +639,4 @@ impl super::ModeHooks for Hooks {
     fn on_death(&self, sim: &mut Sim, pid: PlayerId) {
         sim.broadcast_death_cut_time(pid);
     }
-
-    fn switchable(&self) -> bool {
-        true
-    }
 }
