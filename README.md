@@ -5,6 +5,14 @@
   </picture>
 </p>
 
+# Links
+
+<div class="header" align="center">  
+  
+[Download](https://github.com/ferrosa-game/Dedicated-Server/releases/lstest) | [Discord](https://discord.gg/yZJWc6MsMZ)
+  
+</div>
+
 # Ferrosa Dedicated Server
 
 A Sub Rosa dedicated server written in Rust: a port of the original Sub Rosa dedicated server.
