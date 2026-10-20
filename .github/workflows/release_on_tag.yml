@@ -28,10 +28,17 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.target }},wasm32-wasip2
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Build plugins
+        shell: bash
+        run: |
+          for plugin in plugins/*/; do
+            (cd "$plugin" && cargo build --release)
+          done
 
       - name: Package
         shell: bash
@@ -43,6 +50,14 @@ jobs:
           mkdir "$staging"
           cp "target/${{ matrix.target }}/release/$bin" "$staging/"
           cp -r data "$staging/"
+
+          for plugin in plugins/*/; do
+            name=$(basename "$plugin")
+            entry=$(sed -n 's/^entry = "\(.*\)"/\1/p' "$plugin/plugin.toml")
+            mkdir -p "$staging/plugins/$name"
+            grep -v '^entry' "$plugin/plugin.toml" > "$staging/plugins/$name/plugin.toml"
+            cp "$plugin/$entry" "$staging/plugins/$name/plugin.wasm"
+          done
 
           cd "$staging" && 7z a "../$staging.zip" .
 

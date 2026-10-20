@@ -49,7 +49,7 @@ pub(crate) struct HostState {
     pub(crate) registering: bool,
     pub(crate) registered: Option<RegisteredMode>,
     wasi: WasiCtx,
-    table: ResourceTable,
+    pub(crate) table: ResourceTable,
     pub(crate) limits: StoreLimits,
 }
 

@@ -649,6 +649,7 @@ dependencies = [
 name = "ferrosa-plugins"
 version = "0.2.1"
 dependencies = [
+ "ferrosa-physics",
  "ferrosa-protocol",
  "ferrosa-sim",
  "glam",

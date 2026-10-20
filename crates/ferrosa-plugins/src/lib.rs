@@ -10,6 +10,12 @@ mod bindings {
         path: "../ferrosa-wit/wit",
         world: "plugin",
         imports: { default: trappable },
+        with: {
+            "ferrosa:plugin/types.human": crate::types::HumanRef,
+            "ferrosa:plugin/types.player": crate::types::PlayerRef,
+            "ferrosa:plugin/types.item": crate::types::ItemRef,
+            "ferrosa:plugin/types.vehicle": crate::types::VehicleRef,
+        },
     });
 }
 

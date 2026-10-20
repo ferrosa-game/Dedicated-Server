@@ -5,6 +5,7 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
+ferrosa-physics.workspace = true
 ferrosa-protocol.workspace = true
 ferrosa-sim.workspace = true
 

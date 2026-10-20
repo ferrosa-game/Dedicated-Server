@@ -10,7 +10,7 @@ use ferrosa_sim::{Mode, NoPlugins, Plugins};
 use serde::Deserialize;
 use wasmtime::{
     Store,
-    component::{Component, HasSelf, Linker},
+    component::{Component, HasSelf, Instance, InstancePre, Linker},
 };
 
 use crate::{
@@ -33,9 +33,27 @@ pub(crate) struct WasmPlugin {
     pub(crate) name: &'static str,
     pub(crate) mode: Option<&'static str>,
     store: Mutex<Store<HostState>>,
-    bindings: bindings::Plugin,
+    hooks: Hooks,
     stopped: AtomicBool,
 }
+
+macro_rules! hooks {
+    ($($hook:ident),* $(,)?) => {
+        pub(crate) struct Hooks {
+            $(pub(crate) $hook: Option<bindings::exports::ferrosa::plugin::$hook::Guest>,)*
+        }
+
+        impl Hooks {
+            fn load(pre: &InstancePre<HostState>, store: &mut Store<HostState>, instance: &Instance) -> wasmtime::Result<Self> {
+                Ok(Self {
+                    $($hook: bindings::exports::ferrosa::plugin::$hook::GuestIndices::new(pre).ok().map(|i| i.load(&mut *store, instance)).transpose()?,)*
+                })
+            }
+        }
+    };
+}
+
+hooks!(init, on_start, get_rules, reset, tick, tick_after_traffic, before_physics, after_physics, menus_done, on_menu, on_chat, on_join, on_leave, on_death, joining_money, on_admin_select);
 
 pub struct LoadedPlugin {
     pub plugins: Plugins,
@@ -111,21 +129,26 @@ impl WasmPlugin {
         store.limiter(|state| &mut state.limits);
         store.set_epoch_deadline(10);
 
-        let bindings = bindings::Plugin::instantiate(&mut store, &component, &linker)?;
+        let pre = linker.instantiate_pre(&component)?;
+        let instance = pre.instantiate(&mut store)?;
+        let hooks = Hooks::load(&pre, &mut store, &instance)?;
         let name = match &manifest.name {
             Some(name) => name.clone(),
             None => folder.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
         };
 
-        let mut plugin = Self { name: leak(name), mode: None, store: Mutex::new(store), bindings, stopped: AtomicBool::new(false) };
-        let init = plugin.call_hook(plugin.name, None, "init", |b, s| {
+        let mut plugin = Self { name: leak(name), mode: None, store: Mutex::new(store), hooks, stopped: AtomicBool::new(false) };
+        plugin.call_hook(plugin.name, None, "init", |h, s| {
+            let init = h.init.as_ref()?;
             s.data_mut().registering = true;
-            let result = b.ferrosa_plugin_hooks().call_init(&mut *s);
+
+            let result = init.call_init(&mut *s);
+
             s.data_mut().registering = false;
-            result
+            Some(result)
         });
 
-        if init.is_none() {
+        if plugin.stopped.load(Ordering::Relaxed) {
             return Ok(None);
         }
 
@@ -140,7 +163,7 @@ impl WasmPlugin {
         who: &str,
         sim: Option<SimPtr>,
         hook: &str,
-        f: impl FnOnce(&bindings::Plugin, &mut Store<HostState>) -> wasmtime::Result<R>,
+        f: impl FnOnce(&Hooks, &mut Store<HostState>) -> Option<wasmtime::Result<R>>,
     ) -> Option<R> {
         if self.stopped.load(Ordering::Relaxed) {
             return None;
@@ -154,10 +177,10 @@ impl WasmPlugin {
         store.data_mut().sim = sim;
         store.set_epoch_deadline(10);
 
-        let result = f(&self.bindings, &mut store);
+        let result = f(&self.hooks, &mut store);
         store.data_mut().sim = None;
 
-        result
+        result?
             .map_err(|e| {
                 eprintln!("[Plugins] {who}.{hook}: {e:?}");
                 eprintln!("[Plugins] {} is stopped", self.name);

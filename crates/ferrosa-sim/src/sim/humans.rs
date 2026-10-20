@@ -1,6 +1,6 @@
 use ferrosa_physics::{
     RotMatrix,
-    rotation::{IDENTITY, rot_matrix_to_quaternion},
+    rotation::rot_matrix_to_quaternion,
 };
 use ferrosa_protocol::clientbound::game::{
     HumanAppearance, ItemKind, OwnHumanData, ServerHumanObject,
@@ -26,27 +26,8 @@ pub const OBJECT_SLOTS: usize = 1024;
 impl Sim {
     pub(crate) fn spawn_human(&mut self, pos: Vec3, rot: &RotMatrix, player: Option<PlayerId>) -> Option<usize> {
         let player = player.and_then(|p| self.players.get(p.idx()));
+
         create_human(&mut self.humans, &mut self.bodies, pos, rot, player)
-    }
-
-    pub(crate) fn spawn_human_for(&mut self, player_id: PlayerId) {
-        let Some(player) = self.players.get(player_id.idx()) else { return };
-
-        let pos = player.camera_pos;
-        let Some(id) = self.spawn_human(pos, &IDENTITY, Some(player_id)) else {
-            return println!("[Sim] Human table full");
-        };
-
-        if let Some(player) = self.players.get_mut(player_id.idx()) {
-            player.human = Some(id);
-            player.ghost_human = false;
-            player.menu = ferrosa_protocol::clientbound::game::MenuType::Empty;
-            player.items_bought = 0;
-
-            self.update_player_event(player_id);
-        }
-
-        println!("[Sim] Spawned human #{id} at {:?}", pos);
     }
 
     /// player_simulation: hands each player's latest controls to their human.
@@ -224,26 +205,6 @@ impl Sim {
         for bone in &human.bones {
             self.bodies.remove(bone.body);
         }
-    }
-
-    pub(crate) fn kill_human_for(&mut self, player_id: PlayerId) {
-        let Some(player) = self.players.get(player_id.idx()) else { return };
-        let eye = player.camera_pos;
-
-        let target = self
-            .humans
-            .iter()
-            .filter(|(_, h)| h.health.vitality > 0)
-            .min_by(|(_, a), (_, b)| (a.pos - eye).length().total_cmp(&(b.pos - eye).length()))
-            .map(|(id, _)| id);
-
-        let Some(id) = target else { return println!("[Sim] No living human to kill") };
-
-        if let Some(h) = self.humans.get_mut(id) {
-            h.health.vitality = 0;
-        }
-
-        println!("[Sim] Killed human #{id}");
     }
 
     pub(crate) fn human_objects(&self) -> Vec<ServerHumanObject> {

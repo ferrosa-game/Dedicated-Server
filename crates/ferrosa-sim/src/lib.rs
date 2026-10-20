@@ -20,8 +20,12 @@ pub(crate) mod vehicle;
 pub(crate) use ferrosa_world as world;
 
 pub use gamemode::{MODES, Mode, ModeHooks, ModeSync, find, rules::ModeRules};
+pub use human::Human;
+pub use items::Item;
+pub use player::Player;
 pub use plugin::{NoPlugins, PluginHooks, Plugins};
 pub use sim::Sim;
+pub use vehicle::Vehicle;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct PlayerId(pub u32);

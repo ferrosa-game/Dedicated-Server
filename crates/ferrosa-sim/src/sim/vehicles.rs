@@ -1,16 +1,14 @@
-use ferrosa_physics::{body::SolverStep, rotation::{IDENTITY, rot_matrix_to_quaternion, rotate, rotate_orientation}};
+use ferrosa_physics::{body::SolverStep, rotation::rot_matrix_to_quaternion};
 use ferrosa_protocol::clientbound::game::{
-    ServerVehicleObject, VehicleKind,
-    events::{Event, ServerEvent, chat::ChatType, update_vehicle::EventUpdateVehicle, update_vehicle_type_color::EventUpdateVehicleTypeColor},
+    ServerVehicleObject,
+    events::{Event, ServerEvent, update_vehicle::EventUpdateVehicle, update_vehicle_type_color::EventUpdateVehicleTypeColor},
 };
 use glam::Vec3;
 
 use super::Sim;
 use crate::{
-    PlayerId,
     items::state::ItemState,
     vehicle::{NETWORKED_VEHICLES, physics, spawn_vehicle},
-    world::trace::line_intersect_level,
 };
 
 const HIDDEN_STATE: i32 = 3;
@@ -129,45 +127,6 @@ impl Sim {
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateVehicleTypeColor(e) });
 
         Some(id)
-    }
-
-    /// Test command (/car [type] [color]): a vehicle in front of the player, facing away from them.
-    pub(crate) fn car_command(&mut self, player_id: PlayerId, message: &str) {
-        let mut args = message.split_whitespace().skip(1).map(|a| a.parse::<i32>().ok());
-        let kind = args.next().flatten().unwrap_or(0);
-        let color = args.next().flatten().unwrap_or(0);
-        let kind = u8::try_from(kind)
-            .ok()
-            .and_then(|k| VehicleKind::try_from(k).ok())
-            .filter(|&k| self.vehicle_types.get(k as usize).is_some_and(|t| !t.nodes.is_empty()));
-
-        let Some(kind) = kind else {
-            let ready: Vec<String> =
-                self.vehicle_types.iter().enumerate().filter(|(_, t)| !t.nodes.is_empty()).map(|(k, t)| format!("{k} {}", t.name)).collect();
-            self.send_chat(&format!("Vehicle types: {}", ready.join(", ")), ChatType::Announce, -1, 0);
-            return;
-        };
-
-        let Some(player) = self.players.get(player_id.idx()) else { return };
-        let human = player.human.and_then(|h| self.humans.get(h));
-        let mut rot = IDENTITY;
-        rotate_orientation(&mut rot, Vec3::Y, human.map_or(player.view_yaw, |h| h.view_yaw));
-
-        let forward = -rot[2];
-        let origin = human.map_or(player.camera_pos, |h| h.bones[0].pos);
-        let ahead = origin + forward * 6.0;
-        let rot = [-rot[0], rot[1], -rot[2]];
-        let map = &self.world.map;
-
-        let ground = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, ahead + Vec3::Y * 8.0, ahead - Vec3::Y * 256.0);
-        let pos = ground.map_or(ahead, |g| Vec3::new(ahead.x, g.hit.pos.y + 1.0, ahead.z));
-        let com = self.vehicle_types[kind as usize].center_of_mass;
-        let pos = pos - rotate(&rot, com);
-
-        match self.spawn_vehicle(kind, color, pos, rot) {
-            Some(id) => println!("[Sim] Spawned vehicle {kind:?} #{id} at {pos:?}"),
-            None => println!("[Sim] Vehicle table full"),
-        }
     }
 
     /// The vehicle part of build_objectpacket: each vehicle's position, orientation, steering, wheels and engine, and
@@ -334,26 +293,6 @@ impl Sim {
                 self.delete_vehicle(id);
             }
         }
-    }
-
-    /// Test command (/clear): every item, vehicle, bullet and human without a player is removed.
-    pub(crate) fn clear_command(&mut self) {
-        for id in self.items.ids() {
-            self.delete_item(id);
-        }
-
-        for id in self.vehicles.ids() {
-            self.delete_vehicle(id);
-        }
-
-        for id in self.humans.ids() {
-            if self.humans.get(id).is_some_and(|h| h.player.is_none()) {
-                self.delete_human(id);
-            }
-        }
-
-        self.bullets.clear();
-        self.send_chat("Cleared", ChatType::Announce, -1, 0);
     }
 
     fn vehicle_item_contacts(&mut self) {

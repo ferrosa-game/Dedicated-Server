@@ -7,17 +7,15 @@ use crate::{PlayerId, sim::Sim};
 pub mod eliminator;
 pub mod round;
 pub mod rules;
-pub mod sandbox;
 pub mod unported;
 pub mod world;
 
 pub type Mode = &'static dyn ModeHooks;
 
-pub static MODES: [Mode; 9] = [
+pub static MODES: [Mode; 8] = [
     &round::Hooks,
     &eliminator::Hooks,
     &world::Hooks,
-    &sandbox::Hooks,
     &unported::DRIVING,
     &unported::RACING,
     &unported::COOP,

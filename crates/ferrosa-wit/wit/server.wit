@@ -1,13 +1,49 @@
 package ferrosa:plugin@0.1.0;
 
 interface server {
-    use types.{body, body-id, client-mode, game-state, rules, vec3};
+    use types.{body, body-id, chat-type, client-mode, game-state, human, human-id, item, item-id, kind-name, mat3, player, player-id, rules, vec3, vehicle, vehicle-id};
 
     /// Makes this plugin a game mode, named for config.toml's gamemode and /resetgame. Only from init, and only once: a
     /// plugin that registers a mode is that mode, and only its mode hooks are called. `map` is the map it plays; none
     /// keeps config.toml's.
     register-mode: func(name: string, aliases: list<string>, client-mode: client-mode, %map: option<string>);
 
+    /// A message to everyone. Long messages and line breaks become several chat lines of up to 63 characters.
+    announce: func(message: string);
+    /// Any other kind of message. `volume` is chat's: how far it carries.
+    send-chat: func(kind: chat-type, speaker: s32, volume: s32, message: string);
+
+    get-player: func(id: player-id) -> option<player>;
+    /// Every player, bots included.
+    players: func() -> list<player>;
+
+    /// A new human at `pos`; with a player, it is theirs and has their look.
+    spawn-human: func(pos: vec3, rot: mat3, player: option<player-id>) -> option<human>;
+    humans: func() -> list<human>;
+    get-human: func(id: human-id) -> option<human>;
+
+    /// Each item kind's name; a kind's number is its place in the list.
+    item-kinds: func() -> list<string>;
+    /// An item kind's number by its name, in any case.
+    find-item-kind: func(name: string) -> option<u32>;
+    spawn-item: func(kind: u32, pos: vec3, rot: mat3) -> option<item>;
+    items: func() -> list<item>;
+    get-item: func(id: item-id) -> option<item>;
+
+    /// The vehicle kinds that can be spawned (those with a model).
+    vehicle-kinds: func() -> list<kind-name>;
+    /// A vehicle of one of vehicle-kinds, with its centre of mass at `pos`.
+    spawn-vehicle: func(kind: u32, colour: s32, pos: vec3, rot: mat3) -> option<vehicle>;
+    vehicles: func() -> list<vehicle>;
+    get-vehicle: func(id: vehicle-id) -> option<vehicle>;
+    /// The height of the ground under `pos`, looking from 8 above it to 256 below.
+    ground-below: func(pos: vec3) -> option<f32>;
+
+    /// Every bullet in flight gone.
+    clear-bullets: func();
+
+    /// The running mode's name.
+    get-mode: func() -> string;
     get-game-state: func() -> game-state;
     set-game-state: func(state: game-state);
 

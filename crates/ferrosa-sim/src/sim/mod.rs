@@ -200,6 +200,7 @@ pub struct ServerStats {
 }
 
 impl Sim {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         in_rx: mpsc::UnboundedReceiver<Inbound>,
         out_tx: Outbound,
@@ -207,6 +208,7 @@ impl Sim {
         map_name: String,
         mode: crate::gamemode::Mode,
         available_modes: Vec<crate::gamemode::Mode>,
+        plugins: crate::plugin::Plugins,
         max_players: u8,
     ) -> Self {
         let srk_data = SrkData::load(Path::new("server.srk")).unwrap();
@@ -223,7 +225,7 @@ impl Sim {
             world: World::new(mode.map().map_or(map_name, str::to_string)),
             mode,
             available_modes,
-            plugins: &crate::plugin::NoPlugins,
+            plugins,
             gamestate: GameState::Intermission,
             round_number: 0,
             saved_accounts: srk_data,
@@ -263,6 +265,7 @@ impl Sim {
             do_traffic: None,
         };
 
+        plugins.on_start(&mut sim);
         sim.reset_game();
         sim
     }
@@ -790,7 +793,11 @@ impl Sim {
                 ServerEvent::UpdateCorporation(e) => e.corporation() != team,
                 ServerEvent::MissionText(e) => e.corporation != team,
                 ServerEvent::Mission(e) => e.player != player_id,
-                ServerEvent::Chat(c) => (c.chat_type == ChatType::AdminChat && !client.admin_visible) || (c.chat_type == ChatType::Announce && c.speaker_id >= 0 && alive),
+                ServerEvent::Chat(c) => {
+                    (c.chat_type == ChatType::AdminChat && !client.admin_visible)
+                        || (c.chat_type == ChatType::Announce && c.speaker_id >= 0 && alive)
+                        || (c.chat_type == ChatType::PrivateMessage && c.speaker_id != player_id)
+                }
                 _ => false,
             };
             let kind = if (expired && ephemeral) || foreign { ServerEvent::Empty } else { ev.kind.clone() };

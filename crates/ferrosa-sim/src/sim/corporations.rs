@@ -3,7 +3,7 @@ use ferrosa_protocol::{
     Team,
     clientbound::game::{
         GameState, ItemKind,
-        events::{Event, ServerEvent, chat::ChatType, team_door::EventTeamDoor},
+        events::{Event, ServerEvent, team_door::EventTeamDoor},
     },
 };
 use glam::Vec3;
@@ -93,10 +93,9 @@ impl Sim {
 
         self.corp_state[k].manager = Some(pid);
         let name = self.players.get(pid.idx()).map_or(String::new(), |p| p.username.clone());
-        self.send_chat(&format!("{name} is now manager of {}", Team::CORPORATION_NAMES[k]), ChatType::Announce, -1, 0);
+        self.announce(&format!("{name} is now manager of {}", Team::CORPORATION_NAMES[k]));
     }
 
-    /// disconnect_phone: the team's two phones hang up on whoever they were talking to and despawn.
     pub(crate) fn disconnect_phone(&mut self, k: usize) {
         let number = (k as i32 + 1) * PHONE_NUMBER_STEP;
 

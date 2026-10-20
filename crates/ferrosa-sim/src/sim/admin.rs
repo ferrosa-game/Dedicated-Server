@@ -321,7 +321,7 @@ impl Sim {
         }
 
         if let Some(text) = msg.strip_prefix("/message ") {
-            self.send_chat(text, ChatType::Announce, -1, 0);
+            self.announce(text);
         }
 
         if msg.starts_with("/clearkick") {

@@ -1,35 +1,91 @@
 package ferrosa:plugin@0.1.0;
 
-interface hooks {
-    use types.{player-id, rules};
+// Every hook is its own interface, and a plugin exports only the ones it uses: the server calls whichever it finds.
 
-    /// Once, when the plugin is loaded, before the server starts. A plugin that is a game mode calls
-    /// server.register-mode here; nothing else in server can be used yet.
+/// Once, when the plugin is loaded, before the server starts. A plugin that is a game mode calls server.register-mode
+/// here; nothing else in server can be used yet.
+interface init {
     init: func();
+}
+
+interface on-start {
     on-start: func();
+}
 
-    /// A mode's settings for the shared code, taken at every reset. Only asked of the mode; the server can't be
-    /// changed from here.
+/// A mode's settings for the shared code, taken at every reset. Only asked of the mode; the server can't be changed
+/// from here.
+interface get-rules {
+    use types.{rules};
+
     get-rules: func() -> rules;
-    /// A reset, after the corporations' missions are cleared.
+}
+
+/// A reset, after the corporations' missions are cleared.
+interface reset {
     reset: func();
+}
 
+interface tick {
     tick: func();
+}
+
+interface tick-after-traffic {
     tick-after-traffic: func();
+}
+
+interface before-physics {
     before-physics: func();
+}
+
+interface after-physics {
     after-physics: func();
+}
 
+interface menus-done {
     menus-done: func();
+}
 
-    /// A menu button pressed; true takes it. The mode is asked first, then each plugin, then the shared menus.
+/// A menu button pressed; true takes it. The mode is asked first, then each plugin, then the shared menus.
+interface on-menu {
+    use types.{player-id};
+
     on-menu: func(player: player-id, menu: u8, button: u32) -> bool;
+}
+
+/// A chat message from a player, before the server's own commands; true takes it, and it goes no further. The mode is
+/// asked first, then each plugin. /admin messages never reach plugins.
+interface on-chat {
+    use types.{player-id};
+
+    on-chat: func(player: player-id, message: string) -> bool;
+}
+
+interface on-join {
+    use types.{player-id};
+
     on-join: func(player: player-id);
+}
+
+interface on-leave {
+    use types.{player-id};
+
     on-leave: func(player: player-id);
-    /// A real player's human has died.
+}
+
+/// A real player's human has died.
+interface on-death {
+    use types.{player-id};
+
     on-death: func(player: player-id);
-    /// The money a joining player starts with: the mode is given what their account has, then each plugin the last
-    /// answer. The server can't be changed from here.
+}
+
+/// The money a joining player starts with: the mode is given what their account has, then each plugin the last
+/// answer. The server can't be changed from here.
+interface joining-money {
     joining-money: func(money: s32) -> s32;
-    /// /resetgame has named this plugin's mode. Only asked of the mode.
+}
+
+/// /resetgame has named this plugin's mode. Only asked of the mode.
+interface on-admin-select {
     on-admin-select: func();
 }

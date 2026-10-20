@@ -1,6 +1,6 @@
 use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::{
-    GameMode, Team, clientbound::game::{GameState, ItemKind, MenuType, VehicleKind, events::chat::ChatType},
+    GameMode, Team, clientbound::game::{GameState, ItemKind, MenuType, VehicleKind},
 };
 use glam::Vec3;
 
@@ -296,7 +296,8 @@ impl Sim {
         for k in 0..ROUND_CORPS {
             if let Some(m) = self.corp_state[k].manager.and_then(|m| self.players.get(m.idx())) {
                 let line = format!("{} Manager: {}", TEAM_NAMES[k], m.username);
-                self.send_chat(&line, ChatType::Announce, -1, 0);
+
+                self.announce(&line);
             }
         }
 
@@ -465,7 +466,7 @@ impl Sim {
         self.game_timer -= 1;
 
         if self.game_timer == TOP10_HEADER {
-            self.send_chat("Top 10 list", ChatType::Announce, -1, 0);
+            self.announce("Top 10 list");
         } else if self.game_timer <= TOP10_FIRST && self.game_timer > 0 && (TOP10_FIRST - self.game_timer) % TOP10_STEP == 0 {
             self.print_top10((TOP10_FIRST - self.game_timer) / TOP10_STEP);
         }
@@ -533,7 +534,7 @@ impl Sim {
         let (money, name) = &ranked[n as usize];
         let line = format!("{}. {}   ${}", n + 1, name, memos::with_commas(*money as i32));
 
-        self.send_chat(&line, ChatType::Announce, -1, 0);
+        self.announce(&line);
     }
 
     /// server_main's check before each pass of its loop: when people come to an empty server the game is reset as

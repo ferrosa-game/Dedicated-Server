@@ -2,7 +2,7 @@ use ferrosa_physics::rotation::rotate;
 use ferrosa_physics::{
     RotMatrix, Table,
     body::RigidBodyType,
-    rotation::{IDENTITY, rot_matrix_to_quaternion, rotate_orientation},
+    rotation::rot_matrix_to_quaternion,
 };
 use ferrosa_protocol::clientbound::game::{
     ItemKind, ItemTail, ServerItemObject,
@@ -10,7 +10,6 @@ use ferrosa_protocol::clientbound::game::{
 };
 use ferrosa_world::sphere_cast;
 use glam::{IVec3, Vec3};
-use rand::RngExt;
 
 pub mod grid;
 pub mod logic;
@@ -20,7 +19,6 @@ pub use ferrosa_world::item_types as types;
 
 use crate::{human::inventory, sim::tps::timed};
 use crate::{
-    PlayerId,
     items::{grid::ItemGrid, state::ItemState, types::ItemType},
     sim::{
         Sim,
@@ -54,7 +52,6 @@ const KICK_FRICTION: f32 = 0.4;
 const KICK_DEPTH_SCALE: f32 = 1.0 / 32.0;
 const KICK_SOFTNESS: f32 = 1.0 / 16.0;
 const BALL_SPIN_DAMPING: f32 = 15.0 / 16.0;
-const SPAWN_DISTANCE: f32 = 1.5;
 
 pub struct Item {
     pub item_type: ItemKind,
@@ -241,77 +238,6 @@ impl Sim {
 
         if let Some(item) = self.items.remove(id) {
             self.bodies.remove(item.body);
-        }
-    }
-
-    pub(crate) fn spawn_watermelon_for(&mut self, player_id: PlayerId) {
-        let mut rng = rand::rng();
-
-        for _ in 0..100 {
-            let rand_x = rng.random_range(1.0..=5.0);
-            let rand_z = rng.random_range(1.0..=5.0);
-            let rand_y = rng.random_range(1.0..=5.0);
-
-            let mut v = Vec3::Z;
-            v.x += rand_x;
-            v.y += rand_y;
-            v.z += rand_z;
-
-            self.spawn_item_for(player_id, ItemKind::Watermelon, v);
-        }
-    }
-
-    /// Test command: an item of any type in front of the player's camera.
-    pub(crate) fn spawn_item_for(&mut self, player_id: PlayerId, kind: ItemKind, pos_offset: Vec3) -> Option<usize> {
-        let player = self.players.get(player_id.idx())?;
-
-        let mut view = IDENTITY;
-        rotate_orientation(&mut view, Vec3::Y, player.view_yaw);
-
-        let right = -view[2];
-        rotate_orientation(&mut view, right, player.view_pitch);
-
-        let mut pos = player.camera_pos - view[0] * SPAWN_DISTANCE;
-        pos += pos_offset;
-
-        let Some(id) = self.create_item(kind, pos, None, IDENTITY) else {
-            println!("[Sim] Item table full");
-            return None;
-        };
-
-        println!("[Sim] Spawned {kind:?} #{id} at {pos:?}");
-        Some(id)
-    }
-
-    /// Test command: every gun in a row in front of the player, each with three of its magazines beside it.
-    pub(crate) fn spawn_guns_for(&mut self, player_id: PlayerId) {
-        const GUNS: [(ItemKind, Option<ItemKind>); 7] = [
-            (ItemKind::Ak47, Some(ItemKind::Ak47Mag)),
-            (ItemKind::M16, Some(ItemKind::M16Mag)),
-            (ItemKind::Mp5, Some(ItemKind::Mp5Mag)),
-            (ItemKind::Uzi, Some(ItemKind::UziMag)),
-            (ItemKind::Pistol, Some(ItemKind::PistolMag)),
-            (ItemKind::Magnum, Some(ItemKind::MagnumMag)),
-            (ItemKind::Auto5, None),
-        ];
-
-        const GUN_SPACING: f32 = 0.75;
-        const MAG_SPACING: f32 = 0.25;
-        let Some(player) = self.players.get(player_id.idx()) else { return };
-        let mut view = IDENTITY;
-        rotate_orientation(&mut view, Vec3::Y, player.view_yaw);
-
-        let (forward, right) = (-view[0], -view[2]);
-        let centre = player.camera_pos + forward * SPAWN_DISTANCE;
-        let first = -(GUNS.len() as f32 - 1.0) * 0.5;
-
-        for (k, (gun, mag)) in GUNS.into_iter().enumerate() {
-            let at = centre + right * ((first + k as f32) * GUN_SPACING);
-            self.create_item(gun, at, None, view);
-
-            for m in mag.into_iter().flat_map(|m| [m; 3]).enumerate() {
-                self.create_item(m.1, at + forward * (MAG_SPACING * (m.0 as f32 + 1.0)), None, view);
-            }
         }
     }
 

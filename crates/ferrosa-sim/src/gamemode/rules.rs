@@ -55,8 +55,6 @@ pub struct ModeRules {
     pub move_delay: Option<i32>,
     /// Buying a vehicle sends the round money update.
     pub round_money_updates: bool,
-    /// Everyone may use the test commands (/human, /guns, ...).
-    pub test_commands: bool,
 }
 
 impl Default for ModeRules {
@@ -87,7 +85,6 @@ impl Default for ModeRules {
             ready_start: true,
             move_delay: None,
             round_money_updates: false,
-            test_commands: false,
         }
     }
 }

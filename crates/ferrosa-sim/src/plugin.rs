@@ -25,6 +25,10 @@ pub trait PluginHooks: Sync {
 
     fn after_physics(&self, _sim: &mut Sim) {}
 
+    fn on_chat(&self, _sim: &mut Sim, _pid: PlayerId, _message: &str) -> bool {
+        false
+    }
+
     fn on_join(&self, _sim: &mut Sim, _pid: PlayerId) {}
 
     fn on_leave(&self, _sim: &mut Sim, _pid: PlayerId) {}

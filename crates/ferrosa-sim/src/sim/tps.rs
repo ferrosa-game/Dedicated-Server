@@ -3,8 +3,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use ferrosa_protocol::clientbound::game::events::chat::ChatType;
-
 use crate::PlayerId;
 
 use super::Sim;
@@ -122,6 +120,6 @@ impl Sim {
             None => "TPS: not enough ticks yet".to_string(),
         };
 
-        self.send_chat(&msg, ChatType::PrivateMessage, player.idx() as i32, 0);
+        self.priv_chat(player, &msg);
     }
 }

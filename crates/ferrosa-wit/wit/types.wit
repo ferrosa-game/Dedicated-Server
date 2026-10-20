@@ -5,6 +5,123 @@ interface types {
 
     type body-id = u32;
 
+    type human-id = u32;
+    type item-id = u32;
+    type vehicle-id = u32;
+
+    enum team {
+        goldmen,
+        monsota,
+        oxs,
+        nexaco,
+        pentacom,
+        prodocon,
+        mission,
+        spectator,
+    }
+
+    /// A player, bots included. Every call reads or changes the real player; once they have left they read as an
+    /// empty spectator and changes do nothing.
+    resource player {
+        id: func() -> player-id;
+        /// False once the player has left.
+        exists: func() -> bool;
+        name: func() -> string;
+        team: func() -> team;
+        admin: func() -> bool;
+        bot: func() -> bool;
+        /// A message only this player sees. Long messages and line breaks become several chat lines.
+        message: func(message: string);
+        human: func() -> option<human>;
+        /// Makes them control `human`.
+        set-human: func(human: borrow<human>);
+        god-mode: func() -> bool;
+        set-god-mode: func(on: bool);
+        /// The menu they have open, by the game's menu number (the numbers on-menu gets).
+        menu: func() -> u8;
+        /// False if there is no such menu.
+        set-menu: func(menu: u8) -> bool;
+        camera: func() -> vec3;
+        yaw: func() -> f32;
+        pitch: func() -> f32;
+        /// The way they face along the ground: their view turned by its yaw alone. -x is ahead and -z to the right.
+        facing: func() -> mat3;
+        /// The way they look: their view turned by its yaw, then its pitch. -x is where they look.
+        view: func() -> mat3;
+    }
+
+    /// A human, controlled by a player or nobody. Every call reads or changes the real human; once it has been
+    /// removed it reads as dead and changes do nothing.
+    resource human {
+        id: func() -> human-id;
+        /// False once the human has been removed.
+        exists: func() -> bool;
+        pos: func() -> vec3;
+        /// 0 or less is dead.
+        vitality: func() -> s32;
+        set-vitality: func(vitality: s32);
+        bleeding: func() -> bool;
+        set-bleeding: func(bleeding: bool);
+        player: func() -> option<player-id>;
+        delete: func();
+    }
+
+    /// An item in the world or carried. Every call reads or changes the real item; once it has been removed it reads
+    /// as nowhere and changes do nothing.
+    resource item {
+        id: func() -> item-id;
+        /// False once the item has been removed.
+        exists: func() -> bool;
+        /// Its kind's number, as item-kinds lists them.
+        kind: func() -> u32;
+        pos: func() -> vec3;
+        /// A phone's number; none if it isn't a phone.
+        phone-number: func() -> option<s32>;
+        /// False if it isn't a phone.
+        set-phone-number: func(number: s32) -> bool;
+        /// Takes it out of the world; an item of a set goes back where the set keeps it.
+        delete: func();
+    }
+
+    /// A vehicle. Every call reads or changes the real vehicle; once it has been removed it reads as nowhere and
+    /// changes do nothing.
+    resource vehicle {
+        id: func() -> vehicle-id;
+        /// False once the vehicle has been removed.
+        exists: func() -> bool;
+        /// Its kind's number, as vehicle-kinds lists them.
+        kind: func() -> u32;
+        colour: func() -> s32;
+        pos: func() -> vec3;
+        /// Takes it out of the world, getting anyone in it out first.
+        delete: func();
+    }
+
+    record mat3 {
+        x: vec3,
+        y: vec3,
+        z: vec3,
+    }
+
+    record kind-name {
+        id: u32,
+        name: string,
+    }
+
+    /// The kinds of message send-chat sends.
+    enum chat-type {
+        /// Said by a human, heard around it: `speaker` is the human.
+        chat,
+        /// Said by an item, such as a phone: `speaker` is the item.
+        item-speak,
+        /// Eliminator's announcement line.
+        eliminator-announcement,
+        /// Seen only by admins.
+        admin-chat,
+        /// Put in the game's notice line rather than the chat.
+        notice,
+    }
+
     record vec3 {
         x: f32,
         y: f32,
@@ -93,7 +210,5 @@ interface types {
         move-delay: option<s32>,
         /// Buying a vehicle sends the round money update.
         round-money-updates: bool,
-        /// Everyone may use the test commands (/human, /guns, ...).
-        test-commands: bool,
     }
 }

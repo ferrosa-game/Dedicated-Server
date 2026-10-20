@@ -1,5 +1,5 @@
 use ferrosa_protocol::{
-    Team, clientbound::game::{ItemKind, MenuType, VehicleKind, events::chat::ChatType},
+    Team, clientbound::game::{ItemKind, MenuType, VehicleKind},
 };
 
 use super::Sim;
@@ -320,7 +320,7 @@ impl Sim {
         let name = t.username.clone();
         self.events.push(e);
         self.events.push(m);
-        self.send_chat(&format!("{name} has been fired from {}", TEAM_NAMES[k]), ChatType::Announce, -1, 0);
+        self.announce(&format!("{name} has been fired from {}", TEAM_NAMES[k]));
     }
 
     fn buyer_pos(&self, pid: PlayerId, b: Buyer) -> Option<glam::Vec3> {

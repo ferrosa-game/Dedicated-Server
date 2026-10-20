@@ -3,9 +3,8 @@ use ferrosa_sim::{ModeHooks, ModeRules, Sim};
 use wasmtime::Store;
 
 use crate::{
-    bindings,
     host::{HostState, RegisteredMode, SimPtr},
-    plugin::WasmPlugin,
+    plugin::{Hooks, WasmPlugin},
 };
 
 pub(crate) struct WasmGameMode {
@@ -33,7 +32,7 @@ impl WasmGameMode {
         }
     }
 
-    fn call<R>(&self, sim: SimPtr, hook: &str, f: impl FnOnce(&bindings::Plugin, &mut Store<HostState>) -> wasmtime::Result<R>) -> Option<R> {
+    fn call<R>(&self, sim: SimPtr, hook: &str, f: impl FnOnce(&Hooks, &mut Store<HostState>) -> Option<wasmtime::Result<R>>) -> Option<R> {
         self.plugin.call_hook(self.who, Some(sim), hook, f)
     }
 }
@@ -56,10 +55,10 @@ impl ModeHooks for WasmGameMode {
     }
 
     fn rules(&self, sim: &Sim) -> ModeRules {
-        self.call(SimPtr::Read(sim), "get-rules", |b, s| b.ferrosa_plugin_hooks().call_get_rules(s)).map_or_else(ModeRules::default, Into::into)
+        self.call(SimPtr::Read(sim), "get-rules", |h, s| h.get_rules.as_ref().map(|g| g.call_get_rules(s))).map_or_else(ModeRules::default, Into::into)
     }
 
     fn on_admin_select(&self, sim: &mut Sim) {
-        self.call(SimPtr::Write(sim), "on-admin-select", |b, s| b.ferrosa_plugin_hooks().call_on_admin_select(s));
+        self.call(SimPtr::Write(sim), "on-admin-select", |h, s| h.on_admin_select.as_ref().map(|g| g.call_on_admin_select(s)));
     }
 }

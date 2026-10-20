@@ -1,12 +1,11 @@
-use ferrosa_protocol::{GameMode, clientbound::game::GameState};
+use ferrosa_physics::RotMatrix;
+use ferrosa_protocol::{
+    GameMode, Team,
+    clientbound::game::{GameState, events::chat::ChatType},
+};
 use ferrosa_sim::ModeRules;
 
-use crate::{
-    bindings::ferrosa::plugin::types::{self, ClientMode, Rules, Vec3},
-    host::HostState,
-};
-
-impl types::Host for HostState {}
+use crate::bindings::ferrosa::plugin::types::{self, ClientMode, Mat3, Rules, Vec3};
 
 impl From<glam::Vec3> for Vec3 {
     fn from(v: glam::Vec3) -> Self {
@@ -41,6 +40,45 @@ impl From<types::GameState> for GameState {
             types::GameState::Restarting => Self::Restarting,
             types::GameState::Paused => Self::Paused,
         }
+    }
+}
+
+impl From<Team> for types::Team {
+    fn from(team: Team) -> Self {
+        match team {
+            Team::Goldmen => Self::Goldmen,
+            Team::Monsota => Self::Monsota,
+            Team::OXS => Self::Oxs,
+            Team::Nexaco => Self::Nexaco,
+            Team::Pentacom => Self::Pentacom,
+            Team::Prodocon => Self::Prodocon,
+            Team::Mission => Self::Mission,
+            Team::Spectator => Self::Spectator,
+        }
+    }
+}
+
+impl From<types::ChatType> for ChatType {
+    fn from(kind: types::ChatType) -> Self {
+        match kind {
+            types::ChatType::Chat => Self::Chat,
+            types::ChatType::ItemSpeak => Self::ItemSpeak,
+            types::ChatType::EliminatorAnnouncement => Self::EliminatorAnnouncement,
+            types::ChatType::AdminChat => Self::AdminChat,
+            types::ChatType::Notice => Self::Notice,
+        }
+    }
+}
+
+impl From<RotMatrix> for Mat3 {
+    fn from([x, y, z]: RotMatrix) -> Self {
+        Self { x: x.into(), y: y.into(), z: z.into() }
+    }
+}
+
+impl From<Mat3> for RotMatrix {
+    fn from(m: Mat3) -> Self {
+        [m.x.into(), m.y.into(), m.z.into()]
     }
 }
 
@@ -87,7 +125,6 @@ impl From<ModeRules> for Rules {
             ready_start: r.ready_start,
             move_delay: r.move_delay,
             round_money_updates: r.round_money_updates,
-            test_commands: r.test_commands,
         }
     }
 }
@@ -120,7 +157,6 @@ impl From<Rules> for ModeRules {
             ready_start: r.ready_start,
             move_delay: r.move_delay,
             round_money_updates: r.round_money_updates,
-            test_commands: r.test_commands,
         }
     }
 }

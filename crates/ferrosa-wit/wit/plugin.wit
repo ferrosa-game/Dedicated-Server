@@ -1,6 +1,28 @@
 package ferrosa:plugin@0.1.0;
 
+/// Every hook. A plugin's own world only needs `import server` and the hooks it uses, such as:
+///
+/// world my-plugin {
+///     import ferrosa:plugin/server@0.1.0;
+///     export ferrosa:plugin/on-chat@0.1.0;
+/// }
 world plugin {
     import server;
-    export hooks;
+
+    export init;
+    export on-start;
+    export get-rules;
+    export reset;
+    export tick;
+    export tick-after-traffic;
+    export before-physics;
+    export after-physics;
+    export menus-done;
+    export on-menu;
+    export on-chat;
+    export on-join;
+    export on-leave;
+    export on-death;
+    export joining-money;
+    export on-admin-select;
 }
