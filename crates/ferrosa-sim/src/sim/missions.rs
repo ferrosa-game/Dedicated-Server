@@ -1,8 +1,8 @@
 use ferrosa_physics::rotation::RotMatrix;
 use ferrosa_protocol::{
-    CharacterCustomization, Team,
+    CharacterCustomization, Gender, Model, SuitColor, Team,
     clientbound::game::{
-        GameState, ItemKind, MenuType,
+        ItemKind, MenuType,
         events::{
             Event, ServerEvent, mission_text::EventMissionText, update_corporation::EventUpdateCorporation,
             update_vehicle_type_color::EventUpdateVehicleTypeColor,
@@ -12,20 +12,14 @@ use ferrosa_protocol::{
 use glam::Vec3;
 
 use super::Sim;
-use crate::{PlayerId, items::state::ItemState};
+use crate::PlayerId;
 
 /// A corporation holds sixteen mission slots.
 pub const MISSION_SLOTS: usize = 16;
 /// A mission text event carries 64 bytes of the text.
 const TEXT_LINE: usize = 64;
-/// The car chase: its key and briefcase are made at a fixed spot and taken straight into the driver's hands, and each
-/// guard has a pistol and four magazines.
-const CHASE_ITEMS_POS: Vec3 = Vec3::new(62.0, 10.0, 60.0);
-const KEY_SLOT: usize = 4;
-const CASE_SLOT: usize = 3;
+/// Each guard of a car chase has a pistol and four magazines.
 const GUARD_MAGAZINES: i32 = 4;
-/// The chase's target sits at no mission spot.
-const CHASE_LOCATION: i32 = 255;
 
 /// One mission of a corporation (the fields read so far).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -86,68 +80,11 @@ const RATING_MONEY: i32 = 10;
 pub struct MissionGlobals {
     /// Deals made since the reset.
     pub counter: i32,
-    /// The next disk colour.
-    pub disk_index: i32,
-    /// The disks of the last deal.
-    pub last_disks: [i32; 2],
-    /// Where the last car chase's target is.
-    pub target_location: i32,
-    /// Players per corporation given missions in the last generation.
-    pub average_players: i32,
     /// The traffic car of the last car chase.
     pub chase_car: i32,
 }
 
 impl Sim {
-    /// create_round_traffic_car: a traffic car on a random street, routed to another and spawned as a vehicle at once,
-    /// with a mission bot driving it holding its key and a briefcase with the disk, and one to three armed guards.
-    pub(crate) fn create_round_traffic_car(&mut self, disk: ItemKind, deadline: i32) {
-        use ferrosa_physics::rotation::IDENTITY;
-        let (_, Some(vid)) = self.spawn_chase_car(None) else { return };
-        let v = self.vehicles.get(vid).unwrap();
-        let (vpos, vrot) = (v.pos, v.rot);
-        let counter = self.missions.counter;
-        let Some((driver, driver_human)) = self.create_mission_bot(deadline, Some(counter), vpos, vrot, vid, 0) else { return };
-
-        if let Some(key) = self.create_item(ItemKind::Key, CHASE_ITEMS_POS, None, IDENTITY) {
-            self.items.get_mut(key).unwrap().state = ItemState::Key { vehicle: Some(vid) };
-
-            if let Some(h) = driver_human {
-                self.link_to_slot(h, key, KEY_SLOT);
-            }
-        }
-
-        let case = self.create_item(ItemKind::Briefcase, CHASE_ITEMS_POS, None, IDENTITY);
-
-        if let Some(case) = case {
-            self.items.get_mut(case).unwrap().item_type = ItemKind::BriefcaseOpen;
-        }
-
-        let id = self.create_item(disk, CHASE_ITEMS_POS, None, IDENTITY);
-        self.missions.last_disks[0] = id.map_or(-1, |i| i as i32);
-        self.missions.target_location = CHASE_LOCATION;
-
-        if let Some(case) = case {
-            if let Some(id) = id {
-                super::items::attach_child(&mut self.items, &self.item_types, case, id);
-            }
-
-            self.items.get_mut(case).unwrap().item_type = ItemKind::Briefcase;
-
-            if let Some(h) = driver_human {
-                self.link_to_slot(h, case, CASE_SLOT);
-            }
-        }
-
-        if let Some(p) = self.players.get_mut(driver.idx()) {
-            p.team = Team::Mission;
-            p.bot.waypoint = 0;
-            p.bot.waypoint_count = 0;
-        }
-
-        self.create_guards(deadline, Some(counter), vpos, vrot, vid);
-    }
-
     /// A town car (create_traffic_car on a random street) routed to another street, at least `min_distance` away
     /// when given (1024 tries), and spawned as a vehicle at once: the car and its vehicle.
     pub(crate) fn spawn_chase_car(&mut self, min_distance: Option<f32>) -> (usize, Option<usize>) {
@@ -253,9 +190,9 @@ impl Sim {
         }
 
         p.is_bot = true;
-        p.customization.gender = 1;
-        p.customization.model = 2;
-        p.customization.suit_color = 1;
+        p.customization.gender = Gender::Male;
+        p.customization.model = Model::Suit2;
+        p.customization.suit_color = SuitColor::Black;
 
         let new_human = self.spawn_human(pos, &rot, Some(pid));
         let bot_player = self.players.get_mut(pid.idx()).unwrap();
@@ -285,21 +222,19 @@ impl Sim {
         let hair_style = rand::random_range(0..9);
         let eye_color = rand::random_range(0..8);
         let customization = CharacterCustomization {
-            gender: 0,
+            gender: Gender::Female,
             head: head as u8,
             skin: skin as u8,
             hair_color: hair_color as u8,
             hair_style: hair_style as u8,
             eye_color: eye_color as u8,
-            model: 0,
+            model: Model::Casual,
             necklace: 0,
-            suit_color: 0,
+            suit_color: SuitColor::Brown,
             tie_color: 0,
         };
-        let lobby = self.gamestate == GameState::Intermission && self.rules.bot_lobby;
-        let menu = if lobby { MenuType::Lobby } else { MenuType::Empty };
         let pid = PlayerId(self.players.next_key() as u32);
-        self.players.insert(crate::player::Player::new_bot(pid, customization, menu));
+        self.players.insert(crate::player::Player::new_bot(pid, customization, MenuType::Empty));
         Some(pid)
     }
 

@@ -1,6 +1,6 @@
 use ferrosa_map::file_types::srk::SrkPlayerData;
 use ferrosa_protocol::{
-    Team,
+    Model, SuitColor, Team,
     clientbound::game::events::{Event, ServerEvent, update_stock::EventUpdateStock},
 };
 
@@ -10,9 +10,8 @@ use crate::{PlayerId, player::Player};
 
 pub const CORPORATIONS: usize = 6;
 const MAX_STOCKS: i32 = 9999;
-/// The share of the price a sale pays: 95%, or 98% in round mode.
+/// The share of the price a sale pays.
 pub(crate) const SELL_RATE: f32 = 0.95;
-pub(crate) const ROUND_SELL_RATE: f32 = 0.98;
 const TAX_FREE: i32 = 10000;
 const TAX_RATE: f32 = 0.05;
 const STOCK_TAX_FREE: f32 = 10000.0;
@@ -163,14 +162,12 @@ pub fn sanitize_name(raw: &[u8]) -> String {
     if name.is_empty() { "Noname".into() } else { name }
 }
 
-const SUIT_MODEL: u8 = 1;
-const CASUAL_MODEL: u8 = 0;
-const SUIT_COLORS: [u8; CORPORATIONS] = [6, 10, 11, 2, 1, 2];
+const SUIT_COLORS: [SuitColor; CORPORATIONS] = [SuitColor::Tan, SuitColor::DarkNavy, SuitColor::DarkGrey, SuitColor::Grey, SuitColor::Black, SuitColor::Grey];
 const TIE_COLORS: [u8; CORPORATIONS] = [2, 9, 8, 3, 7, 1];
 
 /// Suit colours a team change leaves alone.
-fn keeps_suit(suit: u8) -> bool {
-    matches!(suit, 3 | 7 | 8)
+fn keeps_suit(suit: SuitColor) -> bool {
+    matches!(suit, SuitColor::Navy | SuitColor::White | SuitColor::Red)
 }
 
 pub const WORLD_TIME_START: i32 = 1728010;
@@ -194,7 +191,7 @@ impl Sim {
         let look = &mut player.customization;
 
         if let Some(c) = corporation_of(team) {
-            look.model = SUIT_MODEL;
+            look.model = Model::Suit;
 
             if !keeps_suit(look.suit_color) {
                 look.suit_color = SUIT_COLORS[c];
@@ -202,10 +199,10 @@ impl Sim {
 
             look.tie_color = TIE_COLORS[c];
         } else if team == Team::Spectator {
-            look.model = CASUAL_MODEL;
+            look.model = Model::Casual;
 
             if !keeps_suit(look.suit_color) {
-                look.suit_color = 0;
+                look.suit_color = SuitColor::Brown;
             }
 
             look.tie_color = 0;
@@ -272,7 +269,7 @@ impl Sim {
 
         if real {
             wealth_tax(player, &mut self.corporations);
-            self.events.push(player.make_update_round_event(tick));
+            self.events.push(player.make_update_financials_event(tick));
         }
 
         if real {
@@ -305,7 +302,7 @@ impl Sim {
 
         if !accounts.players.iter().any(|a| a.account_id == auth.account_id) {
             let mut a = SrkPlayerData::new(auth.account_id, &auth.player_name, auth.phone_number, auth.steam_id);
-            a.money = if self.rules.world_start_cash { self.modes.world.cfg.startcash as u32 } else { NEW_ACCOUNT_MONEY };
+            a.money = if self.rules.saved_accounts { self.modes.world.cfg.startcash as u32 } else { NEW_ACCOUNT_MONEY };
             a.corp_rating = NEW_ACCOUNT_RATING;
             a.eye_color = rand::random_range(0..3) as u32;
             a.hair_color = rand::random_range(0..8) as u32;
@@ -346,7 +343,6 @@ impl Sim {
         self.reclaim_humans(pid);
         let Some(money) = self.players.get(pid.idx()).map(|p| p.money) else { return };
         let money = self.mode.joining_money(self, money);
-        let money = self.plugins.joining_money(self, money);
 
         if let Some(player) = self.players.get_mut(pid.idx()) {
             player.money = money;
@@ -374,8 +370,8 @@ impl Sim {
                 self.purchase_stocks(pid, stocks);
             } else {
                 player.menu = ferrosa_protocol::clientbound::game::MenuType::Empty;
-                player.customization.model = SUIT_MODEL;
-                player.customization.suit_color = player.team as u8;
+                player.customization.model = Model::Suit;
+                player.customization.suit_color = SuitColor::try_from(player.team as u8).unwrap_or_default();
             }
         }
     }
@@ -427,26 +423,5 @@ impl Sim {
             h.player = None;
             h.account = Some(account);
         }
-    }
-
-    /// handle_buy_menu_selection for the share menu: options 0 to 3 buy 1, 10, 100 or 1000 shares, 4 to 7 sell them.
-    pub(crate) fn stock_menu_selection(&mut self, pid: PlayerId, button: u32) {
-        let tick = self.tick;
-
-        if self.players.get(pid.idx()).is_none_or(|p| p.human.is_none()) {
-            return;
-        }
-
-        let amounts = [1, 10, 100, 1000];
-        let b = (button & 0xff) as usize;
-
-        match b {
-            0..4 => self.purchase_stocks(pid, amounts[b]),
-            4..8 => self.sell_stocks(pid, amounts[b - 4]),
-            _ => {}
-        }
-
-        let Some(player) = self.players.get(pid.idx()) else { return };
-        self.events.push(player.make_update_round_event(tick));
     }
 }

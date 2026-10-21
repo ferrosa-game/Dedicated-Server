@@ -1,6 +1,6 @@
 use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::{
-    GameMode, Team,
+    GameMode, Model, SuitColor, Team,
     clientbound::game::{
         GameState, ItemKind, MenuType, VehicleKind,
         events::{Event, ServerEvent, chat::ChatType, mission::EventMission},
@@ -97,8 +97,31 @@ impl Sim {
         self.round_elapsed = 0;
         self.modes.eliminator.count = 0;
 
-        self.reset_corporation_rounds();
+        self.reset_eliminator_corporations();
         self.reset_lobby_players_and_world();
+    }
+
+    /// reset_game's corporation loop: funds and counts cleared, the managers dropped and the share prices set to
+    /// 100 on the first reset, and the shares counted again.
+    fn reset_eliminator_corporations(&mut self) {
+        let first = self.round_number == 0;
+
+        for (k, corp_state) in self.corp_state.iter_mut().enumerate() {
+            corp_state.funds = 0;
+            corp_state.player_count = 0;
+
+            if first {
+                corp_state.manager = None;
+            }
+
+            let corp = &mut self.corporations[k];
+
+            if first {
+                corp.price = 100.0;
+            }
+
+            corp.shares = 100 + self.players.iter().filter(|(_, p)| p.team == Team::CORPORATIONS[k]).map(|(_, p)| p.stocks).sum::<i32>();
+        }
     }
 
     fn eliminator_lobby(&mut self) {
@@ -238,8 +261,8 @@ impl Sim {
 
         let elim_player = self.players.get_mut(pid.idx()).unwrap();
         elim_player.team = Team::Goldmen;
-        elim_player.customization.model = 1;
-        elim_player.customization.suit_color = 0;
+        elim_player.customization.model = Model::Suit;
+        elim_player.customization.suit_color = SuitColor::Brown;
 
         let elim_human_id = self.spawn_human(pos, &rot, Some(pid));
         let elim_player = self.players.get_mut(pid.idx()).unwrap();
@@ -627,12 +650,12 @@ impl super::ModeHooks for Hooks {
         sim.tick_eliminator();
     }
 
-    fn on_menu(&self, sim: &mut Sim, pid: PlayerId, menu: u8, button: u32) -> bool {
-        if menu != super::round::LOBBY_MENU {
+    fn on_menu(&self, sim: &mut Sim, pid: PlayerId, menu: MenuType, button: u32) -> bool {
+        if menu != MenuType::Lobby {
             return false;
         }
 
-        sim.round_lobby(pid, button);
+        sim.lobby_menu(pid, button);
         true
     }
 

@@ -1,6 +1,7 @@
 {
     "rust-analyzer.linkedProjects": [
         "Cargo.toml",
-        "plugins/sandbox/Cargo.toml"
+        "plugins/sandbox/Cargo.toml",
+        "plugins/round/Cargo.toml"
     ]
 }

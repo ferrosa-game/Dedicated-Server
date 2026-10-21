@@ -1,5 +1,5 @@
 use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
-use ferrosa_protocol::clientbound::game::MenuType;
+use ferrosa_protocol::{SuitColor, clientbound::game::MenuType};
 use glam::Vec3;
 
 use ferrosa_protocol::clientbound::game::ItemKind;
@@ -32,7 +32,7 @@ const BACK: u32 = 16;
 const SELL: u32 = 1;
 const MAX_VEHICLES_BOUGHT: i32 = 2;
 /// The clothing store's buttons: three suits (colours 3, 8 and 7) and two necklaces.
-const SUITS: [u8; 3] = [3, 8, 7];
+const SUITS: [SuitColor; 3] = [SuitColor::Navy, SuitColor::Red, SuitColor::White];
 const POCKETS: std::ops::Range<usize> = 2..7;
 const ANY_SLOT: std::ops::Range<usize> = 0..7;
 /// The bank's buttons: 1 to 6 withdraw a $5 to $1000 bill (the button is the bill's code), 7 deposits the cash in hand.
@@ -217,8 +217,9 @@ impl Sim {
     fn bank_withdraw(&mut self, pid: PlayerId, human: usize, code: u32) {
         let value = BILL_VALUES[code as usize];
         let Some(p) = self.players.get(pid.idx()) else { return };
+        let withdrawn = self.modes.world.state.bills_withdrawn.get(&pid).copied().unwrap_or(0);
 
-        if p.money < value || (code <= SMALL_BILL && p.bills_withdrawn > SMALL_BILL_LIMIT) {
+        if p.money < value || (code <= SMALL_BILL && withdrawn > SMALL_BILL_LIMIT) {
             return;
         }
 
@@ -245,7 +246,7 @@ impl Sim {
         p.money -= value;
 
         if code <= SMALL_BILL {
-            p.bills_withdrawn += 1;
+            *self.modes.world.state.bills_withdrawn.entry(pid).or_default() += 1;
         }
     }
 
@@ -318,10 +319,8 @@ impl Sim {
             self.update_player_event(pid);
         }
 
-        if self.rules.round_money_updates
-            && let Some(p) = self.players.get(pid.idx())
-        {
-            let e = p.make_update_round_event(self.tick);
+        if let Some(p) = self.players.get(pid.idx()) {
+            let e = p.make_update_financials_event(self.tick);
             self.events.push(e);
         }
 

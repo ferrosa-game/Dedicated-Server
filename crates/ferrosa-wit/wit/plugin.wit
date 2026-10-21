@@ -6,12 +6,14 @@ package ferrosa:plugin@0.1.0;
 ///     import ferrosa:plugin/server@0.1.0;
 ///     export ferrosa:plugin/on-chat@0.1.0;
 /// }
+///
+/// A plugin can read and write files in its own folder (the one holding its plugin.toml) through WASI, with paths
+/// relative to it, such as `std::fs::read_to_string("config.toml")`. Nothing outside the folder can be opened.
 world plugin {
     import server;
 
     export init;
     export on-start;
-    export get-rules;
     export reset;
     export tick;
     export tick-after-traffic;
@@ -23,6 +25,6 @@ world plugin {
     export on-join;
     export on-leave;
     export on-death;
-    export joining-money;
+    export on-hurt;
     export on-admin-select;
 }

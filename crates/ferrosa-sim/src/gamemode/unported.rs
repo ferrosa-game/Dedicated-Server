@@ -19,6 +19,27 @@ pub static NONE: Unported = Unported(GameMode::None, "none");
 /// A versus player joins with 250.
 const VERSUS_MONEY: i32 = 250;
 
+/// config_versus.txt (load_conf_versus).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct VersusConfig {
+    /// Seconds at the start of a versus round in which nobody can walk (sent in the initial sync).
+    pub movedelay: i32,
+}
+
+impl VersusConfig {
+    pub(crate) fn load(path: &std::path::Path) -> Self {
+        let mut c = VersusConfig::default();
+
+        if let Ok(text) = std::fs::read_to_string(path) {
+            let num = |key: &str| text.lines().find_map(|l| l.trim().strip_prefix(key)).and_then(|v| v.trim().parse::<i32>().ok());
+
+            c.movedelay = num("movedelay=").unwrap_or(c.movedelay);
+        }
+
+        c
+    }
+}
+
 impl ModeHooks for Unported {
     fn name(&self) -> &'static str {
         self.1
@@ -49,9 +70,8 @@ impl ModeHooks for Unported {
             GameMode::Versus => ModeRules {
                 team_damage: VERSUS_TEAM_DAMAGE,
                 corp_buy_menus: true,
-                free_team_switch: true,
                 intermission_lobby: true,
-                move_delay: Some(sim.modes.round.versus.movedelay * TICKS_PER_SECOND),
+                move_delay: Some(sim.modes.versus.movedelay * TICKS_PER_SECOND),
                 ..base
             },
             _ => base,
@@ -63,13 +83,7 @@ impl ModeHooks for Unported {
     }
 
     fn sync(&self, sim: &Sim) -> ModeSync {
-        let movedelay = (self.0 == GameMode::Versus).then_some(sim.modes.round.versus.movedelay as u8);
+        let movedelay = (self.0 == GameMode::Versus).then_some(sim.modes.versus.movedelay as u8);
         ModeSync { weekly_enabled: false, weekday: sim.world.weekday as u8, versus_movedelay: movedelay }
-    }
-
-    fn on_admin_select(&self, sim: &mut Sim) {
-        if self.0 == GameMode::Versus {
-            sim.modes.round.weekday = super::round::WEEK_DAYS;
-        }
     }
 }

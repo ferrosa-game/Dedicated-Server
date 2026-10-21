@@ -1,0 +1,14 @@
+[package]
+name = "round"
+version = "1.0.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+#ferrosa-wit = { git = "https://github.com/ferrosa-game/Dedicated-Server.git", branch = "main" }
+ferrosa-wit = { path = "../../crates/ferrosa-wit" }
+rand = "0.10"
+
+[workspace]

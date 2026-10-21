@@ -1,19 +1,17 @@
-use ferrosa_protocol::GameMode;
+use ferrosa_protocol::{GameMode, clientbound::game::MenuType};
 use glam::Vec3;
 
 use self::rules::ModeRules;
 use crate::{PlayerId, sim::Sim};
 
 pub mod eliminator;
-pub mod round;
 pub mod rules;
 pub mod unported;
 pub mod world;
 
 pub type Mode = &'static dyn ModeHooks;
 
-pub static MODES: [Mode; 8] = [
-    &round::Hooks,
+pub static MODES: [Mode; 7] = [
     &eliminator::Hooks,
     &world::Hooks,
     &unported::DRIVING,
@@ -29,14 +27,14 @@ pub fn find(modes: &[Mode], name: &str) -> Option<Mode> {
 
 #[derive(Clone, Debug)]
 pub struct Modes {
-    pub round: round::RoundMode,
+    pub versus: unported::VersusConfig,
     pub world: world::WorldMode,
     pub eliminator: eliminator::EliminatorState,
 }
 
 impl Modes {
     pub(crate) fn load() -> Self {
-        Self { round: round::RoundMode::load(), world: world::WorldMode::load(), eliminator: Default::default() }
+        Self { versus: unported::VersusConfig::load(std::path::Path::new("config_versus.txt")), world: world::WorldMode::load(), eliminator: Default::default() }
     }
 }
 
@@ -83,7 +81,7 @@ pub trait ModeHooks: Sync {
     /// no shop or bank. By default, as in every mode but world, a corporation's base offers the buy menus where the
     /// rules allow them.
     fn base_menus(&self, sim: &mut Sim, pid: PlayerId, outside: Option<Vec3>) {
-        sim.round_base_menus(pid, outside);
+        sim.base_buy_menu(pid, outside);
     }
 
     /// Once every player's menus are done for the tick.
@@ -91,7 +89,7 @@ pub trait ModeHooks: Sync {
 
     /// A menu button pressed on `menu`; true if the mode took it, otherwise the shared menus (shops, bank, buy menus
     /// and the plain lobby) get it.
-    fn on_menu(&self, _sim: &mut Sim, _pid: PlayerId, _menu: u8, _button: u32) -> bool {
+    fn on_menu(&self, _sim: &mut Sim, _pid: PlayerId, _menu: MenuType, _button: u32) -> bool {
         false
     }
 

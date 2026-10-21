@@ -1,7 +1,7 @@
 package ferrosa:plugin@0.1.0;
 
 interface server {
-    use types.{body, body-id, chat-type, client-mode, game-state, human, human-id, item, item-id, kind-name, mat3, player, player-id, rules, vec3, vehicle, vehicle-id};
+    use types.{body, body-id, chat-type, client-mode, corporation, game-state, human, human-id, item, item-id, mat3, player, player-id, team, vec3, vehicle, vehicle-id};
 
     /// Makes this plugin a game mode, named for config.toml's gamemode and /resetgame. Only from init, and only once: a
     /// plugin that registers a mode is that mode, and only its mode hooks are called. `map` is the map it plays; none
@@ -14,6 +14,8 @@ interface server {
     send-chat: func(kind: chat-type, speaker: s32, volume: s32, message: string);
 
     get-player: func(id: player-id) -> option<player>;
+    /// A new bot player with a random look, run by the server's bot AI.
+    add-bot: func() -> option<player>;
     /// Every player, bots included.
     players: func() -> list<player>;
 
@@ -26,16 +28,31 @@ interface server {
     item-kinds: func() -> list<string>;
     /// An item kind's number by its name, in any case.
     find-item-kind: func(name: string) -> option<u32>;
+    /// Spawn item (kind) with position and rotation
     spawn-item: func(kind: u32, pos: vec3, rot: mat3) -> option<item>;
+    /// Get a list of all of the items
     items: func() -> list<item>;
+    /// Get a specific item by ID
     get-item: func(id: item-id) -> option<item>;
+    /// What an item kind costs in the shops.
+    item-price: func(kind: u32) -> option<s32>;
 
-    /// The vehicle kinds that can be spawned (those with a model).
-    vehicle-kinds: func() -> list<kind-name>;
-    /// A vehicle of one of vehicle-kinds, with its centre of mass at `pos`.
+    /// Each vehicle kind's name (its model's); a kind's number is its place in the list.
+    vehicle-kinds: func() -> list<string>;
+    /// A vehicle kind's number by its name, in any case.
+    find-vehicle-kind: func(name: string) -> option<u32>;
+    /// The name a vehicle kind's model gives it to show players, such as "Town Car"; none for a kind without a model,
+    /// which can't be spawned.
+    vehicle-display-name: func(kind: u32) -> option<string>;
+    /// A town car on a random street with a route to another (at least `min-distance` away when given), spawned
+    /// already moving. A bot put in its driver's seat drives the route. None for a map without streets.
+    spawn-route-car: func(min-distance: option<f32>) -> option<vehicle>;
+    /// A vehicle with its centre of mass at `pos`; none for a kind without a model.
     spawn-vehicle: func(kind: u32, colour: s32, pos: vec3, rot: mat3) -> option<vehicle>;
     vehicles: func() -> list<vehicle>;
     get-vehicle: func(id: vehicle-id) -> option<vehicle>;
+    /// What a vehicle kind costs.
+    vehicle-price: func(kind: u32) -> option<s32>;
     /// The height of the ground under `pos`, looking from 8 above it to 256 below.
     ground-below: func(pos: vec3) -> option<f32>;
 
@@ -44,18 +61,52 @@ interface server {
 
     /// The running mode's name.
     get-mode: func() -> string;
+    /// Whether a corporation's garage door is open; false for a team without a base.
+    team-door-open: func(team: team) -> bool;
+    /// Opens or closes a corporation's garage door, telling clients; nothing for a team without a base.
+    set-team-door: func(team: team, open: bool);
+    /// A corporation's share market; none for a team that isn't a corporation.
+    get-corporation: func(team: team) -> option<corporation>;
+
     get-game-state: func() -> game-state;
     set-game-state: func(state: game-state);
+    /// The countdown clients show, in ticks.
+    get-game-timer: func() -> s32;
+    set-game-timer: func(ticks: s32);
+    /// The world clock: sixtieths of a world second since midnight. Only world mode runs it; other modes leave it where
+    /// the reset put it (11:00).
+    world-time: func() -> s32;
+    /// Resets the game once the tick is done, as /resetgame does.
+    request-reset: func();
+    /// Every player back in the lobby (menu and readiness) without a human, and the world emptied: every human, item,
+    /// vehicle, bullet and traffic car gone, and the bases' car spaces free. For a mode's reset hook.
+    reset-lobby: func();
+    /// What joining clients are told about weekly play and the day of the week; they get it only as they join. Each
+    /// reset forgets it, back to the server's own (no weekly play, the world's day).
+    set-week: func(weekly: bool, weekday: u8);
+    /// Adds `cars` traffic cars on random streets, made later in the tick, before the traffic moves (from reset, on the
+    /// first tick after it). Each call adds more; a reset clears them all. With `parked`, some are parked in the third
+    /// lane of flat three lane streets. Nothing for a map without streets.
+    set-traffic: func(cars: u32, parked: bool);
 
-    default-rules: func() -> rules;
+    // A mode's settings for the server's own code. Each reset puts them back (no traffic, nothing kept, shares selling
+    // at 95%, members counted only with a human, door knocks on), so a mode sets them from its reset hook.
+
+    /// Dead humans stay on the ground.
+    set-keep-bodies: func(keep: bool);
+    /// Loose items never despawn.
+    set-keep-items: func(keep: bool);
+    /// The share of the price a sale of shares pays.
+    set-stock-sell-rate: func(rate: f32);
+    /// Corporation members count towards the teams' player counts (the lobby's, and the missions') without a human.
+    set-count-humanless-members: func(on: bool);
+    /// Garage doors open and close when a teammate knocks on them.
+    set-door-knocks: func(on: bool);
 
     get-gravity: func() -> f32;
     set-gravity: func(scale: f32);
 
+    /// Every rigid body.
     bodies: func() -> list<body>;
     get-body: func(id: body-id) -> option<body>;
-    set-body-pos: func(id: body-id, pos: vec3);
-    set-body-vel: func(id: body-id, vel: vec3);
-    set-body-ang-vel: func(id: body-id, ang-vel: vec3);
-    add-impulse: func(id: body-id, offset: vec3, impulse: vec3);
 }

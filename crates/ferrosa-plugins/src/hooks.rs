@@ -1,3 +1,4 @@
+use ferrosa_protocol::clientbound::game::MenuType;
 use ferrosa_sim::{PlayerId, PluginHooks, Sim};
 use wasmtime::Store;
 
@@ -18,7 +19,7 @@ impl WasmPlugins {
 
     fn all_hooks(&self, sim: &mut Sim, hook: &str, f: impl Fn(&Hooks, &mut Store<HostState>) -> Option<wasmtime::Result<()>>) {
         for plugin in self.targets(sim) {
-            plugin.call_hook(plugin.name, Some(SimPtr::Write(&mut *sim)), hook, &f);
+            plugin.call_hook(plugin.name, Some(SimPtr(&mut *sim)), hook, &f);
         }
     }
 }
@@ -52,15 +53,15 @@ impl PluginHooks for WasmPlugins {
         self.all_hooks(sim, "menus-done", |h, s| h.menus_done.as_ref().map(|g| g.call_menus_done(s)));
     }
 
-    fn on_menu(&self, sim: &mut Sim, pid: PlayerId, menu: u8, button: u32) -> bool {
+    fn on_menu(&self, sim: &mut Sim, pid: PlayerId, menu: MenuType, button: u32) -> bool {
         self.targets(sim).into_iter().any(|plugin| {
-            plugin.call_hook(plugin.name, Some(SimPtr::Write(&mut *sim)), "on-menu", |h, s| h.on_menu.as_ref().map(|g| g.call_on_menu(s, pid.0, menu, button))) == Some(true)
+            plugin.call_hook(plugin.name, Some(SimPtr(&mut *sim)), "on-menu", |h, s| h.on_menu.as_ref().map(|g| g.call_on_menu(s, pid.0, menu.into(), button))) == Some(true)
         })
     }
 
     fn on_chat(&self, sim: &mut Sim, pid: PlayerId, message: &str) -> bool {
         self.targets(sim).into_iter().any(|plugin| {
-            plugin.call_hook(plugin.name, Some(SimPtr::Write(&mut *sim)), "on-chat", |h, s| h.on_chat.as_ref().map(|g| g.call_on_chat(s, pid.0, message))) == Some(true)
+            plugin.call_hook(plugin.name, Some(SimPtr(&mut *sim)), "on-chat", |h, s| h.on_chat.as_ref().map(|g| g.call_on_chat(s, pid.0, message))) == Some(true)
         })
     }
 
@@ -76,9 +77,7 @@ impl PluginHooks for WasmPlugins {
         self.all_hooks(sim, "on-death", |h, s| h.on_death.as_ref().map(|g| g.call_on_death(s, pid.0)));
     }
 
-    fn joining_money(&self, sim: &Sim, money: i32) -> i32 {
-        self.targets(sim).into_iter().fold(money, |money, plugin| {
-            plugin.call_hook(plugin.name, Some(SimPtr::Read(sim)), "joining-money", |h, s| h.joining_money.as_ref().map(|g| g.call_joining_money(s, money))).unwrap_or(money)
-        })
+    fn on_hurt(&self, sim: &mut Sim, attacker: PlayerId, victim: PlayerId, damage: i32) {
+        self.all_hooks(sim, "on-hurt", |h, s| h.on_hurt.as_ref().map(|g| g.call_on_hurt(s, attacker.0, victim.0, damage)));
     }
 }

@@ -125,7 +125,7 @@ impl TryFrom<u8> for VehicleKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MenuType {
     Empty = 0,
     EnterCity = 1,

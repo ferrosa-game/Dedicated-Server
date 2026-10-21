@@ -21,8 +21,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     modes.extend(ferrosa_sim::MODES);
 
     let mode = ferrosa_sim::find(&modes, &config.gamemode).unwrap_or_else(|| {
-        eprintln!("[Config] unknown gamemode {:?} - using round", config.gamemode);
-        ferrosa_sim::find(&modes, "round").unwrap()
+        let fallback = ferrosa_sim::find(&modes, "round").unwrap_or(modes[0]);
+        eprintln!("[Config] unknown gamemode {:?} - using {}", config.gamemode, fallback.name());
+        fallback
     });
 
     let (in_tx, in_rx) = mpsc::unbounded_channel::<Inbound>();

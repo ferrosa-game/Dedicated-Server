@@ -1,8 +1,11 @@
-use crate::codec::{Reader, WireRead, WireWrite, Writer};
+use crate::{
+    Gender,
+    codec::{Reader, WireRead, WireWrite, Writer},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AvatarInfo {
-    pub gender: u8,
+    pub gender: Gender,
     pub head: u8,
     pub skin_color: u8,
     pub hair_color: u8,
@@ -13,7 +16,7 @@ pub struct AvatarInfo {
 impl AvatarInfo {
     pub fn from_avatar_info(info: u32) -> Self {
         Self {
-            gender: (info & 0x1) as u8,
+            gender: Gender::from_bit(info),
             head: (((info >> 1) & 0xF) as u8).min(4),
             skin_color: (((info >> 5) & 0x7) as u8).min(5),
             hair_color: (((info >> 8) & 0xF) as u8).min(11),

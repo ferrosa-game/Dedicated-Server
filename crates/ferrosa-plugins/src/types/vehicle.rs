@@ -1,7 +1,8 @@
 use wasmtime::component::Resource;
 
+use super::BodyRef;
 use crate::{
-    bindings::ferrosa::plugin::types::{self, Vec3},
+    bindings::ferrosa::plugin::types::{self, Mat3, Vec3},
     host::HostState,
 };
 
@@ -33,9 +34,37 @@ impl types::HostVehicle for HostState {
         Ok(self.sim()?.vehicle(id).map_or(0, |v| v.color))
     }
 
+    fn health(&mut self, vehicle: Resource<VehicleRef>) -> wasmtime::Result<i32> {
+        let id = self.table.get(&vehicle)?.0;
+        Ok(self.sim()?.vehicle(id).map_or(0, |v| v.health))
+    }
+
+    fn body(&mut self, vehicle: Resource<VehicleRef>) -> wasmtime::Result<Option<Resource<BodyRef>>> {
+        let id = self.table.get(&vehicle)?.0;
+        let Some(body) = self.sim()?.vehicle(id).map(|v| v.body) else { return Ok(None) };
+        self.body_handle(body).map(Some)
+    }
+
+    fn wheels(&mut self, vehicle: Resource<VehicleRef>) -> wasmtime::Result<Vec<Resource<BodyRef>>> {
+        let id = self.table.get(&vehicle)?.0;
+        let bodies: Vec<usize> = self.sim()?.vehicle(id).map_or_else(Vec::new, |v| v.wheels.iter().map(|w| w.body).collect());
+        bodies.into_iter().map(|b| self.body_handle(b)).collect()
+    }
+
+    fn rot(&mut self, vehicle: Resource<VehicleRef>) -> wasmtime::Result<Mat3> {
+        let id = self.table.get(&vehicle)?.0;
+        Ok(self.sim()?.vehicle(id).map_or(ferrosa_physics::rotation::IDENTITY, |v| v.rot).into())
+    }
+
     fn pos(&mut self, vehicle: Resource<VehicleRef>) -> wasmtime::Result<Vec3> {
         let id = self.table.get(&vehicle)?.0;
         Ok(self.sim()?.vehicle_pos(id).unwrap_or(glam::Vec3::ZERO).into())
+    }
+
+    fn park_in_traffic(&mut self, vehicle: Resource<VehicleRef>) -> wasmtime::Result<()> {
+        let id = self.table.get(&vehicle)?.0;
+        self.sim_mut()?.park_in_traffic(id);
+        Ok(())
     }
 
     fn delete(&mut self, vehicle: Resource<VehicleRef>) -> wasmtime::Result<()> {

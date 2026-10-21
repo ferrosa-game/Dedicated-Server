@@ -75,7 +75,7 @@ impl Sim {
         player.username = super::economy::sanitize_name(&accout_data.player_name);
         player.is_admin = admin;
         self.events.push(player.make_update_player_event(self.tick));
-        self.events.push(player.make_update_round_event(self.tick));
+        self.events.push(player.make_update_financials_event(self.tick));
 
         if self.gamestate == GameState::Intermission {
             player.menu = MenuType::Lobby
@@ -126,17 +126,15 @@ impl Sim {
 
         let (mode, plugins) = (self.mode, self.plugins);
 
-        if mode.on_menu(self, player_id, id, action.button) || plugins.on_menu(self, player_id, id, action.button) {
+        if let Ok(menu) = MenuType::try_from(id as u32)
+            && (mode.on_menu(self, player_id, menu, action.button) || plugins.on_menu(self, player_id, menu, action.button))
+        {
             return;
         }
 
         let Some(player) = self.players.get_mut(player_id.idx()) else {
             return;
         };
-
-        if player.menu as u8 == id && (player.human.is_some() || player.ghost_human) && matches!(id, 14..=19) {
-            return self.round_buy_menu(player_id, action.button);
-        }
 
         if player.menu as u8 == id && matches!(id, 9..=11) {
             return self.shop_menu_action(player_id, action.button);

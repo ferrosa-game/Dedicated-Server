@@ -1,5 +1,6 @@
 use ferrosa_protocol::GameMode;
-use ferrosa_sim::{ModeHooks, ModeRules, Sim};
+use ferrosa_sim::{ModeHooks, ModeRules, PlayerId, Sim};
+use glam::Vec3;
 use wasmtime::Store;
 
 use crate::{
@@ -54,11 +55,15 @@ impl ModeHooks for WasmGameMode {
         self.map
     }
 
-    fn rules(&self, sim: &Sim) -> ModeRules {
-        self.call(SimPtr::Read(sim), "get-rules", |h, s| h.get_rules.as_ref().map(|g| g.call_get_rules(s))).map_or_else(ModeRules::default, Into::into)
+    /// A plugin mode does for itself what the rules would turn on: it asks for traffic, starts the round, opens the
+    /// lobby and base menus and deals team damage. The rest it changes with the server's setters.
+    fn rules(&self, _sim: &Sim) -> ModeRules {
+        ModeRules { reset_traffic: None, ready_start: false, punish_team_kills: false, ..ModeRules::default() }
     }
 
+    fn base_menus(&self, _sim: &mut Sim, _pid: PlayerId, _outside: Option<Vec3>) {}
+
     fn on_admin_select(&self, sim: &mut Sim) {
-        self.call(SimPtr::Write(sim), "on-admin-select", |h, s| h.on_admin_select.as_ref().map(|g| g.call_on_admin_select(s)));
+        self.call(SimPtr(sim), "on-admin-select", |h, s| h.on_admin_select.as_ref().map(|g| g.call_on_admin_select(s)));
     }
 }

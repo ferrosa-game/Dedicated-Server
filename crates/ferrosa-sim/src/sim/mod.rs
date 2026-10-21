@@ -45,6 +45,7 @@ pub mod economy;
 pub mod events;
 pub use ferrosa_world::hull;
 pub mod humans;
+pub mod lobby;
 pub mod memos;
 pub mod missions;
 pub mod npcs;
@@ -174,7 +175,6 @@ pub struct Sim {
     /// The game timer, the round's elapsed ticks and the intermission's starting time.
     pub(crate) game_timer: i32,
     pub(crate) round_elapsed: i32,
-    pub(crate) round_max_time: i32,
     /// Each game mode's own state and config.
     pub(crate) modes: crate::gamemode::Modes,
     pub(crate) npcs: Vec<Option<npcs::Npc>>,
@@ -190,6 +190,9 @@ pub struct Sim {
     pub(crate) rules: crate::gamemode::rules::ModeRules,
     /// How many traffic cars a mode asked for, made at the next server tick when the map has streets.
     pub(crate) do_traffic: Option<u32>,
+    pub(crate) updates: crate::api::PendingUpdates,
+    /// Weekly play and the day of the week a mode set for joining clients until the next reset_game.
+    pub(crate) week: Option<(bool, u8)>,
 }
 
 /// What stats.txt counts since the server started: mission deals and bullets.
@@ -252,7 +255,6 @@ impl Sim {
             corp_state: Default::default(),
             game_timer: game_minutes(2),
             round_elapsed: 0,
-            round_max_time: game_minutes(2),
             modes: crate::gamemode::Modes::load(),
             npcs: Vec::new(),
             admin: admin::AdminState::load(Path::new("serveradmin.txt")),
@@ -263,6 +265,8 @@ impl Sim {
             links: Default::default(),
             rules: crate::gamemode::rules::ModeRules::default(),
             do_traffic: None,
+            updates: Default::default(),
+            week: None,
         };
 
         plugins.on_start(&mut sim);
@@ -309,10 +313,12 @@ impl Sim {
 
     fn initial_sync(&self) -> InitialSync {
         let mode = self.mode.sync(self);
+        let (weekly, weekday) = self.week.unwrap_or((mode.weekly_enabled, mode.weekday));
+
         InitialSync {
             round_number: self.round_number,
-            weekly_enabled: mode.weekly_enabled,
-            weekday: mode.weekday,
+            weekly_enabled: weekly,
+            weekday,
             sun_angle: self.world.sun_angle(),
             sun_axial_tilt: self.world.sun_axial_tilt(),
             versus_movedelay: mode.versus_movedelay,

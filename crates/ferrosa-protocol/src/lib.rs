@@ -80,23 +80,94 @@ impl Team {
     pub const CORPORATION_NAMES: [&str; 6] = ["Goldmen Inc", "Monsota", "OXS International", "Nexaco", "Pentacom", "Prodocon"];
 }
 
+/// A player's gender, which picks their body, head and hair models. Sent in 1 bit.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Gender {
+    #[default]
+    Female = 0,
+    Male = 1,
+}
+
+impl Gender {
+    /// The gender a bit says: 1 is male.
+    pub fn from_bit(bit: u32) -> Self {
+        if bit & 1 == 1 { Self::Male } else { Self::Female }
+    }
+}
+
+/// What a player wears: casual clothes, a suit, or the second suit (fsuit2/msuit2) mission bots and guards wear. Sent in
+/// 5 bits.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Model {
+    #[default]
+    Casual = 0,
+    Suit = 1,
+    Suit2 = 2,
+}
+
+impl TryFrom<u8> for Model {
+    type Error = u8;
+
+    fn try_from(v: u8) -> Result<Self, u8> {
+        Ok(match v {
+            0 => Self::Casual,
+            1 => Self::Suit,
+            2 => Self::Suit2,
+            _ => return Err(v),
+        })
+    }
+}
+
+/// The colours a suit comes in: the columns of the character palette's suit row. Sent in 4 bits.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SuitColor {
+    #[default]
+    Brown = 0,
+    Black = 1,
+    Grey = 2,
+    Navy = 3,
+    Teal = 4,
+    Purple = 5,
+    Tan = 6,
+    White = 7,
+    Red = 8,
+    Indigo = 9,
+    DarkNavy = 10,
+    DarkGrey = 11,
+}
+
+impl SuitColor {
+    pub const COUNT: usize = 12;
+}
+
+impl TryFrom<u8> for SuitColor {
+    type Error = u8;
+
+    fn try_from(v: u8) -> Result<Self, u8> {
+        if (v as usize) < Self::COUNT { Ok(unsafe { std::mem::transmute::<u8, SuitColor>(v) }) } else { Err(v) }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct CharacterCustomization {
-    pub gender: u8,
+    pub gender: Gender,
     pub head: u8,
     pub skin: u8,
     pub hair_color: u8,
     pub hair_style: u8,
     pub eye_color: u8,
-    pub model: u8,
+    pub model: Model,
     pub necklace: u8,
-    pub suit_color: u8,
+    pub suit_color: SuitColor,
     pub tie_color: u8,
 }
 
 impl Default for CharacterCustomization {
     fn default() -> Self {
-        Self { gender: 0, head: 4, skin: 2, hair_color: 4, hair_style: 6, eye_color: 6, model: 1, necklace: 0, suit_color: 0, tie_color: 1 }
+        Self { gender: Gender::Female, head: 4, skin: 2, hair_color: 4, hair_style: 6, eye_color: 6, model: Model::Suit, necklace: 0, suit_color: SuitColor::Brown, tie_color: 1 }
     }
 }
 

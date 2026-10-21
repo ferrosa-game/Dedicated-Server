@@ -7,6 +7,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
+#ferrosa-wit = { git = "https://github.com/ferrosa-game/Dedicated-Server.git", branch = "main" }
 ferrosa-wit = { path = "../../crates/ferrosa-wit" }
 rand = "0.10"
 

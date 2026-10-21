@@ -11,6 +11,8 @@ mod bindings {
         world: "plugin",
         imports: { default: trappable },
         with: {
+            "ferrosa:plugin/types.body": crate::types::BodyRef,
+            "ferrosa:plugin/types.corporation": crate::types::CorporationRef,
             "ferrosa:plugin/types.human": crate::types::HumanRef,
             "ferrosa:plugin/types.player": crate::types::PlayerRef,
             "ferrosa:plugin/types.item": crate::types::ItemRef,

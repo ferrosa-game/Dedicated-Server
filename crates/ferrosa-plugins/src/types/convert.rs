@@ -1,11 +1,11 @@
 use ferrosa_physics::RotMatrix;
 use ferrosa_protocol::{
-    GameMode, Team,
-    clientbound::game::{GameState, events::chat::ChatType},
+    GameMode, SuitColor, Team,
+    clientbound::game::{GameState, MenuType, events::chat::ChatType},
 };
-use ferrosa_sim::ModeRules;
+use ferrosa_sim::BoneId;
 
-use crate::bindings::ferrosa::plugin::types::{self, ClientMode, Mat3, Rules, Vec3};
+use crate::bindings::ferrosa::plugin::types::{self, ClientMode, Mat3, Mission, Vec3};
 
 impl From<glam::Vec3> for Vec3 {
     fn from(v: glam::Vec3) -> Self {
@@ -58,6 +58,21 @@ impl From<Team> for types::Team {
     }
 }
 
+impl From<types::Team> for Team {
+    fn from(team: types::Team) -> Self {
+        match team {
+            types::Team::Goldmen => Self::Goldmen,
+            types::Team::Monsota => Self::Monsota,
+            types::Team::Oxs => Self::OXS,
+            types::Team::Nexaco => Self::Nexaco,
+            types::Team::Pentacom => Self::Pentacom,
+            types::Team::Prodocon => Self::Prodocon,
+            types::Team::Mission => Self::Mission,
+            types::Team::Spectator => Self::Spectator,
+        }
+    }
+}
+
 impl From<types::ChatType> for ChatType {
     fn from(kind: types::ChatType) -> Self {
         match kind {
@@ -97,66 +112,200 @@ impl From<ClientMode> for GameMode {
     }
 }
 
-impl From<ModeRules> for Rules {
-    fn from(r: ModeRules) -> Self {
+impl From<ferrosa_sim::Mission> for Mission {
+    fn from(m: ferrosa_sim::Mission) -> Self {
         Self {
-            team_damage: r.team_damage,
-            stock_sell_rate: r.stock_sell_rate,
-            reset_traffic: r.reset_traffic,
-            parked_cars: r.parked_cars,
-            coop_traffic: r.coop_traffic,
-            keep_bodies: r.keep_bodies,
-            keep_items: r.keep_items,
-            crime: r.crime,
-            punish_team_kills: r.punish_team_kills,
-            world_corporations: r.world_corporations,
-            corp_buy_menus: r.corp_buy_menus,
-            count_humanless_members: r.count_humanless_members,
-            mission_spots: r.mission_spots,
-            door_knocks: r.door_knocks,
-            saved_accounts: r.saved_accounts,
-            world_start_cash: r.world_start_cash,
-            shares_follow_human: r.shares_follow_human,
-            keys_keep_vehicles: r.keys_keep_vehicles,
-            respawn_wait: r.respawn_wait,
-            free_team_switch: r.free_team_switch,
-            intermission_lobby: r.intermission_lobby,
-            bot_lobby: r.bot_lobby,
-            ready_start: r.ready_start,
-            move_delay: r.move_delay,
-            round_money_updates: r.round_money_updates,
+            active: m.active,
+            done: m.done,
+            id: m.id,
+            kind: m.kind,
+            item: m.item,
+            item2: m.item2,
+            team1: m.team1,
+            team2: m.team2,
+            disk_type: m.disk_type,
+            value: m.value,
+            deadline: m.deadline,
+            location: m.location,
+            provided_cash: m.provided_cash,
+            rate: m.rate,
         }
     }
 }
 
-impl From<Rules> for ModeRules {
-    fn from(r: Rules) -> Self {
+impl From<Mission> for ferrosa_sim::Mission {
+    fn from(m: Mission) -> Self {
         Self {
-            team_damage: r.team_damage,
-            stock_sell_rate: r.stock_sell_rate,
-            reset_traffic: r.reset_traffic,
-            parked_cars: r.parked_cars,
-            coop_traffic: r.coop_traffic,
-            keep_bodies: r.keep_bodies,
-            keep_items: r.keep_items,
-            crime: r.crime,
-            punish_team_kills: r.punish_team_kills,
-            world_corporations: r.world_corporations,
-            corp_buy_menus: r.corp_buy_menus,
-            count_humanless_members: r.count_humanless_members,
-            mission_spots: r.mission_spots,
-            door_knocks: r.door_knocks,
-            saved_accounts: r.saved_accounts,
-            world_start_cash: r.world_start_cash,
-            shares_follow_human: r.shares_follow_human,
-            keys_keep_vehicles: r.keys_keep_vehicles,
-            respawn_wait: r.respawn_wait,
-            free_team_switch: r.free_team_switch,
-            intermission_lobby: r.intermission_lobby,
-            bot_lobby: r.bot_lobby,
-            ready_start: r.ready_start,
-            move_delay: r.move_delay,
-            round_money_updates: r.round_money_updates,
+            active: m.active,
+            done: m.done,
+            id: m.id,
+            kind: m.kind,
+            item: m.item,
+            item2: m.item2,
+            team1: m.team1,
+            team2: m.team2,
+            disk_type: m.disk_type,
+            value: m.value,
+            deadline: m.deadline,
+            location: m.location,
+            provided_cash: m.provided_cash,
+            rate: m.rate,
+            result: None,
+        }
+    }
+}
+
+impl From<types::Bone> for BoneId {
+    fn from(b: types::Bone) -> Self {
+        match b {
+            types::Bone::Pelvis => Self::Pelvis,
+            types::Bone::Stomach => Self::Stomach,
+            types::Bone::Torso => Self::Torso,
+            types::Bone::Head => Self::Head,
+            types::Bone::ShoulderLeft => Self::ShoulderLeft,
+            types::Bone::ForearmLeft => Self::ForearmLeft,
+            types::Bone::HandLeft => Self::HandLeft,
+            types::Bone::ShoulderRight => Self::ShoulderRight,
+            types::Bone::ForearmRight => Self::ForearmRight,
+            types::Bone::HandRight => Self::HandRight,
+            types::Bone::ThighLeft => Self::ThighLeft,
+            types::Bone::ShinLeft => Self::ShinLeft,
+            types::Bone::FootLeft => Self::FootLeft,
+            types::Bone::ThighRight => Self::ThighRight,
+            types::Bone::ShinRight => Self::ShinRight,
+            types::Bone::FootRight => Self::FootRight,
+        }
+    }
+}
+
+impl From<ferrosa_protocol::Gender> for types::Gender {
+    fn from(g: ferrosa_protocol::Gender) -> Self {
+        match g {
+            ferrosa_protocol::Gender::Female => Self::Female,
+            ferrosa_protocol::Gender::Male => Self::Male,
+        }
+    }
+}
+
+impl From<types::Gender> for ferrosa_protocol::Gender {
+    fn from(g: types::Gender) -> Self {
+        match g {
+            types::Gender::Female => Self::Female,
+            types::Gender::Male => Self::Male,
+        }
+    }
+}
+
+impl From<ferrosa_protocol::Model> for types::Model {
+    fn from(m: ferrosa_protocol::Model) -> Self {
+        match m {
+            ferrosa_protocol::Model::Casual => Self::Casual,
+            ferrosa_protocol::Model::Suit => Self::Suit,
+            ferrosa_protocol::Model::Suit2 => Self::Suit2,
+        }
+    }
+}
+
+impl From<types::Model> for ferrosa_protocol::Model {
+    fn from(m: types::Model) -> Self {
+        match m {
+            types::Model::Casual => Self::Casual,
+            types::Model::Suit => Self::Suit,
+            types::Model::Suit2 => Self::Suit2,
+        }
+    }
+}
+
+impl From<SuitColor> for types::SuitColour {
+    fn from(c: SuitColor) -> Self {
+        match c {
+            SuitColor::Brown => Self::Brown,
+            SuitColor::Black => Self::Black,
+            SuitColor::Grey => Self::Grey,
+            SuitColor::Navy => Self::Navy,
+            SuitColor::Teal => Self::Teal,
+            SuitColor::Purple => Self::Purple,
+            SuitColor::Tan => Self::Tan,
+            SuitColor::White => Self::White,
+            SuitColor::Red => Self::Red,
+            SuitColor::Indigo => Self::Indigo,
+            SuitColor::DarkNavy => Self::DarkNavy,
+            SuitColor::DarkGrey => Self::DarkGrey,
+        }
+    }
+}
+
+impl From<types::SuitColour> for SuitColor {
+    fn from(c: types::SuitColour) -> Self {
+        match c {
+            types::SuitColour::Brown => Self::Brown,
+            types::SuitColour::Black => Self::Black,
+            types::SuitColour::Grey => Self::Grey,
+            types::SuitColour::Navy => Self::Navy,
+            types::SuitColour::Teal => Self::Teal,
+            types::SuitColour::Purple => Self::Purple,
+            types::SuitColour::Tan => Self::Tan,
+            types::SuitColour::White => Self::White,
+            types::SuitColour::Red => Self::Red,
+            types::SuitColour::Indigo => Self::Indigo,
+            types::SuitColour::DarkNavy => Self::DarkNavy,
+            types::SuitColour::DarkGrey => Self::DarkGrey,
+        }
+    }
+}
+
+impl From<MenuType> for types::Menu {
+    fn from(menu: MenuType) -> Self {
+        match menu {
+            MenuType::Empty => Self::Empty,
+            MenuType::EnterCity => Self::EnterCity,
+            MenuType::Lobby => Self::Lobby,
+            MenuType::EmptyBase => Self::EmptyBase,
+            MenuType::WorldCarShop => Self::WorldCarShop,
+            MenuType::WorldStore => Self::WorldStore,
+            MenuType::WorldStoreDone => Self::WorldStoreDone,
+            MenuType::WorldBank => Self::WorldBank,
+            MenuType::WorldBank2 => Self::WorldBank2,
+            MenuType::RoundCorpWeapons => Self::RoundCorpWeapons,
+            MenuType::RoundCorpAmmo => Self::RoundCorpAmmo,
+            MenuType::RoundCorpEquip => Self::RoundCorpEquip,
+            MenuType::RoundCorpVehicle => Self::RoundCorpVehicle,
+            MenuType::RoundCorpStock => Self::RoundCorpStock,
+            MenuType::WorldEmptyCorp => Self::WorldEmptyCorp,
+            MenuType::WorldCorpApplication => Self::WorldCorpApplication,
+            MenuType::WorldCorpTabs => Self::WorldCorpTabs,
+            MenuType::WorldCorpHiring => Self::WorldCorpHiring,
+            MenuType::WorldCorpFiring => Self::WorldCorpFiring,
+            MenuType::WorldCorpTeam => Self::WorldCorpTeam,
+            MenuType::WorldCorpRequistion => Self::WorldCorpRequisition,
+        }
+    }
+}
+
+impl From<types::Menu> for MenuType {
+    fn from(menu: types::Menu) -> Self {
+        match menu {
+            types::Menu::Empty => Self::Empty,
+            types::Menu::EnterCity => Self::EnterCity,
+            types::Menu::Lobby => Self::Lobby,
+            types::Menu::EmptyBase => Self::EmptyBase,
+            types::Menu::WorldCarShop => Self::WorldCarShop,
+            types::Menu::WorldStore => Self::WorldStore,
+            types::Menu::WorldStoreDone => Self::WorldStoreDone,
+            types::Menu::WorldBank => Self::WorldBank,
+            types::Menu::WorldBank2 => Self::WorldBank2,
+            types::Menu::RoundCorpWeapons => Self::RoundCorpWeapons,
+            types::Menu::RoundCorpAmmo => Self::RoundCorpAmmo,
+            types::Menu::RoundCorpEquip => Self::RoundCorpEquip,
+            types::Menu::RoundCorpVehicle => Self::RoundCorpVehicle,
+            types::Menu::RoundCorpStock => Self::RoundCorpStock,
+            types::Menu::WorldEmptyCorp => Self::WorldEmptyCorp,
+            types::Menu::WorldCorpApplication => Self::WorldCorpApplication,
+            types::Menu::WorldCorpTabs => Self::WorldCorpTabs,
+            types::Menu::WorldCorpHiring => Self::WorldCorpHiring,
+            types::Menu::WorldCorpFiring => Self::WorldCorpFiring,
+            types::Menu::WorldCorpTeam => Self::WorldCorpTeam,
+            types::Menu::WorldCorpRequisition => Self::WorldCorpRequistion,
         }
     }
 }

@@ -20,6 +20,81 @@ interface types {
         spectator,
     }
 
+    /// The game's menus.
+    enum menu {
+        empty,
+        enter-city,
+        lobby,
+        empty-base,
+        world-car-shop,
+        world-store,
+        world-store-done,
+        world-bank,
+        world-bank2,
+        round-corp-weapons,
+        round-corp-ammo,
+        round-corp-equip,
+        round-corp-vehicle,
+        round-corp-stock,
+        world-empty-corp,
+        world-corp-application,
+        world-corp-tabs,
+        world-corp-hiring,
+        world-corp-firing,
+        world-corp-team,
+        world-corp-requisition,
+    }
+
+    /// A human's bones.
+    enum bone {
+        pelvis,
+        stomach,
+        torso,
+        head,
+        shoulder-left,
+        forearm-left,
+        hand-left,
+        shoulder-right,
+        forearm-right,
+        hand-right,
+        thigh-left,
+        shin-left,
+        foot-left,
+        thigh-right,
+        shin-right,
+        foot-right,
+    }
+
+    /// A player's gender, which picks their body, head and hair models.
+    enum gender {
+        female,
+        male,
+    }
+
+    /// What a player wears.
+    enum model {
+        casual,
+        suit,
+        /// The second suit, which mission bots and guards wear.
+        suit2,
+    }
+
+    /// The colours a suit comes in.
+    enum suit-colour {
+        brown,
+        black,
+        grey,
+        navy,
+        teal,
+        purple,
+        tan,
+        white,
+        red,
+        indigo,
+        dark-navy,
+        dark-grey,
+    }
+
     /// A player, bots included. Every call reads or changes the real player; once they have left they read as an
     /// empty spectator and changes do nothing.
     resource player {
@@ -27,7 +102,35 @@ interface types {
         /// False once the player has left.
         exists: func() -> bool;
         name: func() -> string;
+        /// Shown to everyone; a bot's can be blank.
+        set-name: func(name: string);
         team: func() -> team;
+        /// Puts them on `team`. Their look stays as it is.
+        set-team: func(team: team);
+        /// Whether they're ready in the lobby.
+        ready: func() -> bool;
+        set-ready: func(ready: bool);
+        /// Whether they see the manager page (menu 19) of their corporation's base.
+        manager-tab: func() -> bool;
+        set-manager-tab: func(on: bool);
+        /// The account they joined with; none for a bot.
+        account-id: func() -> option<u32>;
+        /// Their next human has it.
+        gender: func() -> gender;
+        set-gender: func(gender: gender);
+        /// Their look, and their human's with it: what they wear, the suit's and tie's colours and the necklace (0
+        /// none).
+        model: func() -> model;
+        set-model: func(model: model);
+        suit-colour: func() -> suit-colour;
+        set-suit-colour: func(colour: suit-colour);
+        tie-colour: func() -> u8;
+        set-tie-colour: func(colour: u8);
+        necklace: func() -> u8;
+        set-necklace: func(necklace: u8);
+        /// Ticks until they may switch team again; 0 lets them.
+        team-switch-timer: func() -> s32;
+        set-team-switch-timer: func(ticks: s32);
         admin: func() -> bool;
         bot: func() -> bool;
         /// A message only this player sees. Long messages and line breaks become several chat lines.
@@ -35,12 +138,34 @@ interface types {
         human: func() -> option<human>;
         /// Makes them control `human`.
         set-human: func(human: borrow<human>);
+        money: func() -> s32;
+        /// Sets their money and tells their client.
+        set-money: func(money: s32);
+        /// The shares they hold in their corporation.
+        stocks: func() -> s32;
+        /// Sets the shares they hold, and tells their client. Their corporation's share count stays as it is.
+        set-stocks: func(stocks: s32);
+        /// Buys `count` shares in their corporation (never past 9999 held) if they have more money than they cost, and
+        /// tells their client.
+        buy-stocks: func(count: s32);
+        /// Sells `count` of their shares if they hold that many, at the share of the price server.set-stock-sell-rate
+        /// set (95% unless a mode changed it), less what the corporation's running missions were given per share, and
+        /// tells their client.
+        sell-stocks: func(count: s32);
+        /// Sells every share they hold the same way; nothing for a player in no corporation.
+        sell-all-stocks: func();
+        /// Takes a bot off the server; false for a real player, who can only be kicked.
+        remove: func() -> bool;
+        /// The route a bot walks, from the first point, round and round.
+        set-waypoints: func(waypoints: list<vec3>);
         god-mode: func() -> bool;
         set-god-mode: func(on: bool);
-        /// The menu they have open, by the game's menu number (the numbers on-menu gets).
-        menu: func() -> u8;
-        /// False if there is no such menu.
-        set-menu: func(menu: u8) -> bool;
+        /// The menu they have open.
+        menu: func() -> menu;
+        set-menu: func(menu: menu);
+        /// A button on their open menu, for this tick: the server sends the menu's buttons each tick, so add them
+        /// from menus-done. `extra` is the number shown with it, such as a price; none keeps that slot's last one.
+        add-menu-button: func(id: s32, text: string, extra: option<s32>);
         camera: func() -> vec3;
         yaw: func() -> f32;
         pitch: func() -> f32;
@@ -48,6 +173,46 @@ interface types {
         facing: func() -> mat3;
         /// The way they look: their view turned by its yaw, then its pitch. -x is where they look.
         view: func() -> mat3;
+    }
+
+    /// A corporation: its share market, base and missions. Every call reads or changes the real one.
+    resource corporation {
+        team: func() -> team;
+        /// Its base on the map; none if the map has none for it.
+        base: func() -> option<base>;
+        /// A vehicle in the first free car space of its base; none when they're all taken.
+        spawn-vehicle: func(kind: u32, colour: s32) -> option<vehicle>;
+        funds: func() -> s32;
+        set-funds: func(funds: s32);
+        /// Its 16 mission slots.
+        missions: func() -> list<mission>;
+        /// Sets a mission slot and tells the corporation's clients.
+        set-mission: func(slot: u32, mission: mission);
+        /// The shares its members hold, plus what the market keeps.
+        shares: func() -> s32;
+        set-shares: func(shares: s32);
+        price: func() -> f32;
+        /// Sets a share's price, and sends every client the prices.
+        set-price: func(price: f32);
+    }
+
+    /// A rigid body: a bone of a human, an item, or a vehicle's chassis or wheel. Every call reads or changes the real
+    /// body; once it has been removed it reads as still at the origin and changes do nothing. Velocities are per tick.
+    resource body {
+        id: func() -> body-id;
+        /// False once the body has been removed.
+        exists: func() -> bool;
+        pos: func() -> vec3;
+        set-pos: func(pos: vec3);
+        vel: func() -> vec3;
+        set-vel: func(vel: vec3);
+        ang-vel: func() -> vec3;
+        set-ang-vel: func(ang-vel: vec3);
+        mass: func() -> f32;
+        /// Resting, so the physics leaves it alone until something wakes it.
+        settled: func() -> bool;
+        /// A push of `impulse` at `offset` from its centre.
+        add-impulse: func(offset: vec3, impulse: vec3);
     }
 
     /// A human, controlled by a player or nobody. Every call reads or changes the real human; once it has been
@@ -59,10 +224,27 @@ interface types {
         pos: func() -> vec3;
         /// 0 or less is dead.
         vitality: func() -> s32;
+        /// A hit of `damage` on one of its bones, as a bullet's: the torso loses chest health, the head head health,
+        /// arms and legs more; any hit may start bleeding. Team damage hits the head.
+        damage: func(bone: bone, damage: s32);
         set-vitality: func(vitality: s32);
         bleeding: func() -> bool;
         set-bleeding: func(bleeding: bool);
         player: func() -> option<player-id>;
+        /// The vehicle it's in.
+        vehicle: func() -> option<vehicle>;
+        /// Puts it in one of `vehicle`'s seats, 0 the driver's; false if the vehicle is gone.
+        enter-vehicle: func(vehicle: borrow<vehicle>, seat: u32) -> bool;
+        /// Its bones' bodies.
+        bones: func() -> list<body>;
+        set-view-yaw: func(yaw: f32);
+        /// A new item of `kind` into the first free slot from `first` up to but not `end`: 0 and 1 are the hands, 2
+        /// to 6 the pockets. None if it didn't fit.
+        give-item: func(kind: u32, first: u32, end: u32) -> option<item>;
+        /// What one slot holds.
+        slot: func(slot: u32) -> list<item>;
+        /// Puts `item` into one of its slots, with whatever is there already.
+        put-item: func(item: borrow<item>, slot: u32);
         delete: func();
     }
 
@@ -79,6 +261,25 @@ interface types {
         phone-number: func() -> option<s32>;
         /// False if it isn't a phone.
         set-phone-number: func(number: s32) -> bool;
+        /// Which of the two phone textures it shows; false if it isn't a phone.
+        set-phone-texture: func(texture: s32) -> bool;
+        /// The vehicle a key opens; false if it isn't a key.
+        set-key-vehicle: func(vehicle: option<borrow<vehicle>>) -> bool;
+        /// Puts `child` inside it, such as a disk in a briefcase (open or closed) or a magazine in a gun; false if it
+        /// can't go there.
+        attach: func(child: borrow<item>) -> bool;
+        /// What's inside it. Deleting an item drops these.
+        children: func() -> list<item>;
+        body: func() -> option<body>;
+        /// What's left in it: a gun's chambered rounds, a magazine's rounds, a grenade's or bandage's uses.
+        uses: func() -> s32;
+        set-uses: func(uses: s32);
+        /// The vehicle a key opens.
+        key-vehicle: func() -> option<vehicle>;
+        /// A bundle of cash's bills; none if it isn't cash.
+        cash: func() -> option<cash>;
+        /// False if it isn't cash.
+        set-cash: func(cash: cash) -> bool;
         /// Takes it out of the world; an item of a set goes back where the set keeps it.
         delete: func();
     }
@@ -92,7 +293,16 @@ interface types {
         /// Its kind's number, as vehicle-kinds lists them.
         kind: func() -> u32;
         colour: func() -> s32;
+        /// 0 or less is wrecked.
+        health: func() -> s32;
+        rot: func() -> mat3;
+        /// Its chassis's body.
+        body: func() -> option<body>;
+        /// Its wheels' bodies.
+        wheels: func() -> list<body>;
         pos: func() -> vec3;
+        /// Makes it a parked traffic car, which bots can drive.
+        park-in-traffic: func();
         /// Takes it out of the world, getting anyone in it out first.
         delete: func();
     }
@@ -103,9 +313,55 @@ interface types {
         z: vec3,
     }
 
-    record kind-name {
-        id: u32,
-        name: string,
+    /// A corporation's base: the box inside it (one floor high), its vault, the table, where players spawn and the
+    /// spaces its cars appear in.
+    record base {
+        interior-min: vec3,
+        interior-max: vec3,
+        vault-min: vec3,
+        vault-max: vec3,
+        /// The way the table faces, in radians about the up axis.
+        table-orientation: f32,
+        table: vec3,
+        spawn: vec3,
+        car-spaces: list<car-space>,
+    }
+
+    /// A bundle of cash: how many bills, and each bill's code (three bits apiece).
+    record cash {
+        bills: s32,
+        codes: u32,
+    }
+
+    /// Where a vehicle's origin goes in a base.
+    record car-space {
+        pos: vec3,
+        rot: mat3,
+    }
+
+    /// One of a corporation's missions.
+    record mission {
+        active: bool,
+        /// Set once the mission is decided.
+        done: bool,
+        /// The deal it belongs to, shared by the corporations of one deal.
+        id: s32,
+        /// 1 acquisition by car chase, 2 sell a disk, 3 buy it, 4 buy it unfunded, 7 two-team sellers, 8 their buyer.
+        kind: s32,
+        /// The disks of the deal; -1 for none.
+        item: s32,
+        item2: s32,
+        /// The other corporations of the deal.
+        team1: s32,
+        team2: s32,
+        disk-type: s32,
+        value: s32,
+        /// The world clock the mission runs until.
+        deadline: s32,
+        /// The mission spot the disk waits at, or -1 for the table.
+        location: s32,
+        provided-cash: s32,
+        rate: f32,
     }
 
     /// The kinds of message send-chat sends.
@@ -128,6 +384,7 @@ interface types {
         z: f32,
     }
 
+    /// The current state of the game, physics only ticks on in-game
     enum game-state {
         idle,
         intermission,
@@ -146,69 +403,5 @@ interface types {
         coop,
         versus,
         none,
-    }
-
-    /// A rigid body: a bone of a human, an item or a part of a vehicle. Velocities are per tick.
-    record body {
-        id: body-id,
-        pos: vec3,
-        vel: vec3,
-        ang-vel: vec3,
-        mass: f32,
-        settled: bool,
-    }
-
-    /// Game mode rules, determines how the server behaves.
-    record rules {
-        /// The share of a teammate's damage that comes back on the attacker's head.
-        team-damage: s32,
-        /// The share of the price a sale of shares pays.
-        stock-sell-rate: f32,
-        /// The amount of traffic cars a reset asks for; none for modes that make theirs when they start.
-        reset-traffic: option<u32>,
-        /// Some traffic is parked in the third lane of flat three lane streets.
-        parked-cars: bool,
-        /// The traffic drives as in co-op.
-        coop-traffic: bool,
-        /// Dead humans stay on the ground.
-        keep-bodies: bool,
-        /// Loose items never despawn.
-        keep-items: bool,
-        /// Is the criminal rating system implemented
-        crime: bool,
-        /// Hurting a teammate hurts the attacker too.
-        punish-team-kills: bool,
-        /// Corporations run as in world mode.
-        world-corporations: bool,
-        /// The base buy menus open inside a corporation's base.
-        corp-buy-menus: bool,
-        /// Corporation members count towards the player counts without a human.
-        count-humanless-members: bool,
-        /// The base computers and labs get their mission volumes.
-        mission-spots: bool,
-        /// Garage doors open and close when a teammate knocks on them.
-        door-knocks: bool,
-        /// Joining players get their saved money and ratings back.
-        saved-accounts: bool,
-        /// New accounts start with the world config's startcash.
-        world-start-cash: bool,
-        /// Shares are sold when the human dies and bought back when a returning player takes it over.
-        shares-follow-human: bool,
-        /// A saved key keeps its own vehicle for the next day.
-        keys-keep-vehicles: bool,
-        /// A death waits out a respawn timer that grows with criminal rating.
-        respawn-wait: bool,
-        /// Teams can be picked in the lobby however late it is.
-        free-team-switch: bool,
-        /// A player without a human sees the lobby menu during intermission.
-        intermission-lobby: bool,
-        /// Bots join with the lobby menu open during intermission.
-        bot-lobby: bool,
-        /// The round starts once everyone is ready.
-        ready-start: bool,
-        /// Nobody can walk for this many ticks after the round starts.
-        move-delay: option<s32>,
-        /// Buying a vehicle sends the round money update.
-        round-money-updates: bool,
     }
 }

@@ -1,6 +1,7 @@
 use ferrosa_sim::Human;
 use wasmtime::component::Resource;
 
+use super::{BodyRef, ItemRef, VehicleRef};
 use crate::{
     bindings::ferrosa::plugin::types::{self, Vec3},
     host::HostState,
@@ -34,7 +35,7 @@ impl types::HostHuman for HostState {
     }
 
     fn pos(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<Vec3> {
-        Ok(self.human_of(&human)?.map_or(Vec3 { x: 0.0, y: 0.0, z: 0.0 }, |h| h.pos.into()))
+        Ok(self.human_of(&human)?.and_then(|h| h.bones.first()).map_or(Vec3 { x: 0.0, y: 0.0, z: 0.0 }, |b| b.pos.into()))
     }
 
     fn vitality(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<i32> {
@@ -63,6 +64,52 @@ impl types::HostHuman for HostState {
 
     fn player(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<Option<u32>> {
         Ok(self.human_of(&human)?.and_then(|h| h.player).map(|p| p.0))
+    }
+
+    fn damage(&mut self, human: Resource<HumanRef>, bone: types::Bone, damage: i32) -> wasmtime::Result<()> {
+        let id = self.table.get(&human)?.0;
+        self.sim_mut()?.damage_human(id, bone.into(), damage);
+        Ok(())
+    }
+
+    fn vehicle(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<Option<Resource<VehicleRef>>> {
+        let Some(v) = self.human_of(&human)?.and_then(|h| h.vehicle) else { return Ok(None) };
+        self.vehicle_handle(v).map(Some)
+    }
+
+    fn bones(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<Vec<Resource<BodyRef>>> {
+        let bodies: Vec<usize> = self.human_of(&human)?.map_or_else(Vec::new, |h| h.bones.iter().map(|b| b.body).collect());
+        bodies.into_iter().map(|b| self.body_handle(b)).collect()
+    }
+
+    fn enter_vehicle(&mut self, human: Resource<HumanRef>, vehicle: Resource<VehicleRef>, seat: u32) -> wasmtime::Result<bool> {
+        let (id, vehicle) = (self.table.get(&human)?.0, self.table.get(&vehicle)?.0);
+        Ok(self.sim_mut()?.enter_vehicle(id, vehicle, seat as usize))
+    }
+
+    fn set_view_yaw(&mut self, human: Resource<HumanRef>, yaw: f32) -> wasmtime::Result<()> {
+        let id = self.table.get(&human)?.0;
+        self.sim_mut()?.set_view_yaw(id, yaw);
+        Ok(())
+    }
+
+    fn give_item(&mut self, human: Resource<HumanRef>, kind: u32, first: u32, end: u32) -> wasmtime::Result<Option<Resource<ItemRef>>> {
+        let id = self.table.get(&human)?.0;
+        let slots = first.min(end) as usize..end as usize;
+        let Some(item) = self.sim_mut()?.give_human_item(id, kind, slots) else { return Ok(None) };
+        self.item_handle(item).map(Some)
+    }
+
+    fn slot(&mut self, human: Resource<HumanRef>, slot: u32) -> wasmtime::Result<Vec<Resource<ItemRef>>> {
+        let id = self.table.get(&human)?.0;
+        let items = self.sim()?.human_slot_items(id, slot as usize);
+        items.into_iter().map(|i| self.item_handle(i)).collect()
+    }
+
+    fn put_item(&mut self, human: Resource<HumanRef>, item: Resource<ItemRef>, slot: u32) -> wasmtime::Result<()> {
+        let (id, item) = (self.table.get(&human)?.0, self.table.get(&item)?.0);
+        self.sim_mut()?.put_item(id, item, slot as usize);
+        Ok(())
     }
 
     fn delete(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<()> {

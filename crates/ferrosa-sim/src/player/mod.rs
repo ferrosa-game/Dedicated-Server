@@ -1,5 +1,5 @@
 use ferrosa_protocol::{
-    CharacterCustomization, Team,
+    CharacterCustomization, Model, SuitColor, Team,
     clientbound::game::{
         MenuButton, MenuType,
         events::{Event, ServerEvent, update_player::EventUpdatePlayer, update_player_round::EventUpdatePlayerRound},
@@ -11,7 +11,6 @@ use glam::Vec3;
 
 use crate::{
     PlayerId, SimJoinMsg,
-    gamemode::round,
     player::{actions::ActionQueue, voice::PlayerVoice},
 };
 
@@ -63,12 +62,9 @@ pub struct Player {
     /// logic_player keeps closing their menu (they are out of every corporation) and the buy pages still take tab
     /// buttons.
     pub ghost_human: bool,
-    /// What the binary still has of that deleted human (its record stays behind): purchases go into it.
-    pub ghost: Option<round::menus::GhostHuman>,
     pub team_switch_timer: i32,
     pub vehicles_bought: i32,
-    pub bills_withdrawn: i32,
-    pub saved_inventory: [Vec<crate::gamemode::round::SavedItem>; 7],
+    pub saved_inventory: [Vec<crate::sim::lobby::SavedItem>; 7],
     pub saved_body: Option<crate::gamemode::world::SavedBody>,
     pub corp_money: i32,
     pub corp_credit: i32,
@@ -155,10 +151,8 @@ impl Player {
             button_extras: Vec::new(),
             manager_tab: false,
             ghost_human: false,
-            ghost: None,
             team_switch_timer: 0,
             vehicles_bought: 0,
-            bills_withdrawn: 0,
             saved_inventory: Default::default(),
             saved_body: None,
             corp_money: 0,
@@ -181,10 +175,10 @@ impl Player {
                 hair_color: avatar_info.hair_color,
                 hair_style: avatar_info.hair,
                 head: avatar_info.head,
-                model: 0,
+                model: Model::Casual,
                 necklace: 0,
                 skin: avatar_info.skin_color,
-                suit_color: 0,
+                suit_color: SuitColor::Brown,
                 tie_color: 0,
             },
             camera_pos: Default::default(),
@@ -219,10 +213,8 @@ impl Player {
             button_extras: Vec::new(),
             manager_tab: false,
             ghost_human: false,
-            ghost: None,
             team_switch_timer: 0,
             vehicles_bought: 0,
-            bills_withdrawn: 0,
             saved_inventory: Default::default(),
             saved_body: None,
             corp_money: 0,
@@ -316,7 +308,7 @@ impl Player {
         }
     }
 
-    pub(crate) fn make_update_round_event(&self, tick: u32) -> Event {
+    pub(crate) fn make_update_financials_event(&self, tick: u32) -> Event {
         Event {
             tick_created: tick,
             kind: ServerEvent::UpdatePlayerRound(EventUpdatePlayerRound {

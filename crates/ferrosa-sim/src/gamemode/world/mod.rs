@@ -220,6 +220,8 @@ pub struct WorldState {
     pub max_time: i32,
     /// What the memos at the spawn say (newspaper_load at reset_game).
     pub newspaper: Vec<u8>,
+    /// The small bills each player has taken from the bank since the last crime pass.
+    pub bills_withdrawn: std::collections::HashMap<PlayerId, i32>,
 }
 
 impl Sim {
@@ -541,6 +543,7 @@ impl Sim {
         }
 
         let nobuy = self.modes.world.cfg.crimenobuy;
+        self.modes.world.state.bills_withdrawn.clear();
 
         for pid in self.players.iter().map(|(i, _)| i).collect::<Vec<_>>() {
             let Some(p) = self.players.get_mut(pid) else { continue };
@@ -564,9 +567,6 @@ impl Sim {
             } else if p.vehicles_bought > 0 {
                 p.vehicles_bought -= 1;
             }
-
-            let Some(p) = self.players.get_mut(pid) else { continue };
-            p.bills_withdrawn = 0;
 
             if crim >= nobuy {
                 p.items_bought = NO_BUY_ITEMS;
@@ -615,6 +615,29 @@ impl Sim {
 
         self.save_accounts();
         self.reset_game();
+    }
+
+    /// reset_game's corporation loop for a new day: funds and counts cleared, the managers dropped and the share
+    /// prices set to 100 on the first reset, and the shares counted again.
+    fn reset_world_corporations(&mut self) {
+        let first = self.round_number == 0;
+
+        for (k, corp_state) in self.corp_state.iter_mut().enumerate() {
+            corp_state.funds = 0;
+            corp_state.player_count = 0;
+
+            if first {
+                corp_state.manager = None;
+            }
+
+            let corp = &mut self.corporations[k];
+
+            if first {
+                corp.price = 100.0;
+            }
+
+            corp.shares = 100 + self.players.iter().filter(|(_, p)| p.team == Team::CORPORATIONS[k]).map(|(_, p)| p.stocks).sum::<i32>();
+        }
     }
 
     /// The world part of reset_game: everyone back without a human (bots gone), the world emptied and the round counted.
@@ -753,7 +776,7 @@ impl Sim {
         }
 
         let e = p.make_update_player_event(tick);
-        let r = p.make_update_round_event(tick);
+        let r = p.make_update_financials_event(tick);
         p.menu = MenuType::Empty;
         self.events.push(e);
         self.events.push(r);
@@ -774,7 +797,7 @@ impl Sim {
     /// The world mode part of reset_game: the corporations' day reset, an intermission of no length, the players and
     /// saved vehicles respawned where they were, and the garage doors open.
     pub(crate) fn reset_world(&mut self) {
-        self.reset_corporation_rounds();
+        self.reset_world_corporations();
 
         self.gamestate = GameState::Intermission;
         self.game_timer = 0;
@@ -819,7 +842,6 @@ impl super::ModeHooks for Hooks {
             world_corporations: true,
             mission_spots: true,
             saved_accounts: true,
-            world_start_cash: true,
             shares_follow_human: true,
             keys_keep_vehicles: true,
             respawn_wait: true,
@@ -848,18 +870,22 @@ impl super::ModeHooks for Hooks {
         sim.copy_corp_money();
     }
 
-    fn on_menu(&self, sim: &mut Sim, pid: PlayerId, menu: u8, button: u32) -> bool {
-        let open = sim.players.get(pid.idx()).is_some_and(|p| p.menu as u8 == menu && p.human.is_some());
+    fn on_menu(&self, sim: &mut Sim, pid: PlayerId, menu: MenuType, button: u32) -> bool {
+        let open = sim.players.get(pid.idx()).is_some_and(|p| p.menu == menu && p.human.is_some());
 
-        if !open || !(CORP_MENUS_FIRST..=CORP_MENUS_LAST).contains(&menu) {
+        if !open || !(CORP_MENUS_FIRST..=CORP_MENUS_LAST).contains(&(menu as u8)) {
             return false;
         }
 
-        sim.corp_menu_action(pid, menu, button as i32);
+        sim.corp_menu_action(pid, menu as u8, button as i32);
         true
     }
 
     fn joining_money(&self, sim: &Sim, money: i32) -> i32 {
         money.max(sim.modes.world.cfg.mincash)
+    }
+
+    fn on_leave(&self, sim: &mut Sim, pid: PlayerId) {
+        sim.modes.world.state.bills_withdrawn.remove(&pid);
     }
 }

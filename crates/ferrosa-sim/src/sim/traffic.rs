@@ -57,6 +57,7 @@ impl Sim {
         self.ticks_since_reset = 0;
         self.events.now = 0;
         self.do_traffic = None;
+        self.week = None;
 
         for (_, p) in self.players.iter_mut() {
             p.items_bought = 0;
@@ -97,7 +98,9 @@ impl Sim {
         self.restock_dealerships();
         self.stock_gun_stores();
 
-        self.do_traffic = self.rules.reset_traffic;
+        if let Some(cars) = self.rules.reset_traffic {
+            self.do_traffic = Some(cars);
+        }
 
         self.announce_players();
     }
@@ -125,7 +128,7 @@ impl Sim {
 
         let tick = self.tick;
 
-        let es: Vec<_> = self.players.iter().flat_map(|(_, p)| [p.make_update_player_event(tick), p.make_update_round_event(tick)]).collect();
+        let es: Vec<_> = self.players.iter().flat_map(|(_, p)| [p.make_update_player_event(tick), p.make_update_financials_event(tick)]).collect();
 
         for e in es {
             self.events.push(e);

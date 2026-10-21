@@ -35,8 +35,6 @@ pub struct CorpState {
     pub door_cells_open: bool,
     /// The corporation's round funds.
     pub funds: i32,
-    /// What setting up this round's missions took from the corporation (negative).
-    pub spent: i32,
     pub missions: [super::missions::Mission; super::missions::MISSION_SLOTS],
     /// Active players on the team, counted every tick.
     pub player_count: i32,

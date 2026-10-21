@@ -1,6 +1,6 @@
 use ferrosa_physics::rotation::rotate;
 use ferrosa_physics::{Bond, Joint as BondJoint, RigidBodies, RotMatrix, Table, body::RigidBodyType};
-use ferrosa_protocol::CharacterCustomization;
+use ferrosa_protocol::{CharacterCustomization, Gender, Model, SuitColor};
 use glam::Vec3;
 
 use super::{
@@ -151,7 +151,7 @@ pub fn create_human(humans: &mut Table<Human>, bodies: &mut RigidBodies, pos: Ve
 }
 
 fn bot_customization() -> CharacterCustomization {
-    CharacterCustomization { gender: 0, head: 0, skin: 0, hair_color: 0, hair_style: 0, eye_color: 0, model: 0, necklace: 0, suit_color: 0, tie_color: 0 }
+    CharacterCustomization { gender: Gender::Female, head: 0, skin: 0, hair_color: 0, hair_style: 0, eye_color: 0, model: Model::Casual, necklace: 0, suit_color: SuitColor::Brown, tie_color: 0 }
 }
 
 fn build_attachments(bones: &[Bone]) -> Attachments {

@@ -8,16 +8,9 @@ interface init {
     init: func();
 }
 
+/// Once, when the server starts.
 interface on-start {
     on-start: func();
-}
-
-/// A mode's settings for the shared code, taken at every reset. Only asked of the mode; the server can't be changed
-/// from here.
-interface get-rules {
-    use types.{rules};
-
-    get-rules: func() -> rules;
 }
 
 /// A reset, after the corporations' missions are cleared.
@@ -25,10 +18,15 @@ interface reset {
     reset: func();
 }
 
+/// Each server tick (60 a second), whatever the game state: after the players' input and menus (menus-done has
+/// run), before the traffic and NPCs move. The mode is called first, then each plugin. Traffic asked for here with
+/// server.set-traffic is made this tick.
 interface tick {
     tick: func();
 }
 
+/// Each server tick, after the traffic cars and NPCs have moved (they only move in game), and before the players'
+/// own simulation and the physics. The mode is called first, then each plugin.
 interface tick-after-traffic {
     tick-after-traffic: func();
 }
@@ -47,9 +45,9 @@ interface menus-done {
 
 /// A menu button pressed; true takes it. The mode is asked first, then each plugin, then the shared menus.
 interface on-menu {
-    use types.{player-id};
+    use types.{menu, player-id};
 
-    on-menu: func(player: player-id, menu: u8, button: u32) -> bool;
+    on-menu: func(player: player-id, menu: menu, button: u32) -> bool;
 }
 
 /// A chat message from a player, before the server's own commands; true takes it, and it goes no further. The mode is
@@ -60,12 +58,14 @@ interface on-chat {
     on-chat: func(player: player-id, message: string) -> bool;
 }
 
+/// A player has joined, their account restored and the initial sync sent: where a mode sets their starting money.
 interface on-join {
     use types.{player-id};
 
     on-join: func(player: player-id);
 }
 
+/// A player has left
 interface on-leave {
     use types.{player-id};
 
@@ -79,10 +79,12 @@ interface on-death {
     on-death: func(player: player-id);
 }
 
-/// The money a joining player starts with: the mode is given what their account has, then each plugin the last
-/// answer. The server can't be changed from here.
-interface joining-money {
-    joining-money: func(money: s32) -> s32;
+/// A player hurt another (bullets and the like, not themselves), after the server's own scoring. Team damage is the
+/// mode's to deal here.
+interface on-hurt {
+    use types.{player-id};
+
+    on-hurt: func(attacker: player-id, victim: player-id, damage: s32);
 }
 
 /// /resetgame has named this plugin's mode. Only asked of the mode.

@@ -1,5 +1,5 @@
 use crate::{
-    CharacterCustomization, Team,
+    CharacterCustomization, Gender, Model, SuitColor, Team,
     clientbound::game::events::{
         bullet::EventBullet, bullet_hit::EventBulletHit, bullet_hole::EventBulletHole, chat::EventChat, explosion::EventExplosion,
         item_set_cell::EventItemSetCell, mission::EventMission, mission_text::EventMissionText, phone_sound::EventPhoneSound, sound::EventSound,
@@ -204,14 +204,14 @@ impl WireRead for Event {
                     Err(e) => return Err(e),
                 };
                 let customization = CharacterCustomization {
-                    gender: (c & 1) as u8,
+                    gender: Gender::from_bit(c as u32),
                     head: ((c >> 1) & 0xf) as u8,
                     skin: ((c >> 6) & 7) as u8,
                     hair_style: ((c >> 9) & 0xf) as u8,
                     eye_color: (d & 7) as u8,
                     hair_color: ((d >> 3) & 0xf) as u8,
-                    model: ((d >> 7) & 0x1f) as u8,
-                    suit_color: ((d >> 12) & 0xf) as u8,
+                    model: Model::try_from(((d >> 7) & 0x1f) as u8).unwrap_or_default(),
+                    suit_color: SuitColor::try_from(((d >> 12) & 0xf) as u8).unwrap_or_default(),
                     tie_color: ((d >> 16) & 0xf) as u8,
                     necklace: ((d >> 20) & 0xf) as u8,
                 };

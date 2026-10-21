@@ -1,13 +1,13 @@
-use ferrosa_sim::{ModeRules, PlayerId, Sim};
+use ferrosa_sim::PlayerId;
 use wasmtime::bail;
 
 use crate::{
     bindings::ferrosa::plugin::{
         server,
-        types::{self, Body, ChatType, ClientMode, KindName, Mat3, Rules, Vec3},
+        types::{self, ChatType, ClientMode, Mat3, Vec3},
     },
     host::{HostState, RegisteredMode},
-    types::{HumanRef, ItemRef, PlayerRef, VehicleRef},
+    types::{BodyRef, CorporationRef, HumanRef, ItemRef, PlayerRef, VehicleRef},
 };
 use wasmtime::component::Resource;
 
@@ -41,6 +41,11 @@ impl server::Host for HostState {
         }
 
         self.player_handle(PlayerId(id)).map(Some)
+    }
+
+    fn add_bot(&mut self) -> wasmtime::Result<Option<Resource<PlayerRef>>> {
+        let Some(id) = self.sim_mut()?.add_bot() else { return Ok(None) };
+        self.player_handle(id).map(Some)
     }
 
     fn players(&mut self) -> wasmtime::Result<Vec<Resource<PlayerRef>>> {
@@ -92,8 +97,16 @@ impl server::Host for HostState {
         self.item_handle(id as usize).map(Some)
     }
 
-    fn vehicle_kinds(&mut self) -> wasmtime::Result<Vec<KindName>> {
-        Ok(self.sim()?.vehicle_kind_names().into_iter().map(|(id, name)| KindName { id, name }).collect())
+    fn vehicle_kinds(&mut self) -> wasmtime::Result<Vec<String>> {
+        Ok(self.sim()?.vehicle_kind_names())
+    }
+
+    fn find_vehicle_kind(&mut self, name: String) -> wasmtime::Result<Option<u32>> {
+        Ok(self.sim()?.find_vehicle_kind(&name))
+    }
+
+    fn vehicle_display_name(&mut self, kind: u32) -> wasmtime::Result<Option<String>> {
+        Ok(self.sim()?.vehicle_display_name(kind).map(str::to_string))
     }
 
     fn spawn_vehicle(&mut self, kind: u32, colour: i32, pos: Vec3, rot: Mat3) -> wasmtime::Result<Option<Resource<VehicleRef>>> {
@@ -104,6 +117,11 @@ impl server::Host for HostState {
     fn vehicles(&mut self) -> wasmtime::Result<Vec<Resource<VehicleRef>>> {
         let ids = self.sim()?.vehicle_ids();
         ids.into_iter().map(|id| self.vehicle_handle(id)).collect()
+    }
+
+    fn spawn_route_car(&mut self, min_distance: Option<f32>) -> wasmtime::Result<Option<Resource<VehicleRef>>> {
+        let Some(v) = self.sim_mut()?.spawn_route_car(min_distance) else { return Ok(None) };
+        self.vehicle_handle(v).map(Some)
     }
 
     fn get_vehicle(&mut self, id: u32) -> wasmtime::Result<Option<Resource<VehicleRef>>> {
@@ -127,6 +145,66 @@ impl server::Host for HostState {
         Ok(self.sim()?.mode_name().to_string())
     }
 
+    fn team_door_open(&mut self, team: types::Team) -> wasmtime::Result<bool> {
+        Ok(self.sim()?.team_door_open(team.into()))
+    }
+
+    fn set_team_door(&mut self, team: types::Team, open: bool) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_team_door_open(team.into(), open);
+        Ok(())
+    }
+
+    fn get_corporation(&mut self, team: types::Team) -> wasmtime::Result<Option<Resource<CorporationRef>>> {
+        let team = team.into();
+
+        if self.sim()?.corporation(team).is_none() {
+            return Ok(None);
+        }
+
+        self.corporation_handle(team).map(Some)
+    }
+
+    fn get_game_timer(&mut self) -> wasmtime::Result<i32> {
+        Ok(self.sim()?.game_timer())
+    }
+
+    fn set_game_timer(&mut self, ticks: i32) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_game_timer(ticks);
+        Ok(())
+    }
+
+    fn world_time(&mut self) -> wasmtime::Result<i32> {
+        Ok(self.sim()?.world_time())
+    }
+
+    fn request_reset(&mut self) -> wasmtime::Result<()> {
+        self.sim_mut()?.request_reset();
+        Ok(())
+    }
+
+    fn reset_lobby(&mut self) -> wasmtime::Result<()> {
+        self.sim_mut()?.reset_lobby();
+        Ok(())
+    }
+
+    fn set_week(&mut self, weekly: bool, weekday: u8) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_week(weekly, weekday);
+        Ok(())
+    }
+
+    fn set_traffic(&mut self, cars: u32, parked: bool) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_traffic(cars, parked);
+        Ok(())
+    }
+
+    fn item_price(&mut self, kind: u32) -> wasmtime::Result<Option<i32>> {
+        Ok(self.sim()?.item_price(kind))
+    }
+
+    fn vehicle_price(&mut self, kind: u32) -> wasmtime::Result<Option<i32>> {
+        Ok(self.sim()?.vehicle_price(kind))
+    }
+
     fn get_game_state(&mut self) -> wasmtime::Result<types::GameState> {
         Ok(self.sim()?.gamestate().into())
     }
@@ -136,8 +214,29 @@ impl server::Host for HostState {
         Ok(())
     }
 
-    fn default_rules(&mut self) -> wasmtime::Result<Rules> {
-        Ok(ModeRules::default().into())
+    fn set_keep_bodies(&mut self, keep: bool) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_keep_bodies(keep);
+        Ok(())
+    }
+
+    fn set_keep_items(&mut self, keep: bool) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_keep_items(keep);
+        Ok(())
+    }
+
+    fn set_stock_sell_rate(&mut self, rate: f32) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_stock_sell_rate(rate);
+        Ok(())
+    }
+
+    fn set_count_humanless_members(&mut self, on: bool) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_count_humanless_members(on);
+        Ok(())
+    }
+
+    fn set_door_knocks(&mut self, on: bool) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_door_knocks(on);
+        Ok(())
     }
 
     fn get_gravity(&mut self) -> wasmtime::Result<f32> {
@@ -149,47 +248,16 @@ impl server::Host for HostState {
         Ok(())
     }
 
-    fn bodies(&mut self) -> wasmtime::Result<Vec<Body>> {
-        let sim = self.sim()?;
-        Ok(sim.body_ids().into_iter().filter_map(|id| body(sim, id)).collect())
+    fn bodies(&mut self) -> wasmtime::Result<Vec<Resource<BodyRef>>> {
+        let ids = self.sim()?.body_ids();
+        ids.into_iter().map(|id| self.body_handle(id)).collect()
     }
 
-    fn get_body(&mut self, id: u32) -> wasmtime::Result<Option<Body>> {
-        Ok(body(self.sim()?, id as usize))
-    }
-
-    fn set_body_pos(&mut self, id: u32, pos: Vec3) -> wasmtime::Result<()> {
-        if let Some(b) = self.sim_mut()?.body_mut(id as usize) {
-            b.pos = pos.into();
+    fn get_body(&mut self, id: u32) -> wasmtime::Result<Option<Resource<BodyRef>>> {
+        if self.sim()?.body(id as usize).is_none() {
+            return Ok(None);
         }
 
-        Ok(())
+        self.body_handle(id as usize).map(Some)
     }
-
-    fn set_body_vel(&mut self, id: u32, vel: Vec3) -> wasmtime::Result<()> {
-        if let Some(b) = self.sim_mut()?.body_mut(id as usize) {
-            b.vel = vel.into();
-        }
-
-        Ok(())
-    }
-
-    fn set_body_ang_vel(&mut self, id: u32, ang_vel: Vec3) -> wasmtime::Result<()> {
-        if let Some(b) = self.sim_mut()?.body_mut(id as usize) {
-            b.ang_vel = ang_vel.into();
-        }
-
-        Ok(())
-    }
-
-    fn add_impulse(&mut self, id: u32, offset: Vec3, impulse: Vec3) -> wasmtime::Result<()> {
-        self.sim_mut()?.add_impulse(id as usize, offset.into(), impulse.into());
-        Ok(())
-    }
-}
-
-fn body(sim: &Sim, id: usize) -> Option<Body> {
-    let b = sim.body(id)?;
-
-    Some(Body { id: id as u32, pos: b.pos.into(), vel: b.vel.into(), ang_vel: b.ang_vel.into(), mass: b.mass, settled: b.settled })
 }

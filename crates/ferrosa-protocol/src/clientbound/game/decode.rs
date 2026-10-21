@@ -4,7 +4,7 @@
 use glam::Vec3;
 
 use crate::{
-    CharacterCustomization,
+    CharacterCustomization, Gender, Model, SuitColor,
     clientbound::game::{
         GameState, HumanAppearance, ItemHeader, ItemKind, ItemTail, LineLinkEntry, MenuButton, MenuType, ObjectPack, OwnHumanData, ServerGamePacket,
         ServerHumanObject, ServerItemObject, ServerVehicleObject, ServerVoiceData, TrafficEntry, VehicleKind, events::Event,
@@ -188,18 +188,16 @@ impl ObjectDecoder {
         let appearance = if r.bits(1)? == 1 {
             let player_id = r.nullable(8)?;
             let mut c = CharacterCustomization::default();
-            for (f, n) in [
-                (&mut c.gender, 1),
-                (&mut c.head, 5),
-                (&mut c.skin, 3),
-                (&mut c.hair_style, 4),
-                (&mut c.eye_color, 3),
-                (&mut c.hair_color, 4),
-                (&mut c.model, 5),
-                (&mut c.suit_color, 4),
-                (&mut c.tie_color, 4),
-                (&mut c.necklace, 4),
-            ] {
+            c.gender = Gender::from_bit(r.bits(1)? as u32);
+
+            for (f, n) in [(&mut c.head, 5), (&mut c.skin, 3), (&mut c.hair_style, 4), (&mut c.eye_color, 3), (&mut c.hair_color, 4)] {
+                *f = r.bits(n)? as u8;
+            }
+
+            c.model = Model::try_from(r.bits(5)? as u8).unwrap_or_default();
+            c.suit_color = SuitColor::try_from(r.bits(4)? as u8).unwrap_or_default();
+
+            for (f, n) in [(&mut c.tie_color, 4), (&mut c.necklace, 4)] {
                 *f = r.bits(n)? as u8;
             }
             Some(HumanAppearance { player_id, customization: c, wanted: r.bits(2)? as i32 })

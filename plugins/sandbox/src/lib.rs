@@ -1,12 +1,17 @@
-use ferrosa_wit::{ChatType, ClientMode, GameState, Human, Mat3, Player, PlayerId, Plugin, Vec3, command, server};
+use ferrosa_wit::{ChatType, ClientMode, GameState, Human, Mat3, Menu, Player, PlayerId, Plugin, Vec3, command, server};
 
 const EARTH_GRAVITY: f32 = 9.8;
-const STOCK_MENU: u8 = 18;
-const NO_MENU: u8 = 0;
 const ITEM_LIFT: Vec3 = Vec3::new(0.0, 0.0, 1.0);
 
-const GUNS: [(&str, Option<&str>); 7] =
-    [("ak47", Some("ak47mag")), ("m16", Some("m16mag")), ("mp5", Some("mp5mag")), ("uzi", Some("uzimag")), ("pistol", Some("pistolmag")), ("magnum", Some("magnummag")), ("auto5", None)];
+const GUNS: [(&str, Option<&str>); 7] = [
+    ("ak47", Some("ak47mag")),
+    ("m16", Some("m16mag")),
+    ("mp5", Some("mp5mag")),
+    ("uzi", Some("uzimag")),
+    ("pistol", Some("pistolmag")),
+    ("magnum", Some("magnummag")),
+    ("auto5", None)
+];
 
 #[derive(Default)]
 struct Sandbox;
@@ -18,6 +23,7 @@ impl Plugin for Sandbox {
 
     fn reset(&mut self) {
         server::set_game_state(GameState::InGame);
+        server::set_traffic(128, false);
     }
 
     fn on_join(&mut self, player: PlayerId) {
@@ -34,7 +40,7 @@ impl Plugin for Sandbox {
             "human" => {
                 if let Some(h) = server::spawn_human(p.camera(), Mat3::IDENTITY, Some(p.id())) {
                     p.set_human(&h);
-                    p.set_menu(NO_MENU);
+                    p.set_menu(Menu::Empty);
                 }
             }
             "kill" => kill_nearest(&p),
@@ -50,7 +56,7 @@ impl Plugin for Sandbox {
             "car" => car(&p, &args),
             "phone" => phone(&p, &args),
             "gravity" => gravity(&args),
-            "stocks" => _ = p.set_menu(if p.menu() == STOCK_MENU { NO_MENU } else { STOCK_MENU }),
+            "stocks" => p.set_menu(if p.menu() == Menu::RoundCorpStock { Menu::Empty } else { Menu::RoundCorpStock }),
             "clear" => {
                 server::items().iter().for_each(|i| i.delete());
                 server::vehicles().iter().for_each(|v| v.delete());
@@ -130,21 +136,22 @@ fn item(p: &Player, args: &[&str]) {
 }
 
 fn car(p: &Player, args: &[&str]) {
-    let number = |k: usize| args.get(k).and_then(|a| a.parse::<i32>().ok()).unwrap_or(0);
-    let (kind, colour) = (number(0), number(1));
     let kinds = server::vehicle_kinds();
+    let arg = args.first().copied().unwrap_or_default();
+    let kind = server::find_vehicle_kind(arg).or_else(|| arg.parse::<u32>().ok().filter(|&k| (k as usize) < kinds.len()));
+    let colour = args.get(1).and_then(|a| a.parse::<i32>().ok()).unwrap_or(0);
 
-    if u32::try_from(kind).is_ok_and(|kind| kinds.iter().any(|k| k.id == kind)) {
+    if let Some(kind) = kind.filter(|&k| server::vehicle_display_name(k).is_some()) {
         let facing = p.facing();
         let spot = p.human().map_or(p.camera(), |h| h.pos()) - facing.z * 6.0;
         let spot = server::ground_below(spot).map_or(spot, |y| Vec3::new(spot.x, y + 1.0, spot.z));
 
-        server::spawn_vehicle(kind as u32, colour, spot, Mat3 { x: -facing.x, y: facing.y, z: -facing.z });
+        server::spawn_vehicle(kind, colour, spot, Mat3 { x: -facing.x, y: facing.y, z: -facing.z });
         return;
     }
 
-    let list: Vec<String> = kinds.iter().map(|k| format!("{} {}", k.id, k.name)).collect();
-    p.message(&format!("Vehicle types: {}", list.join(", ")));
+    let spawnable: Vec<&str> = kinds.iter().enumerate().filter(|&(k, _)| server::vehicle_display_name(k as u32).is_some()).map(|(_, n)| n.as_str()).collect();
+    p.message(&format!("/car {}", spawnable.join(" ")));
 }
 
 fn phone(p: &Player, args: &[&str]) {

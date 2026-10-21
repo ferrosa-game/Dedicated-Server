@@ -5,7 +5,7 @@ use ferrosa_protocol::{
 };
 use tokio::sync::mpsc::UnboundedSender;
 
-mod api;
+pub(crate) mod api;
 pub(crate) mod computer;
 pub(crate) mod gamemode;
 pub(crate) mod human;
@@ -24,8 +24,9 @@ pub use human::Human;
 pub use items::Item;
 pub use player::Player;
 pub use plugin::{NoPlugins, PluginHooks, Plugins};
-pub use sim::Sim;
+pub use sim::{Sim, economy::Corporation, missions::Mission};
 pub use vehicle::Vehicle;
+pub use world::skeleton::BoneId;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct PlayerId(pub u32);

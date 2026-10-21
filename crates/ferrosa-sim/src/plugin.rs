@@ -1,3 +1,5 @@
+use ferrosa_protocol::clientbound::game::MenuType;
+
 use crate::{PlayerId, sim::Sim};
 
 pub type Plugins = &'static dyn PluginHooks;
@@ -13,12 +15,8 @@ pub trait PluginHooks: Sync {
 
     fn menus_done(&self, _sim: &mut Sim) {}
 
-    fn on_menu(&self, _sim: &mut Sim, _pid: PlayerId, _menu: u8, _button: u32) -> bool {
+    fn on_menu(&self, _sim: &mut Sim, _pid: PlayerId, _menu: MenuType, _button: u32) -> bool {
         false
-    }
-
-    fn joining_money(&self, _sim: &Sim, money: i32) -> i32 {
-        money
     }
 
     fn before_physics(&self, _sim: &mut Sim) {}
@@ -34,6 +32,8 @@ pub trait PluginHooks: Sync {
     fn on_leave(&self, _sim: &mut Sim, _pid: PlayerId) {}
 
     fn on_death(&self, _sim: &mut Sim, _pid: PlayerId) {}
+
+    fn on_hurt(&self, _sim: &mut Sim, _attacker: PlayerId, _victim: PlayerId, _damage: i32) {}
 }
 
 pub struct NoPlugins;

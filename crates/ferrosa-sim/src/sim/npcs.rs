@@ -1,5 +1,5 @@
 use ferrosa_protocol::{
-    Team,
+    Gender, Model, SuitColor, Team,
     clientbound::game::{
         ItemKind,
         events::{Event, ServerEvent, update_player::EventUpdatePlayer},
@@ -167,7 +167,7 @@ impl Sim {
     }
 
     /// delete_player for a bot: its human (if still its own) is left without a player, and the player goes.
-    fn delete_bot_player(&mut self, pid: PlayerId) {
+    pub(crate) fn delete_bot_player(&mut self, pid: PlayerId) {
         let Some(p) = self.players.get(pid.idx()) else { return };
         let (human, account) = (p.human, p.account_id);
 
@@ -205,9 +205,9 @@ impl Sim {
         p.team = NPC_TEAM;
         p.username = String::new();
         p.is_bot = true;
-        p.customization.gender = 1;
-        p.customization.model = 2;
-        p.customization.suit_color = 1;
+        p.customization.gender = Gender::Male;
+        p.customization.model = Model::Suit2;
+        p.customization.suit_color = SuitColor::Black;
         p.bot.waypoint = 0;
         p.bot.waypoint_count = npc.waypoints.len() as i32;
 

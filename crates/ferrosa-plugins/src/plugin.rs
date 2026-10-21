@@ -53,7 +53,7 @@ macro_rules! hooks {
     };
 }
 
-hooks!(init, on_start, get_rules, reset, tick, tick_after_traffic, before_physics, after_physics, menus_done, on_menu, on_chat, on_join, on_leave, on_death, joining_money, on_admin_select);
+hooks!(init, on_start, reset, tick, tick_after_traffic, before_physics, after_physics, menus_done, on_menu, on_chat, on_join, on_leave, on_death, on_hurt, on_admin_select);
 
 pub struct LoadedPlugin {
     pub plugins: Plugins,
@@ -71,6 +71,12 @@ fn leak(s: String) -> &'static str {
 }
 
 pub fn load(dir: &Path) -> LoadedPlugin {
+    let dir = dir.to_path_buf();
+
+    std::thread::spawn(move || load_from(&dir)).join().unwrap_or_else(|e| std::panic::resume_unwind(e))
+}
+
+fn load_from(dir: &Path) -> LoadedPlugin {
     let mut plugins = Vec::new();
     let mut modes = Vec::new();
 
@@ -125,7 +131,7 @@ impl WasmPlugin {
         wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
         bindings::Plugin::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
 
-        let mut store = Store::new(engine(), HostState::new());
+        let mut store = Store::new(engine(), HostState::new(folder)?);
         store.limiter(|state| &mut state.limits);
         store.set_epoch_deadline(10);
 
@@ -179,6 +185,10 @@ impl WasmPlugin {
 
         let result = f(&self.hooks, &mut store);
         store.data_mut().sim = None;
+
+        if let Some(SimPtr(sim)) = sim {
+            unsafe { (*sim).flush_updates() };
+        }
 
         result?
             .map_err(|e| {

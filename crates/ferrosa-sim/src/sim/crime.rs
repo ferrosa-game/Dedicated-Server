@@ -114,7 +114,7 @@ impl Sim {
             damage_human(h, BoneId::Head, damage * share / 100);
         }
 
-        let (update, round) = (player.make_update_player_event(self.tick), player.make_update_round_event(self.tick));
+        let (update, round) = (player.make_update_player_event(self.tick), player.make_update_financials_event(self.tick));
         self.events.push(update);
         self.events.push(round);
     }
@@ -133,6 +133,9 @@ impl Sim {
         if self.same_team(attacker, victim) {
             self.handle_team_kill(attacker, damage);
         }
+
+        let plugins = self.plugins;
+        plugins.on_hurt(self, attacker, victim, damage);
     }
 
     pub(crate) fn same_team(&self, a: PlayerId, b: PlayerId) -> bool {

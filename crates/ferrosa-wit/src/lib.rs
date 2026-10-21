@@ -59,6 +59,26 @@ impl Neg for Vec3 {
     }
 }
 
+/// The server runs 60 ticks a second; timers and hooks count in ticks.
+pub const TICKS_PER_SECOND: i32 = 60;
+
+/// `seconds` of real time in ticks.
+pub const fn game_seconds(seconds: i32) -> i32 {
+    seconds * TICKS_PER_SECOND
+}
+
+/// `minutes` of real time in ticks.
+pub const fn game_minutes(minutes: i32) -> i32 {
+    minutes * 60 * TICKS_PER_SECOND
+}
+
+/// `hours` and `minutes` on the world clock (server::world-time), which counts sixtieths of a world second from
+/// midnight: a time of day, or a stretch of one. It only runs in world mode, where a world minute passes faster than a
+/// real one.
+pub const fn clock_time(hours: i32, minutes: i32) -> i32 {
+    (hours * 60 + minutes) * 60 * TICKS_PER_SECOND
+}
+
 /// A chat message as a command and its arguments, if it is one: `/give ak47 2` is `("give", ["ak47", "2"])`.
 pub fn command(message: &str) -> Option<(&str, Vec<&str>)> {
     let mut words = message.trim().strip_prefix('/')?.split_whitespace();
@@ -76,12 +96,6 @@ pub trait Plugin: Default + 'static {
 
     /// Once, when the server starts.
     fn on_start(&mut self) {}
-
-    /// A mode's settings for the shared code, taken at every reset. Only asked of the mode; the server can't be
-    /// changed from here.
-    fn rules(&mut self) -> Rules {
-        server::default_rules()
-    }
 
     /// A reset, after the corporations' missions are cleared.
     fn reset(&mut self) {}
@@ -102,7 +116,7 @@ pub trait Plugin: Default + 'static {
     fn menus_done(&mut self) {}
 
     /// A menu button pressed; true takes it. The mode is asked first, then each plugin, then the shared menus.
-    fn on_menu(&mut self, _player: PlayerId, _menu: u8, _button: u32) -> bool {
+    fn on_menu(&mut self, _player: PlayerId, _menu: Menu, _button: u32) -> bool {
         false
     }
 
@@ -112,7 +126,7 @@ pub trait Plugin: Default + 'static {
         false
     }
 
-    /// A player has joined, their account restored and the initial sync sent.
+    /// A player has joined, their account restored and the initial sync sent: where a mode sets their starting money.
     fn on_join(&mut self, _player: PlayerId) {}
 
     /// A player is leaving, before their shares and account are settled.
@@ -121,11 +135,9 @@ pub trait Plugin: Default + 'static {
     /// A real player's human has died.
     fn on_death(&mut self, _player: PlayerId) {}
 
-    /// The money a joining player starts with: the mode is given what their account has, then each plugin the last
-    /// answer. The server can't be changed from here.
-    fn joining_money(&mut self, money: i32) -> i32 {
-        money
-    }
+    /// A player hurt another (bullets and the like, not themselves), after the server's own scoring. Team damage is
+    /// the mode's to deal here.
+    fn on_hurt(&mut self, _attacker: PlayerId, _victim: PlayerId, _damage: i32) {}
 
     /// /resetgame has named this plugin's mode. Only asked of the mode.
     fn on_admin_select(&mut self) {}
@@ -150,12 +162,6 @@ macro_rules! plugin {
         impl $crate::exports::ferrosa::plugin::on_start::Guest for __FerrosaPlugin {
             fn on_start() {
                 __FERROSA.with_borrow_mut(|p| $crate::Plugin::on_start(p))
-            }
-        }
-
-        impl $crate::exports::ferrosa::plugin::get_rules::Guest for __FerrosaPlugin {
-            fn get_rules() -> $crate::Rules {
-                __FERROSA.with_borrow_mut(|p| $crate::Plugin::rules(p))
             }
         }
 
@@ -196,7 +202,7 @@ macro_rules! plugin {
         }
 
         impl $crate::exports::ferrosa::plugin::on_menu::Guest for __FerrosaPlugin {
-            fn on_menu(player: $crate::PlayerId, menu: u8, button: u32) -> bool {
+            fn on_menu(player: $crate::PlayerId, menu: $crate::Menu, button: u32) -> bool {
                 __FERROSA.with_borrow_mut(|p| $crate::Plugin::on_menu(p, player, menu, button))
             }
         }
@@ -225,9 +231,9 @@ macro_rules! plugin {
             }
         }
 
-        impl $crate::exports::ferrosa::plugin::joining_money::Guest for __FerrosaPlugin {
-            fn joining_money(money: i32) -> i32 {
-                __FERROSA.with_borrow_mut(|p| $crate::Plugin::joining_money(p, money))
+        impl $crate::exports::ferrosa::plugin::on_hurt::Guest for __FerrosaPlugin {
+            fn on_hurt(attacker: $crate::PlayerId, victim: $crate::PlayerId, damage: i32) {
+                __FERROSA.with_borrow_mut(|p| $crate::Plugin::on_hurt(p, attacker, victim, damage))
             }
         }
 
