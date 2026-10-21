@@ -20,10 +20,10 @@ pub(crate) mod vehicle;
 pub(crate) use ferrosa_world as world;
 
 pub use gamemode::{MODES, Mode, ModeHooks, ModeSync, find, rules::ModeRules};
-pub use human::Human;
+pub use human::{Human, HumanHealth};
 pub use items::Item;
 pub use player::Player;
-pub use plugin::{NoPlugins, PluginHooks, Plugins};
+pub use plugin::{DamageCause, NoPlugins, PluginHooks, Plugins};
 pub use sim::{Sim, economy::Corporation, missions::Mission};
 pub use vehicle::Vehicle;
 pub use world::skeleton::BoneId;

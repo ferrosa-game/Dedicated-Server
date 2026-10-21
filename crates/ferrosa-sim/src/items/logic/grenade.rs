@@ -1,7 +1,7 @@
 use ferrosa_protocol::clientbound::game::events::{Event, ServerEvent, explosion::EventExplosion};
 use glam::Vec3;
 
-use crate::{PlayerId, input::ItemInput, items::state::ItemState, sim::Sim};
+use crate::{PlayerId, input::ItemInput, items::state::ItemState, plugin::DamageCause, sim::Sim};
 
 const GRENADE_KILL_RANGE: f32 = 4.0;
 const GRENADE_PUSH_RANGE: f32 = 8.0;
@@ -69,14 +69,23 @@ impl Sim {
     /// outwards. The primer is scored for each player killed other than themselves.
     fn grenade_explosion(&mut self, at: Vec3, primer: Option<PlayerId>) {
         let mut killed = Vec::new();
+        let in_range: Vec<usize> = self.humans.iter().filter(|(_, h)| h.bones[0].pos.distance(at) < GRENADE_KILL_RANGE).map(|(id, _)| id).collect();
+        let plugins = self.plugins;
+
+        for id in in_range {
+            let Some(vitality) = self.humans.get(id).map(|h| h.health.vitality) else { continue };
+            let damage = plugins.on_damage(self, id, DamageCause::Explosion(primer), None, vitality.max(0));
+            let Some(human) = self.humans.get_mut(id) else { continue };
+
+            human.health.vitality -= damage;
+
+            if damage > 0 && human.health.vitality <= 0 {
+                killed.extend(human.player);
+            }
+        }
 
         for (_, human) in self.humans.iter_mut() {
             let dist = human.bones[0].pos.distance(at);
-
-            if dist < GRENADE_KILL_RANGE {
-                human.health.vitality = 0;
-                killed.extend(human.player);
-            }
 
             if dist < GRENADE_PUSH_RANGE {
                 for bone in &human.bones {

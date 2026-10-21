@@ -1,8 +1,9 @@
 use ferrosa_protocol::clientbound::game::MenuType;
-use ferrosa_sim::{PlayerId, PluginHooks, Sim};
+use ferrosa_sim::{BoneId, DamageCause, PlayerId, PluginHooks, Sim};
 use wasmtime::Store;
 
 use crate::{
+    bindings::ferrosa::plugin::types,
     host::{HostState, SimPtr},
     plugin::{Hooks, WasmPlugin},
 };
@@ -77,7 +78,13 @@ impl PluginHooks for WasmPlugins {
         self.all_hooks(sim, "on-death", |h, s| h.on_death.as_ref().map(|g| g.call_on_death(s, pid.0)));
     }
 
-    fn on_hurt(&self, sim: &mut Sim, attacker: PlayerId, victim: PlayerId, damage: i32) {
-        self.all_hooks(sim, "on-hurt", |h, s| h.on_hurt.as_ref().map(|g| g.call_on_hurt(s, attacker.0, victim.0, damage)));
+    fn on_damage(&self, sim: &mut Sim, human: usize, cause: DamageCause, bone: Option<BoneId>, damage: i32) -> i32 {
+        let (cause, bone): (types::DamageCause, Option<types::Bone>) = (cause.into(), bone.map(Into::into));
+
+        self.targets(sim).into_iter().fold(damage, |damage, plugin| {
+            plugin
+                .call_hook(plugin.name, Some(SimPtr(&mut *sim)), "on-damage", |h, s| h.on_damage.as_ref().map(|g| g.call_on_damage(s, human as u32, cause, bone, damage)))
+                .unwrap_or(damage)
+        })
     }
 }

@@ -1,6 +1,6 @@
 use ferrosa_protocol::clientbound::game::MenuType;
 
-use crate::{PlayerId, sim::Sim};
+use crate::{PlayerId, sim::Sim, world::skeleton::BoneId};
 
 pub type Plugins = &'static dyn PluginHooks;
 
@@ -33,7 +33,17 @@ pub trait PluginHooks: Sync {
 
     fn on_death(&self, _sim: &mut Sim, _pid: PlayerId) {}
 
-    fn on_hurt(&self, _sim: &mut Sim, _attacker: PlayerId, _victim: PlayerId, _damage: i32) {}
+    fn on_damage(&self, _sim: &mut Sim, _human: usize, _cause: DamageCause, _bone: Option<BoneId>, damage: i32) -> i32 {
+        damage
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DamageCause {
+    Bullet(Option<PlayerId>),
+    Explosion(Option<PlayerId>),
+    Fall,
+    Vehicle(Option<PlayerId>),
 }
 
 pub struct NoPlugins;

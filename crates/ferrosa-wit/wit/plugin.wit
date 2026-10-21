@@ -25,6 +25,6 @@ world plugin {
     export on-join;
     export on-leave;
     export on-death;
-    export on-hurt;
+    export on-damage;
     export on-admin-select;
 }

@@ -26,7 +26,7 @@ does on an official server.
 | Mode | Notes |
 | --- | --- |
 | `round` | Three corporations, a lobby, buy menus at the bases, deals and car chases, optional weekly play. A plugin (`plugins/round`). |
-| `eliminator` | Hidden targets, eliminators and protectors, with position reveals and supply drops. |
+| `eliminator` | Hidden targets, eliminators and protectors, with position reveals and supply drops. A plugin (`plugins/eliminator`). |
 | `world` | The persistent city: a day cycle, crime ratings, corporations with managers and projects, computers and world missions. |
 | `sandbox` | No game rules, always in game, and everyone can use the test commands below. Clients see it as round mode. A plugin (`plugins/sandbox`). |
 
@@ -39,7 +39,7 @@ Driving, racing, co-op and versus exist in the client but are not ported. Becaus
 The only thing you need installed is the [Rust toolchain.](https://rustup.rs/)
 
 1. `git submodule update --init --recursive`
-2. `rustup target add wasm32-wasip2`, then `cargo build --release` in `plugins/round` and `plugins/sandbox`
+2. `rustup target add wasm32-wasip2`, then `cargo build --release` in each folder in `plugins/`
 3. `cargo run --release`
 4. Enjoy! Its pretty simple!
 
@@ -98,7 +98,7 @@ corporations and physics. It can read and write files in its own folder, and not
 
 The API is in `crates/ferrosa-wit/wit`. In Rust, `ferrosa-wit` is the SDK: implement its `Plugin` trait, end with
 `ferrosa_wit::plugin!(MyPlugin);`, and build for `wasm32-wasip2`. `plugins/sandbox` is a small example and
-`plugins/round` a whole game mode.
+`plugins/round` and `plugins/eliminator` whole game modes.
 
 ```rust
 use ferrosa_wit::{PlayerId, Plugin, server};

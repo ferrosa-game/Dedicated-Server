@@ -1,6 +1,6 @@
 use wasmtime::component::Resource;
 
-use super::{BodyRef, VehicleRef};
+use super::{BodyRef, HumanRef, VehicleRef};
 use crate::{
     bindings::ferrosa::plugin::types::{self, Cash, Vec3},
     host::HostState,
@@ -58,6 +58,12 @@ impl types::HostItem for HostState {
     fn attach(&mut self, item: Resource<ItemRef>, child: Resource<ItemRef>) -> wasmtime::Result<bool> {
         let (id, child) = (self.table.get(&item)?.0, self.table.get(&child)?.0);
         Ok(self.sim_mut()?.attach_item(id, child))
+    }
+
+    fn holder(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<Option<Resource<HumanRef>>> {
+        let id = self.table.get(&item)?.0;
+        let Some(h) = self.sim()?.item_holder(id) else { return Ok(None) };
+        self.human_handle(h).map(Some)
     }
 
     fn children(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<Vec<Resource<ItemRef>>> {

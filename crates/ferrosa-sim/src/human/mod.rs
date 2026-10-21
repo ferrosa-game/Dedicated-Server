@@ -59,6 +59,7 @@ pub struct Attachments {
     pub groups: Vec<AttachmentGroup>,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct HumanHealth {
     pub health: i32,
     pub blood_level: i32,
@@ -101,9 +102,6 @@ pub struct Human {
     pub last_vehicle_cooldown: i32,
     /// Whether the traffic car this human sits in names it as its driver, set before each tick.
     pub traffic_driver: bool,
-    /// An immortal human loses no blood, cannot die of its wounds and is not hurt by falls or
-    /// vehicles; it recovers quickly while knocked down.
-    pub is_immortal: bool,
     pub is_on_ground: bool,
     pub spawn_protection: i32,
     pub input_flags: u32,
@@ -146,8 +144,6 @@ pub struct Human {
     pub strength: f32,
     pub eat_cooldown: i32,
     pub progress_bar: i32,
-    /// Ticks an immortal human knocked below 50 health is kept from being shot (1800 when knocked down).
-    pub down_timer: i32,
     /// How far the body still has to turn to face the view.
     pub view_turn: f32,
     /// The body's heading, turned towards the view a step at a time.

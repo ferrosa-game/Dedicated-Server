@@ -66,6 +66,18 @@ impl types::HostHuman for HostState {
         Ok(self.human_of(&human)?.and_then(|h| h.player).map(|p| p.0))
     }
 
+    fn health(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<types::Health> {
+        Ok(self.human_of(&human)?.map_or_else(Default::default, |h| h.health).into())
+    }
+
+    fn set_health(&mut self, human: Resource<HumanRef>, health: types::Health) -> wasmtime::Result<()> {
+        if let Some(h) = self.human_mut_of(&human)? {
+            h.health = health.into();
+        }
+
+        Ok(())
+    }
+
     fn damage(&mut self, human: Resource<HumanRef>, bone: types::Bone, damage: i32) -> wasmtime::Result<()> {
         let id = self.table.get(&human)?.0;
         self.sim_mut()?.damage_human(id, bone.into(), damage);

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bases::{Area, base};
 use corps::Corps;
-use ferrosa_wit::{Bone, ClientMode, GameState, Mat3, Menu, Model, Player, PlayerId, Plugin, SuitColour, Team, Vec3, game_minutes, game_seconds, server};
+use ferrosa_wit::{Bone, ClientMode, DamageCause, GameState, HumanId, Mat3, Menu, Model, Player, PlayerId, Plugin, SuitColour, Team, Vec3, game_minutes, game_seconds, server};
 
 mod accounts;
 mod bases;
@@ -12,21 +12,11 @@ mod inventory;
 mod menus;
 mod missions;
 
-/// The round corporations: Goldmen, Monsota and OXS.
-pub(crate) const ROUND_CORPS: usize = 3;
-pub(crate) const TEAMS: [Team; ROUND_CORPS] = [Team::Goldmen, Team::Monsota, Team::Oxs];
+pub(crate) const TEAMS: [Team; 3] = [Team::Goldmen, Team::Monsota, Team::Oxs];
 pub(crate) const TEAM_NAMES: Corps<&str> = Corps(["Goldmen Inc", "Monsota", "OXS International"]);
-const ROUND_START: i32 = game_seconds(90);
-/// With nobody on a team the intermission timer rests at 6900.
-const IDLE_TIME: i32 = game_seconds(115);
-/// Ticks in a round day, and how many elapsed ticks pass before loot in the open starts to matter.
-pub(crate) const DAY: i32 = game_minutes(1);
-const LOOT_GRACE: i32 = game_minutes(2) - 1;
 
-const LOBBY_TEAM_TIME: i32 = game_seconds(10) - 1;
-const LOBBY_UNREADY_TIME: i32 = game_seconds(3);
-/// The lobby lasts two minutes.
-const LOBBY_TIME: i32 = game_minutes(2);
+const ROUND_START: i32 = game_seconds(90);
+
 /// The phones on each round corporation's table: 7.75 along its back, the second 0.5 beside it, numbered from 1111.
 const PHONE_BACK: f32 = 7.75;
 const PHONE_SIDE: f32 = 0.5;
@@ -63,7 +53,7 @@ impl RoundConfig {
 
 /// The team, if it is a round corporation: Goldmen, Monsota or OXS.
 pub(crate) fn round_corp(team: Team) -> Option<Team> {
-    ((team as usize) < ROUND_CORPS).then_some(team)
+    ((team as usize) < 3).then_some(team)
 }
 
 /// A corporation's share price.
@@ -165,18 +155,21 @@ impl Plugin for Round {
         self.inventories.forget(player);
     }
 
-    /// Team damage: hurting a teammate deals the config's share of it to the attacker's head.
-    fn on_hurt(&mut self, attacker: PlayerId, victim: PlayerId, damage: i32) {
-        let (Some(a), Some(v)) = (server::get_player(attacker), server::get_player(victim)) else { return };
+    fn on_damage(&mut self, human: HumanId, cause: DamageCause, _bone: Option<Bone>, damage: i32) -> i32 {
+        let DamageCause::Bullet(Some(attacker)) = cause else { return damage };
+        let victim = server::get_human(human).and_then(|h| h.player()).and_then(server::get_player);
+        let (Some(a), Some(v)) = (server::get_player(attacker), victim) else { return damage };
 
-        if a.team() != v.team() || a.god_mode() || damage <= 0 {
-            return;
+        if a.id() == v.id() || a.team() != v.team() || a.god_mode() || damage <= 0 {
+            return damage;
         }
 
-        let Some(human) = a.human() else { return };
+        if let Some(own) = a.human() {
+            println!("[round] {} team damage: {damage}", a.name());
+            own.damage(Bone::Head, damage * self.cfg.teamdamage / 100);
+        }
 
-        println!("[round] {} team damage: {damage}", a.name());
-        human.damage(Bone::Head, damage * self.cfg.teamdamage / 100);
+        damage
     }
 
     fn on_admin_select(&mut self) {
@@ -230,8 +223,8 @@ impl Round {
 
         self.game_timer = timer - 1;
 
-        if on_teams == 0 && (ROUND_START + 2..=IDLE_TIME).contains(&timer) {
-            self.game_timer = IDLE_TIME;
+        if on_teams == 0 && (ROUND_START + 2..=game_seconds(115)).contains(&timer) {
+            self.game_timer = game_seconds(115);
             return;
         }
 
@@ -274,7 +267,7 @@ impl Round {
         }
 
         server::set_game_state(GameState::InGame);
-        self.game_timer = self.cfg.roundtime * DAY;
+        self.game_timer = self.cfg.roundtime * game_minutes(1);
     }
 
     fn setup(&mut self) {
@@ -312,7 +305,7 @@ impl Round {
         let number = (team as i32 + 1) * 1111 + 1;
 
         for (pos, texture, number) in [(first, 0, number - 1), (second, 1, number)] {
-            let Some(item) = server::spawn_item(phone, pos, rot) else { continue };
+            let Some(item) = server::spawn_item_by_id(phone, pos, rot) else { continue };
 
             item.set_phone_number(number);
             item.set_phone_texture(texture);
@@ -348,7 +341,7 @@ impl Round {
         self.game_timer -= 1;
         self.round_elapsed += 1;
 
-        if self.game_timer % DAY == 0 {
+        if self.game_timer % game_minutes(1) == 0 {
             self.items_bought.clear();
 
             for bought in self.vehicles_bought.values_mut() {
@@ -356,7 +349,7 @@ impl Round {
             }
         }
 
-        if self.round_elapsed > LOOT_GRACE && !loot_all_in_bases() && all_members_home() {
+        if self.round_elapsed > game_minutes(2) && !loot_all_in_bases() && all_members_home() {
             self.game_timer -= 10;
         }
 
@@ -488,8 +481,8 @@ impl Round {
 
         server::set_game_state(GameState::Intermission);
         self.round_elapsed = 0;
-        self.round_max_time = LOBBY_TIME;
-        self.game_timer = LOBBY_TIME;
+        self.round_max_time = game_minutes(2);
+        self.game_timer = game_minutes(2);
         self.missions.counter = 0;
 
         self.items_bought.clear();
@@ -531,7 +524,7 @@ impl Round {
         let timer = self.game_timer;
         let Some(p) = server::get_player(player) else { return };
 
-        if timer > LOBBY_TEAM_TIME && !self.switch_timers.contains_key(&player) {
+        if timer > game_seconds(10) && !self.switch_timers.contains_key(&player) {
             match button {
                 1..=3 => {
                     let team = TEAMS[button as usize - 1];
@@ -565,7 +558,7 @@ impl Round {
         if button == 5 {
             if !p.ready() {
                 p.set_ready(true);
-            } else if timer > LOBBY_UNREADY_TIME {
+            } else if timer > game_seconds(3) {
                 p.set_ready(false);
             }
         }

@@ -59,9 +59,7 @@ pub fn trace_ray_human(h: &Human, start: Vec3, end: Vec3, radius: f32) -> Option
 /// directly, arms lose three times the damage and legs twice; torso and leg hits cost health the more blood is
 /// already gone, and any hit may start bleeding.
 pub fn damage_human(h: &mut Human, bone: BoneId, damage: i32) {
-    if !h.is_immortal {
-        h.health.blood_level -= damage / 2;
-    }
+    h.health.blood_level -= damage / 2;
 
     let blood_health = |health: i32, blood: i32| (health as f32 - ((90 - blood) * damage) as f32 / 100.0) as i32;
 

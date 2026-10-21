@@ -134,8 +134,6 @@ impl Sim {
             self.handle_team_kill(attacker, damage);
         }
 
-        let plugins = self.plugins;
-        plugins.on_hurt(self, attacker, victim, damage);
     }
 
     pub(crate) fn same_team(&self, a: PlayerId, b: PlayerId) -> bool {

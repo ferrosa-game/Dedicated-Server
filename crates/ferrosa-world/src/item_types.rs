@@ -36,6 +36,8 @@ pub struct ItemType {
     pub bullet_spread: f32,
     pub can_mount_to: [i32; ItemKind::COUNT],
     pub gun_hold_pos: Vec3,
+    /// Where a gun's muzzle flash shows, from its `muzzle_flash` empty; only clients draw it.
+    pub muzzle_flash: Option<Vec3>,
 }
 
 impl ItemType {
@@ -61,6 +63,7 @@ impl ItemType {
             bullet_spread: 0.0,
             can_mount_to: [0; ItemKind::COUNT],
             gun_hold_pos: Vec3::ZERO,
+            muzzle_flash: None,
         }
     }
 }
@@ -148,6 +151,7 @@ fn from_model(path: &Path, kinds: &dyn Fn(&str) -> Option<usize>) -> Result<Item
     t.bullet_velocity = p!("bullet_velocity").unwrap_or(0.0);
     t.bullet_spread = p!("bullet_spread").unwrap_or(0.0);
     t.gun_hold_pos = Vec3::from_array(p!("gun_hold_pos").unwrap_or([0.0; 3]));
+    t.muzzle_flash = child(&glb, root, "muzzle_flash").map(|n| glb.translation(n));
 
     let mounts: Vec<String> = p!("mounts_to").unwrap_or_default();
 

@@ -4,18 +4,12 @@ use ferrosa_wit::{Cash, Mat3, Player, PlayerId, Team, server};
 
 use crate::spawn_corp_vehicle;
 
-pub(crate) const SLOTS: u32 = 7;
-
-/// One item kept from a player's last round.
 enum Kept {
-    /// A gun, magazine, grenade or bandage with what's left in it, and a gun's magazine with its rounds.
     Item { kind: u32, uses: i32, magazine: Option<(u32, i32)> },
-    /// A key, with the kind and colour of the car it opened, which comes back in the corporation's base.
     Key { kind: u32, colour: i32 },
     Cash(Cash),
 }
 
-/// What each player's human held at the end of the last round (save_inventory), by slot.
 #[derive(Default)]
 pub(crate) struct Inventories(HashMap<PlayerId, Vec<(u32, Kept)>>);
 
@@ -29,7 +23,7 @@ impl Inventories {
         let (last_kept, key, cash) = (server::find_item_kind("bandage"), server::find_item_kind("key"), server::find_item_kind("cashworld"));
         let mut kept = Vec::new();
 
-        for slot in 0..SLOTS {
+        for slot in 0..7 {
             for item in human.slot(slot) {
                 let kind = item.kind();
 
@@ -59,7 +53,7 @@ impl Inventories {
     pub(crate) fn restore(&self, p: &Player, team: Team) {
         let (Some(human), Some(kept)) = (p.human(), self.0.get(&p.id())) else { return };
         let pos = human.pos();
-        let spawn = |kind: u32| server::spawn_item(kind, pos, Mat3::IDENTITY);
+        let spawn = |kind: u32| server::spawn_item_by_id(kind, pos, Mat3::IDENTITY);
 
         for (slot, thing) in kept {
             let item = match thing {

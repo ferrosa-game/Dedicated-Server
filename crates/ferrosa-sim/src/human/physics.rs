@@ -1,5 +1,4 @@
 use ferrosa_physics::{Bond, RigidBodies};
-use ferrosa_protocol::clientbound::game::events::sound::Sound;
 use glam::{IVec3, Vec3};
 
 use super::{
@@ -8,6 +7,7 @@ use super::{
 };
 use crate::{
     items::Touchables,
+    plugin::DamageCause,
     world::{
         capsule::{CapsuleHit, capsule_intersect_level, segment_closest_points},
         map::Map,
@@ -21,6 +21,8 @@ const BONE_FRICTION_STATE_2: f32 = 0.1;
 const BONE_SOFTNESS: f32 = 1.0 / 16.0;
 const HEAD_IMPACT: f32 = 4.0 / 15.0;
 const TORSO_IMPACT: f32 = 0.2;
+/// A crush (a hard fall on the head or torso, or being run over) takes 120 vitality.
+const CRUSH: i32 = 120;
 const SPIN_LIMIT: f32 = 1.0 / 4096.0;
 const LIMIT_STIFFNESS: f32 = 0.25;
 const LIMIT_DAMPING: f32 = 0.5;
@@ -115,7 +117,7 @@ pub(super) fn update_networked_bones(h: &mut Human) {
     }
 }
 
-pub(super) fn bone_world_contacts(h: &mut Human, bodies: &mut RigidBodies, map: &mut Map, out: &mut Vec<HumanOutput>) {
+pub(super) fn bone_world_contacts(id: usize, h: &mut Human, bodies: &mut RigidBodies, map: &mut Map, out: &mut Vec<HumanOutput>) {
     let movement_state = h.movement_state;
 
     for j in 0..BONE_COUNT {
@@ -163,21 +165,20 @@ pub(super) fn bone_world_contacts(h: &mut Human, bodies: &mut RigidBodies, map: 
             add_bullet_hole(map, hit, bone.pos, bone.vel, out);
         }
 
-        if h.last_vehicle_cooldown == 0 && !h.is_immortal {
-            if j == BoneId::Head as usize {
-                if impact > HEAD_IMPACT {
-                    h.health.vitality -= 120;
-                }
+        if h.last_vehicle_cooldown == 0 {
+            let thigh = j == BoneId::ThighLeft as usize || j == BoneId::ThighRight as usize;
+            let hurt = if j == BoneId::Head as usize {
+                impact > HEAD_IMPACT
             } else if j == BoneId::Pelvis as usize || j == BoneId::Torso as usize {
-                if impact > TORSO_IMPACT {
-                    h.health.vitality -= 120;
-                }
-            } else if (j == BoneId::ThighLeft as usize || j == BoneId::ThighRight as usize) && impact > HEAD_IMPACT {
-                if j == BoneId::ThighLeft as usize {
-                    h.health.left_leg = 0;
-                } else {
-                    h.health.right_leg = 0;
-                }
+                impact > TORSO_IMPACT
+            } else {
+                thigh && impact > HEAD_IMPACT
+            };
+
+            if hurt {
+                let bone = BoneId::ALL[j];
+                let damage = if thigh { if bone == BoneId::ThighLeft { h.health.left_leg } else { h.health.right_leg } } else { CRUSH };
+                out.push(HumanOutput::Damage { human: id, cause: DamageCause::Fall, bone, damage });
             }
         }
 
@@ -295,7 +296,7 @@ pub(super) fn find_nearby_vehicles(h: &mut Human, touch: &Touchables) {
 /// human_collide_vehicle: every bone capsule but the feet against each nearby vehicle's chassis, pushing the two
 /// apart; a vehicle the human was not last hit by hurts it when its point of contact moves into the bone fast
 /// enough.
-pub(super) fn vehicle_contacts(h: &mut Human, bodies: &mut RigidBodies, touch: &Touchables, out: &mut Vec<HumanOutput>) {
+pub(super) fn vehicle_contacts(id: usize, h: &mut Human, bodies: &mut RigidBodies, touch: &Touchables, out: &mut Vec<HumanOutput>) {
     for k in 0..h.nearby_vehicles.len() {
         let vid = h.nearby_vehicles[k];
         let Some(v) = touch.vehicles.get(vid) else { continue };
@@ -334,19 +335,12 @@ pub(super) fn vehicle_contacts(h: &mut Human, bodies: &mut RigidBodies, touch: &
             let leg = shin || j == BoneId::ThighLeft as usize || j == BoneId::ThighRight as usize;
             let threshold = if leg { LEG_RUN_OVER } else { RUN_OVER };
 
-            if h.is_immortal || (rel.dot(n)) <= threshold {
+            if rel.dot(n) <= threshold {
                 continue;
             }
 
-            h.health.vitality -= 120;
-
-            if (-119..=0).contains(&h.health.vitality) {
-                out.push(HumanOutput::Sound { sound: Sound::BodyHit, pos: h.pos, volume: 1.0, pitch: 0.5 });
-
-                if v.last_driver != -1 {
-                    out.push(HumanOutput::RunOver { driver: crate::PlayerId(v.last_driver as u32), victim: h.player });
-                }
-            }
+            let driver = (v.last_driver != -1).then_some(crate::PlayerId(v.last_driver as u32));
+            out.push(HumanOutput::Damage { human: id, cause: DamageCause::Vehicle(driver), bone: BoneId::ALL[j], damage: CRUSH });
         }
     }
 }
@@ -495,8 +489,9 @@ pub enum HumanOutput {
     TaxAccount(u32),
     /// A sound at a place (event 9), e.g. a magazine going in.
     Sound { sound: ferrosa_protocol::clientbound::game::events::sound::Sound, pos: Vec3, volume: f32, pitch: f32 },
-    /// A vehicle's last driver killed the human by running it over.
-    RunOver { driver: crate::PlayerId, victim: Option<crate::PlayerId> },
+    /// A fall or a crash hurts the human: `damage` off its vitality, or off a leg's health for a thigh. Dealt after the
+    /// physics, once plugins have had their say.
+    Damage { human: usize, cause: DamageCause, bone: BoneId, damage: i32 },
     /// A player let go of the mouse with a hand free: the head's look ahead (start to end) may open or close their
     /// corporation's garage door, if the human (at `pos`) is at its base.
     DoorProbe { player: Option<crate::PlayerId>, start: Vec3, end: Vec3, pos: Vec3 },

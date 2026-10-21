@@ -2,7 +2,13 @@ use ferrosa_physics::{
     RotMatrix,
     rotation::{IDENTITY, rotate_orientation},
 };
-use ferrosa_protocol::{CharacterCustomization, Team, clientbound::game::MenuType};
+use ferrosa_protocol::{
+    CharacterCustomization, Team,
+    clientbound::game::{
+        MenuType,
+        events::{Event, ServerEvent, mission::EventMission},
+    },
+};
 use glam::Vec3;
 
 use super::mark;
@@ -58,6 +64,12 @@ impl Sim {
         mark(&mut self.updates.players, player);
     }
 
+    /// The client's mission event (eliminator's HUD) to one player.
+    pub fn send_mission_event(&mut self, player: PlayerId, kind: i32, role: i32, value: i32, pos: Option<Vec3>) {
+        let e = EventMission { player: player.0 as i32, kind, role, value, pos: pos.map_or([0.0; 3], |p| p.to_array()) };
+        self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Mission(e) });
+    }
+
     pub fn set_name(&mut self, player: PlayerId, name: &str) {
         let Some(p) = self.players.get_mut(player.idx()) else { return };
         p.username = name.to_string();
@@ -79,7 +91,6 @@ impl Sim {
         mark(&mut self.updates.players, player);
     }
 
-    /// The player's look, and their human's model, suit, tie and necklace with it.
     pub fn set_customization(&mut self, player: PlayerId, look: CharacterCustomization) {
         let Some(p) = self.players.get_mut(player.idx()) else { return };
         p.customization = look;

@@ -9,38 +9,13 @@ use crate::{
     team_counts,
 };
 
-/// How long transaction and two-team missions run, and acquisitions, on the world clock. Round never runs the clock (it
-/// stays at 11:00), so these are the deadlines the briefings show: 12:55 and 12:25.
-const TRANSACTION_TIME: i32 = clock_time(1, 55);
-const ACQUISITION_TIME: i32 = clock_time(1, 25);
 /// The disks come in turn, black to red; gold missions are worth four times as much.
 const DISKS: [&str; 6] = ["diskblack", "diskgreen", "diskblue", "diskwhite", "diskgold", "diskred"];
 const GOLD: usize = 4;
-/// The seller's price, and the buyers' base price and its steps.
-const SELLER_VALUE: i32 = 100;
-const BASE_VALUE: i32 = 1000;
-const VALUE_STEP: i32 = 250;
-/// Each round cash item is worth 250; a briefcase starts every fourth.
-const CASH_VALUE: i32 = 250;
 /// Steps along the table: half a unit between items, three quarters around a briefcase.
 const ITEM_STEP: f32 = 0.5;
 const CASE_STEP: f32 = 0.75;
-/// An acquisition's reward rate per unit of value.
-const RATE_SCALE: f32 = 1.0 / 40000.0;
-/// At round end each member is paid their share and a flat 250.
-const ROUND_WAGE: i32 = 250;
-/// A share's price grows by the earnings over 50000 of itself; below 50 it is held at 50, at 500 or more (outside
-/// weekly play) it splits five for one.
-const EARNINGS_SCALE: f32 = 50000.0;
-const PRICE_FLOOR: f32 = 50.0;
-const PRICE_SPLIT: f32 = 500.0;
-const SPLIT_RATIO: f32 = 0.2;
-const SPLIT_SHARES: i32 = 5;
-/// A disk left on the table rather than at a mission spot, and the car chase's target, at none.
-const NO_LOCATION: i32 = -1;
-const CHASE_LOCATION: i32 = 255;
-/// No item.
-const NO_ITEM: i32 = -1;
+
 /// Where a disk can be left for a transaction.
 const MISSION_SPOTS: [Vec3; 8] = [
     // Hondo Park
@@ -61,13 +36,14 @@ const MISSION_SPOTS: [Vec3; 8] = [
     Vec3::new(1546.0, 38.0, 1278.0),
 ];
 
-/// The kinds of mission.
-const ACQUISITION: i32 = 1;
-const SELL: i32 = 2;
-const BUY_FUNDED: i32 = 3;
-const BUY: i32 = 4;
-const TWO_TEAM_SELL: i32 = 7;
-const TWO_TEAM_BUY: i32 = 8;
+enum MissionTypes {
+    Acquisition = 1,
+    Sell = 2,
+    BuyFunded = 3,
+    Buy = 4,
+    TwoTeamSell = 7,
+    TwoTeamBuy = 8
+}
 
 #[derive(Clone, Copy)]
 enum Deal {
@@ -123,7 +99,7 @@ pub(crate) struct Missions {
 
 impl Default for Missions {
     fn default() -> Self {
-        Self { spent: Corps::default(), counter: 0, disk_index: 0, last_disks: [NO_ITEM; 2] }
+        Self { spent: Corps::default(), counter: 0, disk_index: 0, last_disks: [-1; 2] }
     }
 }
 
@@ -161,11 +137,11 @@ fn item_kind(id: i32) -> i32 {
 }
 
 fn spawn(name: &str, pos: Vec3, rot: Mat3) -> Option<ferrosa_wit::Item> {
-    server::spawn_item(server::find_item_kind(name)?, pos, rot)
+    server::spawn_item(name, pos, rot)
 }
 
 fn value_step() -> i32 {
-    rand::random_range(0..5) * VALUE_STEP
+    rand::random_range(0..5) * 250
 }
 
 impl Round {
@@ -234,16 +210,16 @@ impl Round {
             }
 
             spawn("cashround", p, rot);
-            self.missions.spent[team] -= CASH_VALUE;
+            self.missions.spent[team] -= 250;
             p = step(p, rot.x, ITEM_STEP);
         }
     }
 
     /// A disk on a corporation's table with a briefcase beside it.
     fn lay_out_disk(&mut self, team: Team, disk: &str, value: i32) -> i32 {
-        let Some((rot, p)) = Self::table_start(team) else { return NO_ITEM };
+        let Some((rot, p)) = Self::table_start(team) else { return -1 };
 
-        let id = spawn(disk, p, rot).map_or(NO_ITEM, |i| i.id() as i32);
+        let id = spawn(disk, p, rot).map_or(-1, |i| i.id() as i32);
 
         self.missions.spent[team] -= value;
         spawn("briefcase", step(step(p, rot.x, ITEM_STEP), rot.x, CASE_STEP), rot);
@@ -259,14 +235,14 @@ impl Round {
             done: false,
             id: self.missions.counter,
             kind: 0,
-            item: NO_ITEM,
-            item2: NO_ITEM,
+            item: -1,
+            item2: -1,
             team1: 0,
             team2: 0,
             disk_type: 0,
             value: 0,
             deadline: 0,
-            location: NO_LOCATION,
+            location: -1,
             provided_cash: 0,
             rate: 0.0,
         };
@@ -280,18 +256,17 @@ impl Round {
         let n = list.len();
         let twice = rand::random_bool(0.25) as usize + 1;
         let funded = if twice < n { twice } else { 1 };
-        let deadline = deadline(TRANSACTION_TIME);
         let colour = self.next_disk();
         let disk = DISKS[colour];
-        let location = if rand::random_bool(0.75) { rand::random_range(0..MISSION_SPOTS.len() as i32) } else { NO_LOCATION };
+        let location = if rand::random_bool(0.75) { rand::random_range(0..MISSION_SPOTS.len() as i32) } else { -1 };
 
         let values: Vec<i32> = (0..n)
             .map(|i| {
                 if i == 0 {
-                    return SELLER_VALUE;
+                    return 100;
                 }
 
-                let mut v = value_step() + BASE_VALUE;
+                let mut v = value_step() + 1000;
 
                 if funded < i {
                     v += value_step();
@@ -303,7 +278,7 @@ impl Round {
 
         for (i, &team) in list.iter().enumerate() {
             if i == 0 {
-                self.missions.last_disks[0] = if location == NO_LOCATION {
+                self.missions.last_disks[0] = if location == -1 {
                     self.lay_out_disk(team, disk, values[0])
                 } else {
                     self.missions.spent[team] -= values[0];
@@ -330,13 +305,13 @@ impl Round {
             m.item = item;
             m.disk_type = disk_type;
             m.value = values[i];
-            m.deadline = deadline;
+            m.deadline = deadline(clock_time(1, 55));
             m.team1 = list[0] as i32;
 
             (m.kind, m.location, m.provided_cash) = match i {
-                0 => (SELL, location, 0),
-                _ if i <= funded => (BUY_FUNDED, NO_LOCATION, -spent),
-                _ => (BUY, NO_LOCATION, 0),
+                0 => (MissionTypes::Sell as i32, location, 0),
+                _ if i <= funded => (MissionTypes::BuyFunded as i32, -1, -spent),
+                _ => (MissionTypes::Buy as i32, -1, 0),
             };
 
             set_mission(team, slot, m);
@@ -348,7 +323,7 @@ impl Round {
     /// A disk at a mission spot, inside a briefcase.
     fn disk_in_briefcase(&mut self, disk: &str, pos: Vec3) -> i32 {
         let rot = Mat3::IDENTITY;
-        let Some(item) = spawn(disk, pos, rot) else { return NO_ITEM };
+        let Some(item) = spawn(disk, pos, rot) else { return -1 };
 
         if let Some(case) = spawn("briefcase", pos, rot) {
             case.attach(&item);
@@ -361,17 +336,16 @@ impl Round {
     /// Competing for the thirds money.
     fn two_team(&mut self, list: &[Team]) {
         let team_count = list.len();
-        let deadline = deadline(TRANSACTION_TIME);
         let colour = self.next_disk();
         let disk = DISKS[colour];
 
         let values: Vec<i32> = (0..team_count)
             .map(|team_idx| {
                 if team_idx <= 1 {
-                    return SELLER_VALUE;
+                    return 100;
                 }
 
-                let v = value_step() + value_step() + BASE_VALUE;
+                let v = value_step() + value_step() + 1000;
                 (if colour == GOLD { v * 4 } else { v }) * 2
             })
             .collect();
@@ -399,13 +373,13 @@ impl Round {
             mission.item2 = item2;
             mission.disk_type = disk_type;
             mission.value = values[i];
-            mission.deadline = deadline;
+            mission.deadline = deadline(clock_time(1, 55));
 
             if i <= 1 {
-                mission.kind = TWO_TEAM_SELL;
+                mission.kind = MissionTypes::TwoTeamSell as i32;
                 mission.team1 = list[2] as i32;
             } else {
-                mission.kind = TWO_TEAM_BUY;
+                mission.kind = MissionTypes::TwoTeamBuy as i32;
                 mission.team1 = list[0] as i32;
                 mission.team2 = list[1] as i32;
                 mission.provided_cash = -spent;
@@ -420,10 +394,10 @@ impl Round {
     /// create_mission_aquisition (car chase): a disk carried through the streets in a guarded traffic car, every
     /// corporation of the group racing to take it.
     fn car_chase(&mut self, list: &[Team]) {
-        let deadline = deadline(ACQUISITION_TIME);
+        let deadline = deadline(clock_time(1, 25));
         let colour = self.next_disk();
         let chase = server::find_item_kind(DISKS[colour]).and_then(chase::car_chase);
-        let (location, item) = chase.map_or((NO_LOCATION, NO_ITEM), |disk| (CHASE_LOCATION, disk.id() as i32));
+        let (location, item) = chase.map_or((-1, -1), |disk| (255, disk.id() as i32));
 
         self.missions.last_disks[0] = item;
 
@@ -431,19 +405,19 @@ impl Round {
 
         for &team in list {
             let Some((slot, mut m)) = self.open_mission(team) else { continue };
-            let mut value = value_step() + BASE_VALUE;
+            let mut value = value_step() + 1000;
 
             if colour == GOLD {
                 value *= 4;
             }
 
-            m.kind = ACQUISITION;
+            m.kind = MissionTypes::Acquisition as i32;
             m.item = item;
             m.disk_type = disk_type;
             m.value = value;
             m.deadline = deadline;
             m.location = location;
-            m.rate = value as f32 * RATE_SCALE;
+            m.rate = value as f32 * (1.0 / 40000.0);
 
             set_mission(team, slot, m);
         }
@@ -467,14 +441,14 @@ impl Round {
             let pos = |id: i32| u32::try_from(id).ok().and_then(server::get_item).map(|i| i.pos());
             let mut earnings = self.missions.spent[team];
 
-            earnings += items.iter().filter(|i| Some(i.kind()) == cash && base.contains(i.pos())).count() as i32 * CASH_VALUE;
+            earnings += items.iter().filter(|i| Some(i.kind()) == cash && base.contains(i.pos())).count() as i32 * 250;
 
-            for m in corp.missions().iter().filter(|m| m.active && m.item != NO_ITEM) {
+            for m in corp.missions().iter().filter(|m| m.active && m.item != -1) {
                 if !pos(m.item).is_some_and(|p| base.contains(p)) {
                     continue;
                 }
 
-                if (TWO_TEAM_SELL..=9).contains(&m.kind) && m.item2 != NO_ITEM && !pos(m.item2).is_some_and(|p| base.contains(p)) {
+                if (MissionTypes::TwoTeamSell as i32..=9).contains(&m.kind) && m.item2 != -1 && !pos(m.item2).is_some_and(|p| base.contains(p)) {
                     continue;
                 }
 
@@ -484,7 +458,7 @@ impl Round {
             let share = earnings / divisors[team];
 
             for p in players.iter().filter(|p| p.team() == team) {
-                p.set_money(p.money() + share + ROUND_WAGE);
+                p.set_money(p.money() + share + 250);
 
                 if self.cfg.weekly
                     && let Some(id) = p.account_id()
@@ -495,15 +469,15 @@ impl Round {
 
             corp.set_funds(earnings);
 
-            let mut price = corp.price() * (earnings as f32 / EARNINGS_SCALE + 1.0);
+            let mut price = corp.price() * (earnings as f32 / 50000.0 + 1.0);
 
-            if PRICE_FLOOR > price {
-                price = PRICE_FLOOR;
-            } else if !self.cfg.weekly && price >= PRICE_SPLIT {
-                price *= SPLIT_RATIO;
+            if 50.0 > price {
+                price = 50.0;
+            } else if !self.cfg.weekly && price >= 500.0 {
+                price *= 0.2;
 
                 for p in players.iter().filter(|p| p.team() == team) {
-                    p.set_stocks(p.stocks() * SPLIT_SHARES);
+                    p.set_stocks(p.stocks() * 5);
                 }
             }
 

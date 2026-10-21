@@ -3,39 +3,19 @@ use ferrosa_wit::{GameState, Human, Menu, Player, SuitColour, Team, server};
 use crate::{
     Round, TEAM_NAMES,
     bases::{Area, base},
-    inventory::SLOTS,
     round_corp, spawn_corp_vehicle,
 };
 
 
 const COLOUR_NAMES: [&str; 6] = ["Black", "Red", "Blue", "Silver", "White", "Gold"];
-/// A sold-out vehicle slot's button.
-const SOLD: i32 = 8;
-/// Button bytes 128 to 133 switch to menus 14 to 19.
 const TAB: u32 = 0x80;
 const TABS: [Menu; 6] = [Menu::RoundCorpWeapons, Menu::RoundCorpAmmo, Menu::RoundCorpEquip, Menu::RoundCorpVehicle, Menu::RoundCorpStock, Menu::WorldEmptyCorp];
-/// The manager page (menu 19) and its fire button.
-const MANAGER_PAGE: Menu = Menu::WorldEmptyCorp;
-const FIRE: i32 = 6;
-/// A player can buy 10 items a round day.
-const BUY_LIMIT: i32 = 9;
 const WEAPONS: [&str; 5] = ["pistol", "mp5", "ak47", "m16", "uzi"];
 const AMMO: [&str; 5] = ["pistolmag", "mp5mag", "ak47mag", "m16mag", "uzimag"];
-/// The suits on the equipment page: buttons 1 to 3 (colour, price).
 const SUITS: [(SuitColour, i32); 3] = [(SuitColour::Navy, 5000), (SuitColour::Red, 20000), (SuitColour::White, 100000)];
-/// The necklaces on the equipment page: buttons 4 and 5 (necklace, price).
 const NECKLACES: [(u8, i32); 2] = [(1, 10000), (2, 1000000)];
-/// A corporation records up to 128 fired accounts.
-const MAX_FIRED: usize = 128;
-/// The share page's buttons 0 to 3 buy this many shares, 4 to 7 sell them.
 const SHARE_AMOUNTS: [i32; 4] = [1, 10, 100, 1000];
-/// Hands for a briefcase, pockets for everything else.
-const HANDS: std::ops::Range<u32> = 0..2;
-const POCKETS: std::ops::Range<u32> = 2..7;
-/// What a fired player loses from their human: guns, magazines, keys, grenades and bandages.
-const STRIPPED: [&str; 3] = ["key", "grenade", "bandage"];
 
-/// One vehicle on sale: whether it is still there, its kind, colour and price.
 #[derive(Clone, Copy, Default)]
 pub(crate) struct VehicleOffer {
     pub(crate) active: bool,
@@ -134,7 +114,7 @@ impl Round {
                 Menu::RoundCorpVehicle => {
                     for (i, o) in self.vehicle_stock.iter().enumerate() {
                         if !o.active {
-                            p.add_menu_button(SOLD, "SOLD", Some(0));
+                            p.add_menu_button(8, "SOLD", Some(0));
                             continue;
                         }
 
@@ -144,9 +124,9 @@ impl Round {
                         p.add_menu_button(i as i32, &format!("{colour} {name}"), Some(o.price));
                     }
                 }
-                MANAGER_PAGE if p.manager_tab() => {
+                Menu::WorldEmptyCorp if p.manager_tab() => {
                     for other in players.iter().filter(|o| o.id() != p.id() && o.team() == p.team()) {
-                        p.add_menu_button(((other.id() as i32) << 16) + FIRE, &format!("Fire {}", other.name()), None);
+                        p.add_menu_button(((other.id() as i32) << 16) + 6, &format!("Fire {}", other.name()), None);
                     }
                 }
                 _ => {}
@@ -190,7 +170,7 @@ impl Round {
             (Menu::RoundCorpVehicle, 0..8) => self.buy_vehicle(p, &human, b as usize),
             (Menu::RoundCorpStock, 0..4) => p.buy_stocks(SHARE_AMOUNTS[b as usize]),
             (Menu::RoundCorpStock, 4..8) => p.sell_stocks(SHARE_AMOUNTS[b as usize - 4]),
-            (MANAGER_PAGE, 6) => self.fire(p, &human, target),
+            (Menu::WorldEmptyCorp, 6) => self.fire(p, &human, target),
             _ => {}
         }
 
@@ -202,11 +182,11 @@ impl Round {
         let price = server::item_price(kind).unwrap_or(0);
         let bought = self.items_bought.entry(p.id()).or_default();
 
-        if *bought > BUY_LIMIT || !(p.money() >= price || price == 0) {
+        if *bought > 9 || !(p.money() >= price || price == 0) {
             return;
         }
 
-        let slots = if name == "briefcase" { HANDS } else { POCKETS };
+        let slots = if name == "briefcase" { 0..2 } else { 2..7 };
 
         if human.give_item(kind, slots.start, slots.end).is_none() {
             return;
@@ -226,7 +206,7 @@ impl Round {
 
         let Some(vehicle) = spawn_corp_vehicle(offer.kind, team, offer.colour) else { return };
 
-        if let Some(key) = server::find_item_kind("key").and_then(|k| human.give_item(k, POCKETS.start, POCKETS.end)) {
+        if let Some(key) = server::find_item_kind("key").and_then(|k| human.give_item(k, 2, 7)) {
             key.set_key_vehicle(Some(&vehicle));
         }
 
@@ -243,7 +223,7 @@ impl Round {
 
         let at_base = base(team).is_some_and(|b| b.contains(human.pos()));
 
-        if !at_base || self.fired[team].len() >= MAX_FIRED || target == p.id() as i32 {
+        if !at_base || self.fired[team].len() >= 128 || target == p.id() as i32 {
             return;
         }
 
@@ -270,9 +250,9 @@ impl Round {
 }
 
 fn strip_human(human: &Human) {
-    let stripped: Vec<u32> = WEAPONS.iter().chain(&AMMO).chain(&STRIPPED).filter_map(|n| server::find_item_kind(n)).collect();
+    let stripped: Vec<u32> = WEAPONS.iter().chain(&AMMO).chain(&["key", "grenade", "bandage"]).filter_map(|n| server::find_item_kind(n)).collect();
 
-    for slot in 0..SLOTS {
+    for slot in 0..7 {
         for item in human.slot(slot).into_iter().filter(|i| stripped.contains(&i.kind())) {
             for child in item.children() {
                 child.delete();

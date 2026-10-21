@@ -187,8 +187,7 @@ impl ObjectDecoder {
     fn read_human(&mut self, r: &mut Reader, slot: u16, h: usize) -> Result<ServerHumanObject, CodecError> {
         let appearance = if r.bits(1)? == 1 {
             let player_id = r.nullable(8)?;
-            let mut c = CharacterCustomization::default();
-            c.gender = Gender::from_bit(r.bits(1)? as u32);
+            let mut c = CharacterCustomization { gender: Gender::from_bit(r.bits(1)?), ..Default::default() };
 
             for (f, n) in [(&mut c.head, 5), (&mut c.skin, 3), (&mut c.hair_style, 4), (&mut c.eye_color, 3), (&mut c.hair_color, 4)] {
                 *f = r.bits(n)? as u8;
@@ -204,6 +203,7 @@ impl ObjectDecoder {
         } else {
             None
         };
+
         let base_index = r.bits(8)?;
         let vehicle = r.signed(8)?;
         let vehicle_seat = r.bits(4)? as i32;

@@ -4,15 +4,13 @@ use glam::Vec3;
 use self::rules::ModeRules;
 use crate::{PlayerId, sim::Sim};
 
-pub mod eliminator;
 pub mod rules;
 pub mod unported;
 pub mod world;
 
 pub type Mode = &'static dyn ModeHooks;
 
-pub static MODES: [Mode; 7] = [
-    &eliminator::Hooks,
+pub static MODES: [Mode; 6] = [
     &world::Hooks,
     &unported::DRIVING,
     &unported::RACING,
@@ -29,12 +27,11 @@ pub fn find(modes: &[Mode], name: &str) -> Option<Mode> {
 pub struct Modes {
     pub versus: unported::VersusConfig,
     pub world: world::WorldMode,
-    pub eliminator: eliminator::EliminatorState,
 }
 
 impl Modes {
     pub(crate) fn load() -> Self {
-        Self { versus: unported::VersusConfig::load(std::path::Path::new("config_versus.txt")), world: world::WorldMode::load(), eliminator: Default::default() }
+        Self { versus: unported::VersusConfig::load(std::path::Path::new("config_versus.txt")), world: world::WorldMode::load() }
     }
 }
 

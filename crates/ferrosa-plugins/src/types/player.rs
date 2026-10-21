@@ -157,6 +157,12 @@ impl types::HostPlayer for HostState {
         Ok(())
     }
 
+    fn send_mission_event(&mut self, player: Resource<PlayerRef>, kind: i32, role: i32, value: i32, pos: Option<Vec3>) -> wasmtime::Result<()> {
+        let id = self.player_id_of(&player)?;
+        self.sim_mut()?.send_mission_event(id, kind, role, value, pos.map(Into::into));
+        Ok(())
+    }
+
     fn human(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<Option<Resource<HumanRef>>> {
         let Some(h) = self.player_of(&player)?.and_then(|p| p.human) else { return Ok(None) };
         self.human_handle(h).map(Some)

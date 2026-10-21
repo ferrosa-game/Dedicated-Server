@@ -4,7 +4,7 @@ use ferrosa_wit::{Gender, Human, Item, Mat3, Model, Player, SuitColour, Team, Ve
 const ITEMS_AT: Vec3 = Vec3::new(62.0, 10.0, 60.0);
 
 fn spawn(name: &str, pos: Vec3) -> Option<Item> {
-    server::spawn_item(server::find_item_kind(name)?, pos, Mat3::IDENTITY)
+    server::spawn_item(name, pos, Mat3::IDENTITY)
 }
 
 /// create_round_traffic_car: a town car driving a route through the streets, its driver holding its key and a
@@ -19,7 +19,7 @@ pub(crate) fn car_chase(kind: u32) -> Option<Item> {
         human.put_item(&key, 4);
     }
 
-    let disk = server::spawn_item(kind, ITEMS_AT, Mat3::IDENTITY);
+    let disk = server::spawn_item_by_id(kind, ITEMS_AT, Mat3::IDENTITY);
 
     if let Some(case) = spawn("briefcase", ITEMS_AT) {
         if let Some(disk) = &disk {

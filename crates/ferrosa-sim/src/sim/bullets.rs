@@ -15,6 +15,7 @@ use crate::{
         damage::{BoneHit, damage_human, trace_ray_human},
         physics::{HumanOutput, add_bullet_hole},
     },
+    plugin::DamageCause,
     time::TICKS_PER_SECOND_F32,
     vehicle::physics::{VehicleHit, VehiclePart, trace_vehicle_parts},
     world::{
@@ -312,14 +313,15 @@ impl Sim {
             damage = 0;
         }
 
+        if damage > 0 {
+            let plugins = self.plugins;
+            damage = plugins.on_damage(self, id, DamageCause::Bullet(bullet.player), Some(hit.bone), damage);
+        }
+
         let victim = self.humans.get(id).and_then(|h| h.player);
         self.score_hurt(bullet.player, victim, damage);
 
         let Some(human) = self.humans.get_mut(id) else { return };
-
-        if human.is_immortal && human.down_timer > 0 {
-            damage = 0;
-        }
 
         damage_human(human, hit.bone, damage);
 

@@ -3,7 +3,7 @@ use ferrosa_protocol::{
     GameMode, SuitColor, Team,
     clientbound::game::{GameState, MenuType, events::chat::ChatType},
 };
-use ferrosa_sim::BoneId;
+use ferrosa_sim::{BoneId, DamageCause};
 
 use crate::bindings::ferrosa::plugin::types::{self, ClientMode, Mat3, Mission, Vec3};
 
@@ -151,6 +151,74 @@ impl From<Mission> for ferrosa_sim::Mission {
             provided_cash: m.provided_cash,
             rate: m.rate,
             result: None,
+        }
+    }
+}
+
+impl From<BoneId> for types::Bone {
+    fn from(b: BoneId) -> Self {
+        match b {
+            BoneId::Pelvis => Self::Pelvis,
+            BoneId::Stomach => Self::Stomach,
+            BoneId::Torso => Self::Torso,
+            BoneId::Head => Self::Head,
+            BoneId::ShoulderLeft => Self::ShoulderLeft,
+            BoneId::ForearmLeft => Self::ForearmLeft,
+            BoneId::HandLeft => Self::HandLeft,
+            BoneId::ShoulderRight => Self::ShoulderRight,
+            BoneId::ForearmRight => Self::ForearmRight,
+            BoneId::HandRight => Self::HandRight,
+            BoneId::ThighLeft => Self::ThighLeft,
+            BoneId::ShinLeft => Self::ShinLeft,
+            BoneId::FootLeft => Self::FootLeft,
+            BoneId::ThighRight => Self::ThighRight,
+            BoneId::ShinRight => Self::ShinRight,
+            BoneId::FootRight => Self::FootRight,
+        }
+    }
+}
+
+impl From<DamageCause> for types::DamageCause {
+    fn from(c: DamageCause) -> Self {
+        let id = |p: Option<ferrosa_sim::PlayerId>| p.map(|p| p.0);
+
+        match c {
+            DamageCause::Bullet(p) => Self::Bullet(id(p)),
+            DamageCause::Explosion(p) => Self::Explosion(id(p)),
+            DamageCause::Fall => Self::Fall,
+            DamageCause::Vehicle(p) => Self::Vehicle(id(p)),
+        }
+    }
+}
+
+impl From<ferrosa_sim::HumanHealth> for types::Health {
+    fn from(h: ferrosa_sim::HumanHealth) -> Self {
+        Self {
+            health: h.health,
+            blood: h.blood_level,
+            vitality: h.vitality,
+            chest: h.chest,
+            head: h.head,
+            left_arm: h.left_arm,
+            right_arm: h.right_arm,
+            left_leg: h.left_leg,
+            right_leg: h.right_leg,
+        }
+    }
+}
+
+impl From<types::Health> for ferrosa_sim::HumanHealth {
+    fn from(h: types::Health) -> Self {
+        Self {
+            health: h.health,
+            blood_level: h.blood,
+            vitality: h.vitality,
+            chest: h.chest,
+            head: h.head,
+            left_arm: h.left_arm,
+            right_arm: h.right_arm,
+            left_leg: h.left_leg,
+            right_leg: h.right_leg,
         }
     }
 }

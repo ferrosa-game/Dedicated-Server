@@ -135,9 +135,11 @@ pub trait Plugin: Default + 'static {
     /// A real player's human has died.
     fn on_death(&mut self, _player: PlayerId) {}
 
-    /// A player hurt another (bullets and the like, not themselves), after the server's own scoring. Team damage is
-    /// the mode's to deal here.
-    fn on_hurt(&mut self, _attacker: PlayerId, _victim: PlayerId, _damage: i32) {}
+    /// A human is about to be hurt by a bullet, a grenade, a fall or a vehicle; returns the damage to deal instead (0
+    /// to refuse it). The mode is asked first, then each plugin with the last answer.
+    fn on_damage(&mut self, _human: HumanId, _cause: DamageCause, _bone: Option<Bone>, damage: i32) -> i32 {
+        damage
+    }
 
     /// /resetgame has named this plugin's mode. Only asked of the mode.
     fn on_admin_select(&mut self) {}
@@ -231,9 +233,9 @@ macro_rules! plugin {
             }
         }
 
-        impl $crate::exports::ferrosa::plugin::on_hurt::Guest for __FerrosaPlugin {
-            fn on_hurt(attacker: $crate::PlayerId, victim: $crate::PlayerId, damage: i32) {
-                __FERROSA.with_borrow_mut(|p| $crate::Plugin::on_hurt(p, attacker, victim, damage))
+        impl $crate::exports::ferrosa::plugin::on_damage::Guest for __FerrosaPlugin {
+            fn on_damage(human: $crate::HumanId, cause: $crate::DamageCause, bone: ::std::option::Option<$crate::Bone>, damage: i32) -> i32 {
+                __FERROSA.with_borrow_mut(|p| $crate::Plugin::on_damage(p, human, cause, bone, damage))
             }
         }
 

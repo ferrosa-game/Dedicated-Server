@@ -117,6 +117,10 @@ impl Sim {
         self.reset_lobby_players_and_world();
     }
 
+    pub fn intersections(&self) -> &[crate::world::streets::StreetIntersection] {
+        &self.world.map.streets.intersections
+    }
+
     pub fn clear_bullets(&mut self) {
         self.bullets.clear();
     }

@@ -49,25 +49,6 @@ pub struct Mission {
     pub result: Option<(bool, i32)>,
 }
 
-pub const MISSION_SPOTS: [Vec3; 8] = [
-    // Hondo Park
-    Vec3::new(1718.0, 46.0, 1262.0),
-    // Rio Granary
-    Vec3::new(1778.0, 30.0, 1006.0),
-    // Isle of Burgers
-    Vec3::new(1470.0, 50.0, 1494.0),
-    // Park above the Kamel Building
-    Vec3::new(1282.0, 62.0, 1534.0),
-    // Bobson Dugnutt Museum
-    Vec3::new(1674.0, 66.0, 1510.0),
-    // The Mall
-    Vec3::new(1346.0, 38.0, 1298.0),
-    // Gas Station
-    Vec3::new(1606.0, 26.0, 1166.0),
-    // Red Cube Park
-    Vec3::new(1546.0, 38.0, 1278.0),
-];
-
 /// settle_mission_result: a failed acquisition costs 10 rating; a seller gains 50 plus 10 on success when paid at
 /// least what it was given, and up to 10 back on success when short.
 const FAILED_RATING: i32 = -10;

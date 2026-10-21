@@ -1,17 +1,9 @@
 use ferrosa_physics::rotation::IDENTITY;
-use ferrosa_protocol::{
-    Team,
-    clientbound::game::{GameState, ItemKind, MenuType, VehicleKind},
-};
+use ferrosa_protocol::clientbound::game::{ItemKind, MenuType, VehicleKind};
 
 use super::{Sim, corporations::team_index};
 use crate::{PlayerId, items, items::state::ItemState};
 
-/// A player can change team once a second in the lobby, and only while more than 599 intermission ticks remain;
-/// readiness can only be taken back above 180.
-const TEAM_SWITCH: i32 = 60;
-const LOBBY_TEAM_TIME: i32 = 599;
-const LOBBY_UNREADY_TIME: i32 = 180;
 /// reset_game sets the clock to 11:00 outside world mode.
 const CLOCK_START: i32 = 2376000;
 /// The sun's roll: a quarter turn's worth of 256 steps, from a sixteenth of a turn up, and a half turn's tilt.
@@ -264,63 +256,4 @@ impl Sim {
         }
     }
 
-    /// The lobby buttons (menu 2) in an intermission: 1 to 3 join a corporation (not one that fired the account), 4
-    /// leaves to spectate (a manager stops managing), 5 readies up or, early enough, back down.
-    pub(crate) fn lobby_menu(&mut self, pid: PlayerId, button: u32) {
-        if self.gamestate != GameState::Intermission {
-            return;
-        }
-
-        let timer = self.game_timer;
-        let Some(p) = self.players.get(pid.idx()) else { return };
-
-        if timer > LOBBY_TEAM_TIME && p.team_switch_timer == 0 {
-            match button {
-                1..=3 => {
-                    let k = button as usize - 1;
-
-                    if self.corp_state[k].fired.contains(&p.account_id) {
-                        return;
-                    }
-
-                    let p = self.players.get_mut(pid.idx()).unwrap();
-                    p.team = Team::CORPORATIONS[k];
-                    p.team_switch_timer = TEAM_SWITCH;
-                    p.is_ready = false;
-                }
-                4 => {
-                    if let Some(k) = team_index(p.team)
-                        && self.corp_state[k].manager == Some(pid)
-                    {
-                        self.corp_state[k].manager = None;
-                        self.corp_state[k].fired.clear();
-                    }
-
-                    self.sell_all_stocks(pid);
-
-                    let p = self.players.get_mut(pid.idx()).unwrap();
-                    p.team = Team::Spectator;
-                    p.manager_tab = false;
-                    let e = p.make_update_financials_event(self.tick);
-                    self.events.push(e);
-                    let p = self.players.get_mut(pid.idx()).unwrap();
-                    p.team_switch_timer = TEAM_SWITCH;
-                    p.is_ready = false;
-                }
-                _ => {}
-            }
-        }
-
-        if button == 5 {
-            let p = self.players.get_mut(pid.idx()).unwrap();
-
-            if !p.is_ready {
-                p.is_ready = true;
-            } else if timer > LOBBY_UNREADY_TIME {
-                p.is_ready = false;
-            }
-        }
-
-        self.update_player_event(pid);
-    }
 }

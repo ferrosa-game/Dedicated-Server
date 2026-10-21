@@ -152,7 +152,7 @@ pub(crate) fn simulate_human(
             h.seat_exit = 1;
         }
     } else {
-        walk_and_collide(h, bodies, map, touch, &nearby, out);
+        walk_and_collide(id, h, bodies, map, touch, &nearby, out);
     }
 
     if h.health.vitality > 0 {
@@ -201,7 +201,7 @@ pub(crate) fn simulate_human(
 
 /// The part of human_simulation for a human on foot: the jump charging, the feet held to the ground, the bones
 /// against the level and against nearby vehicles.
-fn walk_and_collide(h: &mut Human, bodies: &mut RigidBodies, map: &mut Map, touch: &mut Touchables, nearby: &[usize], out: &mut Vec<HumanOutput>) {
+fn walk_and_collide(id: usize, h: &mut Human, bodies: &mut RigidBodies, map: &mut Map, touch: &mut Touchables, nearby: &[usize], out: &mut Vec<HumanOutput>) {
     let alive = h.health.vitality > 0;
     let standing = alive && h.health.health > 49;
 
@@ -228,7 +228,7 @@ fn walk_and_collide(h: &mut Human, bodies: &mut RigidBodies, map: &mut Map, touc
         start_step(h, 1);
     }
 
-    bone_world_contacts(h, bodies, map, out);
+    bone_world_contacts(id, h, bodies, map, out);
 
     if h.last_vehicle_cooldown > 0 {
         h.last_vehicle_cooldown -= 1;
@@ -236,7 +236,7 @@ fn walk_and_collide(h: &mut Human, bodies: &mut RigidBodies, map: &mut Map, touc
         h.last_vehicle = -1;
     }
 
-    vehicle_contacts(h, bodies, touch, out);
+    vehicle_contacts(id, h, bodies, touch, out);
 
     h.pos = h.bones[0].pos;
 }
@@ -393,15 +393,7 @@ fn weak_strength(id: usize, vitality: i32, ticks: u32, base: f32) -> f32 {
 /// - mortal and bleeding: health every 64 ticks, nothing else;
 /// - mortal: health every 32 ticks, parts every 64, blood every 256.
 fn health_sim(id: usize, h: &mut Human, ticks: u32, out: &mut Vec<HumanOutput>) {
-    if h.is_immortal {
-        if h.down_timer > 0 {
-            h.down_timer -= 1;
-        }
-
-        if h.health.health <= 49 {
-            h.down_timer = 1800;
-        }
-    } else if h.health.health <= 74 {
+    if h.health.health <= 74 {
         h.pain = h.pain.max(((75 - h.health.health) * 2).min(60));
     }
 
@@ -419,39 +411,25 @@ fn health_sim(id: usize, h: &mut Human, ticks: u32, out: &mut Vec<HumanOutput>) 
 
     let every = |n: u32| ticks.is_multiple_of(n);
 
-    if h.is_immortal {
-        if every(8) {
+    if h.health.chest <= 0 || h.health.head <= 0 {
+        h.health.vitality = 0;
+    }
+
+    if h.bleeding {
+        if every(64) {
+            heal(&mut h.health.health);
+        }
+    } else {
+        if every(32) {
             heal(&mut h.health.health);
         }
 
-        if every(16) {
+        if every(64) {
             parts(h).into_iter().for_each(heal);
         }
 
         if every(256) {
             heal(&mut h.health.blood_level);
-        }
-    } else {
-        if h.health.chest <= 0 || h.health.head <= 0 {
-            h.health.vitality = 0;
-        }
-
-        if h.bleeding {
-            if every(64) {
-                heal(&mut h.health.health);
-            }
-        } else {
-            if every(32) {
-                heal(&mut h.health.health);
-            }
-
-            if every(64) {
-                parts(h).into_iter().for_each(heal);
-            }
-
-            if every(256) {
-                heal(&mut h.health.blood_level);
-            }
         }
     }
 
@@ -459,7 +437,7 @@ fn health_sim(id: usize, h: &mut Human, ticks: u32, out: &mut Vec<HumanOutput>) 
         bleed(id, h, ticks, out);
     }
 
-    if !h.is_immortal && h.health.blood_level <= 10 {
+    if h.health.blood_level <= 10 {
         h.health.vitality = 0;
     }
 }
@@ -492,7 +470,7 @@ fn bleed(id: usize, h: &mut Human, ticks: u32, out: &mut Vec<HumanOutput>) {
 
     let id = id as i32;
 
-    if (id.wrapping_mul(id).wrapping_mul(id) ^ ticks as i32) as u8 == 0 && !h.is_immortal {
+    if (id.wrapping_mul(id).wrapping_mul(id) ^ ticks as i32) as u8 == 0 {
         h.health.blood_level = blood - 3;
         let p = h.bones[1].pos;
         out.push(HumanOutput::Blood(Vec3::new(0.0 * 0.5 + p.x, 1.0 * 0.5 + p.y, 0.5 * 0.0 + p.z)));

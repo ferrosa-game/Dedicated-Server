@@ -37,11 +37,14 @@ impl Sim {
         self.delete_item(id);
     }
 
+    pub fn item_holder(&self, item: usize) -> Option<usize> {
+        usize::try_from(self.items.get(item)?.parent_human).ok().filter(|&h| self.humans.get(h).is_some())
+    }
+
     pub fn item_children(&self, item: usize) -> Vec<usize> {
         self.items.get(item).map_or_else(Vec::new, |i| i.children.clone())
     }
 
-    /// Puts `child` inside `parent`. A closed briefcase takes it as an open one would, and stays closed.
     pub fn attach_item(&mut self, parent: usize, child: usize) -> bool {
         let closed = self.items.get(parent).is_some_and(|i| i.item_type == ItemKind::Briefcase);
 
@@ -99,7 +102,6 @@ impl Sim {
         true
     }
 
-    /// A bundle of cash's bills and their codes.
     pub fn item_cash(&self, item: usize) -> Option<(i32, u32)> {
         self.items.get(item)?.state.cash().map(|c| (c.bills, c.codes))
     }

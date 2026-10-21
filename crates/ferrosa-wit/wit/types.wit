@@ -45,6 +45,33 @@ interface types {
         world-corp-requisition,
     }
 
+    /// A human's health, each part out of 100.
+    record health {
+        /// Overall health: at 49 or less the human falls down.
+        health: s32,
+        blood: s32,
+        /// Whether it is alive: dead at 0 or less, weakened at 24 or less, and a bandage saves it at 9 or less.
+        vitality: s32,
+        chest: s32,
+        head: s32,
+        left-arm: s32,
+        right-arm: s32,
+        left-leg: s32,
+        right-leg: s32,
+    }
+
+    /// What is hurting a human, and who is behind it.
+    variant damage-cause {
+        /// A bullet, and the player who fired it.
+        bullet(option<player-id>),
+        /// A grenade, and the player who primed it.
+        explosion(option<player-id>),
+        /// Hitting the ground or a wall hard.
+        fall,
+        /// Run over, and the vehicle's last driver.
+        vehicle(option<player-id>),
+    }
+
     /// A human's bones.
     enum bone {
         pelvis,
@@ -135,6 +162,11 @@ interface types {
         bot: func() -> bool;
         /// A message only this player sees. Long messages and line breaks become several chat lines.
         message: func(message: string);
+        /// The client's mission event, which eliminator's HUD shows, to this player alone. `kind` 0 tells them their
+        /// role (`role` 0 target, 1 eliminator, 2 protector, with `value` their id << 10 plus the target's), 1 a
+        /// position to show (`pos`), 2 a group's result at the end (`role` the group, `value` the eliminator << 10
+        /// plus the target plus the protector << 20).
+        send-mission-event: func(kind: s32, role: s32, value: s32, pos: option<vec3>);
         human: func() -> option<human>;
         /// Makes them control `human`.
         set-human: func(human: borrow<human>);
@@ -225,8 +257,12 @@ interface types {
         /// 0 or less is dead.
         vitality: func() -> s32;
         /// A hit of `damage` on one of its bones, as a bullet's: the torso loses chest health, the head head health,
-        /// arms and legs more; any hit may start bleeding. Team damage hits the head.
+        /// arms and legs more; any hit may start bleeding. It isn't passed to on-damage.
         damage: func(bone: bone, damage: s32);
+        health: func() -> health;
+        /// Sets every part of its health at once. A mortal human dies on its next update with no blood left (10 or
+        /// less) or no chest or head health.
+        set-health: func(health: health);
         set-vitality: func(vitality: s32);
         bleeding: func() -> bool;
         set-bleeding: func(bleeding: bool);
@@ -270,6 +306,8 @@ interface types {
         attach: func(child: borrow<item>) -> bool;
         /// What's inside it. Deleting an item drops these.
         children: func() -> list<item>;
+        /// The human whose hands or pockets it's in; none for an item lying in the world (or inside another).
+        holder: func() -> option<human>;
         body: func() -> option<body>;
         /// What's left in it: a gun's chambered rounds, a magazine's rounds, a grenade's or bandage's uses.
         uses: func() -> s32;
@@ -331,6 +369,17 @@ interface types {
     record cash {
         bills: s32,
         codes: u32,
+    }
+
+    /// A street intersection.
+    record intersection {
+        /// Its position on the road.
+        pos: vec3,
+        /// How far the streets around it reach east, south, west and north, in grid units.
+        lanes: tuple<s32, s32, s32, s32>,
+        /// The box its road covers.
+        min: vec3,
+        max: vec3,
     }
 
     /// Where a vehicle's origin goes in a base.

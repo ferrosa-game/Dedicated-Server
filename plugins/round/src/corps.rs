@@ -2,10 +2,10 @@ use std::ops::{Index, IndexMut};
 
 use ferrosa_wit::Team;
 
-use crate::{ROUND_CORPS, TEAMS};
+use crate::TEAMS;
 
 #[derive(Clone, Copy, Default)]
-pub(crate) struct Corps<T>(pub(crate) [T; ROUND_CORPS]);
+pub(crate) struct Corps<T>(pub(crate) [T; 3]);
 
 impl<T> Corps<T> {
     pub(crate) fn iter(&self) -> impl Iterator<Item = (Team, &T)> {

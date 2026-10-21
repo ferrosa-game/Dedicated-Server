@@ -103,11 +103,9 @@ fn guns(p: &Player) {
     for (k, (gun, mag)) in GUNS.into_iter().enumerate() {
         let at = centre + right * ((first + k as f32) * 0.75);
 
-        if let Some(gun) = server::find_item_kind(gun) {
-            server::spawn_item(gun, at, facing);
-        }
+        server::spawn_item(gun, at, facing);
 
-        let Some(mag) = mag.and_then(server::find_item_kind) else { continue };
+        let Some(mag) = mag else { continue };
 
         for m in 0..3 {
             server::spawn_item(mag, at + forward * (0.25 * (m as f32 + 1.0)), facing);
@@ -120,7 +118,7 @@ fn watermelons(p: &Player) {
 
     for _ in 0..100 {
         let offset = Vec3::new(rand::random_range(1.0..=5.0), rand::random_range(1.0..=5.0), 1.0 + rand::random_range(1.0..=5.0));
-        server::spawn_item(melon, ahead(p) + offset, Mat3::IDENTITY);
+        server::spawn_item_by_id(melon, ahead(p) + offset, Mat3::IDENTITY);
     }
 }
 
@@ -130,7 +128,7 @@ fn item(p: &Player, args: &[&str]) {
     let kind = kinds.iter().position(|k| *k == arg).or_else(|| arg.parse::<usize>().ok().filter(|&k| k < kinds.len()));
 
     match kind {
-        Some(k) => _ = server::spawn_item(k as u32, ahead(p) + ITEM_LIFT, Mat3::IDENTITY),
+        Some(k) => _ = server::spawn_item_by_id(k as u32, ahead(p) + ITEM_LIFT, Mat3::IDENTITY),
         None => p.message(&format!("/item {}", kinds.join(" "))),
     }
 }
@@ -146,7 +144,7 @@ fn car(p: &Player, args: &[&str]) {
         let spot = p.human().map_or(p.camera(), |h| h.pos()) - facing.z * 6.0;
         let spot = server::ground_below(spot).map_or(spot, |y| Vec3::new(spot.x, y + 1.0, spot.z));
 
-        server::spawn_vehicle(kind, colour, spot, Mat3 { x: -facing.x, y: facing.y, z: -facing.z });
+        server::spawn_vehicle_by_id(kind, colour, spot, Mat3 { x: -facing.x, y: facing.y, z: -facing.z });
         return;
     }
 
@@ -156,7 +154,7 @@ fn car(p: &Player, args: &[&str]) {
 
 fn phone(p: &Player, args: &[&str]) {
     let number = args.first().and_then(|a| a.parse::<i32>().ok()).unwrap_or(9999);
-    let Some(item) = server::find_item_kind("phone").and_then(|phone| server::spawn_item(phone, ahead(p) + ITEM_LIFT, Mat3::IDENTITY)) else { return };
+    let Some(item) = server::spawn_item("phone", ahead(p) + ITEM_LIFT, Mat3::IDENTITY) else { return };
 
     item.set_phone_number(number);
 

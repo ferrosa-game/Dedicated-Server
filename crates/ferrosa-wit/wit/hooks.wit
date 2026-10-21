@@ -79,12 +79,15 @@ interface on-death {
     on-death: func(player: player-id);
 }
 
-/// A player hurt another (bullets and the like, not themselves), after the server's own scoring. Team damage is the
-/// mode's to deal here.
-interface on-hurt {
-    use types.{player-id};
+/// A human is about to be hurt by a bullet, a grenade, a fall or a vehicle; returns the damage to deal instead (0 to
+/// refuse it). The mode is asked first, then each plugin with the last answer. For a bullet `damage` is the hit's, as
+/// human.damage deals it, and its scoring (criminal rating) follows the answer; otherwise it is the vitality the hit
+/// takes (a grenade all of it, a fall or a run-over 120), or for a fall on a thigh the leg's health. Admin kills and
+/// the criminal-rating kick aren't asked about.
+interface on-damage {
+    use types.{bone, damage-cause, human-id};
 
-    on-hurt: func(attacker: player-id, victim: player-id, damage: s32);
+    on-damage: func(human: human-id, cause: damage-cause, bone: option<bone>, damage: s32) -> s32;
 }
 
 /// /resetgame has named this plugin's mode. Only asked of the mode.

@@ -4,7 +4,12 @@ use ferrosa_physics::{
 };
 use ferrosa_protocol::clientbound::game::{
     HumanAppearance, ItemKind, OwnHumanData, ServerHumanObject,
-    events::{Event, ServerEvent, bullet_hit::EventBulletHit, bullet_hole::EventBulletHole, sound::EventSound},
+    events::{
+        Event, ServerEvent,
+        bullet_hit::EventBulletHit,
+        bullet_hole::EventBulletHole,
+        sound::{EventSound, Sound},
+    },
 };
 use glam::Vec3;
 
@@ -18,6 +23,8 @@ use crate::{
         physics::{HumanOutput, sync_bones},
         simulation::{HumanTick, simulate_human},
     },
+    plugin::DamageCause,
+    world::skeleton::BoneId,
 };
 
 pub const HUMAN_SLOTS: usize = crate::human::MAX_HUMANS;
@@ -131,6 +138,36 @@ impl Sim {
         }
     }
 
+    /// A fall or crash's damage once plugins have had their say: off the vitality, or off the leg's health for a fall
+    /// on a thigh. A run-over that kills thuds and scores the driver.
+    fn deal_crush(&mut self, human: usize, cause: DamageCause, bone: BoneId, damage: i32) {
+        let plugins = self.plugins;
+        let damage = plugins.on_damage(self, human, cause, Some(bone), damage);
+        let Some(h) = self.humans.get_mut(human) else { return };
+
+        match (cause, bone) {
+            (DamageCause::Fall, BoneId::ThighLeft) => h.health.left_leg -= damage,
+            (DamageCause::Fall, BoneId::ThighRight) => h.health.right_leg -= damage,
+            _ => {
+                let before = h.health.vitality;
+                h.health.vitality -= damage;
+
+                if let DamageCause::Vehicle(driver) = cause
+                    && before > 0
+                    && h.health.vitality <= 0
+                {
+                    let (pos, victim) = (h.pos, h.player);
+                    let e = EventSound { sound_type: Sound::BodyHit, pos, volume: 1.0, pitch: 0.5 };
+                    self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Sound(e) });
+
+                    if let Some(driver) = driver {
+                        self.score_run_over(driver, victim);
+                    }
+                }
+            }
+        }
+    }
+
     pub(crate) fn apply_human_outputs(&mut self, out: Vec<HumanOutput>) {
         for o in out {
             let kind = match o {
@@ -150,8 +187,8 @@ impl Sim {
                     continue;
                 }
                 HumanOutput::Sound { sound, pos, volume, pitch } => ServerEvent::Sound(EventSound { sound_type: sound, pos, volume, pitch }),
-                HumanOutput::RunOver { driver, victim } => {
-                    self.score_run_over(driver, victim);
+                HumanOutput::Damage { human, cause, bone, damage } => {
+                    self.deal_crush(human, cause, bone, damage);
                     continue;
                 }
                 HumanOutput::DoorProbe { player, start, end, pos } => {

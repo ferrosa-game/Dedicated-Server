@@ -1,0 +1,3 @@
+name = "eliminator"
+version = "1.0.0"
+entry = "target/wasm32-wasip2/release/eliminator.wasm"

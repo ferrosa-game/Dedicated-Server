@@ -1,7 +1,7 @@
 package ferrosa:plugin@0.1.0;
 
 interface server {
-    use types.{body, body-id, chat-type, client-mode, corporation, game-state, human, human-id, item, item-id, mat3, player, player-id, team, vec3, vehicle, vehicle-id};
+    use types.{body, body-id, chat-type, client-mode, corporation, game-state, human, human-id, intersection, item, item-id, mat3, player, player-id, team, vec3, vehicle, vehicle-id};
 
     /// Makes this plugin a game mode, named for config.toml's gamemode and /resetgame. Only from init, and only once: a
     /// plugin that registers a mode is that mode, and only its mode hooks are called. `map` is the map it plays; none
@@ -28,8 +28,11 @@ interface server {
     item-kinds: func() -> list<string>;
     /// An item kind's number by its name, in any case.
     find-item-kind: func(name: string) -> option<u32>;
-    /// Spawn item (kind) with position and rotation
-    spawn-item: func(kind: u32, pos: vec3, rot: mat3) -> option<item>;
+    /// A new item of the named kind (in any case) at `pos`; none, with a note on the server console, for a name no
+    /// item kind has. spawn-item-by-id takes a kind's number instead.
+    spawn-item: func(name: string, pos: vec3, rot: mat3) -> option<item>;
+    /// A new item of the kind numbered `kind` (its place in item-kinds) at `pos`; none for a number past the end.
+    spawn-item-by-id: func(kind: u32, pos: vec3, rot: mat3) -> option<item>;
     /// Get a list of all of the items
     items: func() -> list<item>;
     /// Get a specific item by ID
@@ -47,12 +50,17 @@ interface server {
     /// A town car on a random street with a route to another (at least `min-distance` away when given), spawned
     /// already moving. A bot put in its driver's seat drives the route. None for a map without streets.
     spawn-route-car: func(min-distance: option<f32>) -> option<vehicle>;
-    /// A vehicle with its centre of mass at `pos`; none for a kind without a model.
-    spawn-vehicle: func(kind: u32, colour: s32, pos: vec3, rot: mat3) -> option<vehicle>;
+    /// A vehicle of the named kind (in any case) with its centre of mass at `pos`; none, with a note on the server
+    /// console, for a name no vehicle kind has or a kind without a model. spawn-vehicle-by-id takes a number instead.
+    spawn-vehicle: func(name: string, colour: s32, pos: vec3, rot: mat3) -> option<vehicle>;
+    /// A vehicle of the kind numbered `kind` (its place in vehicle-kinds); none for a kind without a model.
+    spawn-vehicle-by-id: func(kind: u32, colour: s32, pos: vec3, rot: mat3) -> option<vehicle>;
     vehicles: func() -> list<vehicle>;
     get-vehicle: func(id: vehicle-id) -> option<vehicle>;
     /// What a vehicle kind costs.
     vehicle-price: func(kind: u32) -> option<s32>;
+    /// The map's street intersections; a corner's number is its place in the list.
+    intersections: func() -> list<intersection>;
     /// The height of the ground under `pos`, looking from 8 above it to 256 below.
     ground-below: func(pos: vec3) -> option<f32>;
 

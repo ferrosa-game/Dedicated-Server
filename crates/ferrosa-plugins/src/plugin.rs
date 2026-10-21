@@ -53,7 +53,7 @@ macro_rules! hooks {
     };
 }
 
-hooks!(init, on_start, reset, tick, tick_after_traffic, before_physics, after_physics, menus_done, on_menu, on_chat, on_join, on_leave, on_death, on_hurt, on_admin_select);
+hooks!(init, on_start, reset, tick, tick_after_traffic, before_physics, after_physics, menus_done, on_menu, on_chat, on_join, on_leave, on_death, on_damage, on_admin_select);
 
 pub struct LoadedPlugin {
     pub plugins: Plugins,

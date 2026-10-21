@@ -4,7 +4,7 @@ use wasmtime::bail;
 use crate::{
     bindings::ferrosa::plugin::{
         server,
-        types::{self, ChatType, ClientMode, Mat3, Vec3},
+        types::{self, ChatType, ClientMode, Intersection, Mat3, Vec3},
     },
     host::{HostState, RegisteredMode},
     types::{BodyRef, CorporationRef, HumanRef, ItemRef, PlayerRef, VehicleRef},
@@ -21,6 +21,7 @@ impl server::Host for HostState {
             bail!("a plugin can only register one mode");
         }
 
+        println!("[Plugins] Registered new game mode {name}");
         self.registered = Some(RegisteredMode { name, aliases, client_mode: client_mode.into(), map });
         Ok(())
     }
@@ -79,7 +80,16 @@ impl server::Host for HostState {
         Ok(self.sim()?.find_item_kind(&name))
     }
 
-    fn spawn_item(&mut self, kind: u32, pos: Vec3, rot: Mat3) -> wasmtime::Result<Option<Resource<ItemRef>>> {
+    fn spawn_item(&mut self, name: String, pos: Vec3, rot: Mat3) -> wasmtime::Result<Option<Resource<ItemRef>>> {
+        let Some(kind) = self.sim()?.find_item_kind(&name) else {
+            eprintln!("[Plugins] Could not spawn {name}");
+            return Ok(None);
+        };
+
+        self.spawn_item_by_id(kind, pos, rot)
+    }
+
+    fn spawn_item_by_id(&mut self, kind: u32, pos: Vec3, rot: Mat3) -> wasmtime::Result<Option<Resource<ItemRef>>> {
         let Some(id) = self.sim_mut()?.spawn_item(kind, pos.into(), rot.into()) else { return Ok(None) };
         self.item_handle(id).map(Some)
     }
@@ -109,7 +119,16 @@ impl server::Host for HostState {
         Ok(self.sim()?.vehicle_display_name(kind).map(str::to_string))
     }
 
-    fn spawn_vehicle(&mut self, kind: u32, colour: i32, pos: Vec3, rot: Mat3) -> wasmtime::Result<Option<Resource<VehicleRef>>> {
+    fn spawn_vehicle(&mut self, name: String, colour: i32, pos: Vec3, rot: Mat3) -> wasmtime::Result<Option<Resource<VehicleRef>>> {
+        let Some(kind) = self.sim()?.find_vehicle_kind(&name) else {
+            eprintln!("[Plugins] Could not spawn {name}");
+            return Ok(None);
+        };
+
+        self.spawn_vehicle_by_id(kind, colour, pos, rot)
+    }
+
+    fn spawn_vehicle_by_id(&mut self, kind: u32, colour: i32, pos: Vec3, rot: Mat3) -> wasmtime::Result<Option<Resource<VehicleRef>>> {
         let Some(id) = self.sim_mut()?.place_vehicle(kind, colour, pos.into(), rot.into()) else { return Ok(None) };
         self.vehicle_handle(id).map(Some)
     }
@@ -130,6 +149,17 @@ impl server::Host for HostState {
         }
 
         self.vehicle_handle(id as usize).map(Some)
+    }
+
+    fn intersections(&mut self) -> wasmtime::Result<Vec<Intersection>> {
+        let corners = self.sim()?.intersections().iter().map(|i| Intersection {
+            pos: i.world_pos.into(),
+            lanes: i.lanes.into(),
+            min: i.bounds_min.into(),
+            max: i.bounds_max.into(),
+        });
+
+        Ok(corners.collect())
     }
 
     fn ground_below(&mut self, pos: Vec3) -> wasmtime::Result<Option<f32>> {

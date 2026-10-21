@@ -203,8 +203,9 @@ impl WireRead for Event {
                     Err(_) if !active => Team::Spectator,
                     Err(e) => return Err(e),
                 };
+
                 let customization = CharacterCustomization {
-                    gender: Gender::from_bit(c as u32),
+                    gender: Gender::from_bit(c),
                     head: ((c >> 1) & 0xf) as u8,
                     skin: ((c >> 6) & 7) as u8,
                     hair_style: ((c >> 9) & 0xf) as u8,
@@ -215,7 +216,9 @@ impl WireRead for Event {
                     tie_color: ((d >> 16) & 0xf) as u8,
                     necklace: ((d >> 20) & 0xf) as u8,
                 };
+
                 let name = chars(r, 31)?;
+
                 ServerEvent::UpdatePlayer(EventUpdatePlayer {
                     client_id: (a & 0xff) as u32,
                     team,
