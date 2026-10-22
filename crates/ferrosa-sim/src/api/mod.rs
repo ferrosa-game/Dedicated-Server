@@ -4,6 +4,7 @@ use glam::Vec3;
 use crate::{
     PlayerId,
     sim::{Sim, economy::stock_event},
+    time::{WORLD_HOUR, WORLD_MINUTE},
     world::trace::line_intersect_level,
 };
 
@@ -15,7 +16,6 @@ mod physics;
 mod players;
 mod vehicles;
 
-/// What the setters changed, sent to clients once each by flush_updates.
 #[derive(Default)]
 pub(crate) struct PendingUpdates {
     players: Vec<PlayerId>,
@@ -42,8 +42,6 @@ impl Sim {
         self.mode.name()
     }
 
-    /// Sends the events for everything the setters changed since the last flush: one player and one round update
-    /// per player, and the share prices once.
     pub fn flush_updates(&mut self) {
         let updates = std::mem::take(&mut self.updates);
         let tick = self.tick;
@@ -75,13 +73,18 @@ impl Sim {
         self.world_time
     }
 
-    /// What joining clients are told about weekly play and the day of the week, until the next reset.
+    pub fn set_world_time(&mut self, time: i32) {
+        self.world_time = time.rem_euclid(24 * WORLD_HOUR);
+    }
+
+    pub fn set_world_time_clock(&mut self, hours: i32, minutes: i32) {
+        self.set_world_time((hours * 60 + minutes) * WORLD_MINUTE);
+    }
+
     pub fn set_week(&mut self, weekly: bool, weekday: u8) {
         self.week = Some((weekly, weekday));
     }
 
-    /// `cars` more traffic cars, made before the traffic moves this tick, some parked in flat three lane streets'
-    /// third lanes.
     pub fn set_traffic(&mut self, cars: u32, parked: bool) {
         self.do_traffic = Some(self.do_traffic.unwrap_or(0) + cars);
         self.rules.parked_cars = parked;
@@ -107,12 +110,10 @@ impl Sim {
         self.rules.door_knocks = on;
     }
 
-    /// A reset at the end of the tick, as /resetgame asks for one.
     pub fn request_reset(&mut self) {
         self.admin.reset_requested = true;
     }
 
-    /// Every player back in the lobby without a human, and the world emptied.
     pub fn reset_lobby(&mut self) {
         self.reset_lobby_players_and_world();
     }

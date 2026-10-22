@@ -84,6 +84,11 @@ interface server {
     /// The world clock: sixtieths of a world second since midnight. Only world mode runs it; other modes leave it where
     /// the reset put it (11:00).
     world-time: func() -> s32;
+    /// Moves the world clock, wrapped into the day. Takes effect at once, so the sun clients are told about jumps with
+    /// it; world mode keeps counting on from there.
+    set-world-time: func(time: s32);
+    /// The same, as a time of day on a 24 hour clock: `set-world-time-clock(20, 30)` is half past eight in the evening.
+    set-world-time-clock: func(hours: s32, minutes: s32);
     /// Resets the game once the tick is done, as /resetgame does.
     request-reset: func();
     /// Every player back in the lobby (menu and readiness) without a human, and the world emptied: every human, item,

@@ -109,7 +109,6 @@ fn load_from(dir: &Path) -> LoadedPlugin {
         }
 
         if let Some(registered) = registered {
-            println!("[Plugins] {} is the mode {}", plugin.name, registered.name);
             modes.push(&*Box::leak(Box::new(WasmGameMode::new(plugin, registered))) as Mode);
         }
 

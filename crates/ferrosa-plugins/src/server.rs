@@ -207,6 +207,16 @@ impl server::Host for HostState {
         Ok(self.sim()?.world_time())
     }
 
+    fn set_world_time(&mut self, time: i32) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_world_time(time);
+        Ok(())
+    }
+
+    fn set_world_time_clock(&mut self, hours: i32, minutes: i32) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_world_time_clock(hours, minutes);
+        Ok(())
+    }
+
     fn request_reset(&mut self) -> wasmtime::Result<()> {
         self.sim_mut()?.request_reset();
         Ok(())

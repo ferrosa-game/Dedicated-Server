@@ -1,4 +1,4 @@
-use ferrosa_wit::{ChatType, ClientMode, GameState, Human, Mat3, Menu, Player, PlayerId, Plugin, Vec3, command, server};
+use ferrosa_wit::{ChatType, ClientMode, GameState, Human, Mat3, Menu, Player, PlayerId, Plugin, Vec3, clock_time, command, server};
 
 const EARTH_GRAVITY: f32 = 9.8;
 const ITEM_LIFT: Vec3 = Vec3::new(0.0, 0.0, 1.0);
@@ -56,6 +56,7 @@ impl Plugin for Sandbox {
             "car" => car(&p, &args),
             "phone" => phone(&p, &args),
             "gravity" => gravity(&args),
+            "time" => time(&args),
             "stocks" => p.set_menu(if p.menu() == Menu::RoundCorpStock { Menu::Empty } else { Menu::RoundCorpStock }),
             "clear" => {
                 server::items().iter().for_each(|i| i.delete());
@@ -175,6 +176,29 @@ fn gravity(args: &[&str]) {
     }
 
     server::announce(&format!("Gravity is {} m/s2", server::get_gravity() * EARTH_GRAVITY));
+}
+
+fn parse_clock(arg: &str) -> Option<(i32, i32)> {
+    let (hours, minutes) = arg.split_once(':').unwrap_or((arg, "0"));
+    let (h, m) = (hours.parse::<i32>().ok()?, minutes.parse::<i32>().ok()?);
+
+    ((0..24).contains(&h) && (0..60).contains(&m)).then_some((h, m))
+}
+
+fn time(args: &[&str]) {
+    if let Some(arg) = args.first() {
+        match parse_clock(arg) {
+            Some((h, m)) => server::set_world_time_clock(h, m),
+            None => {
+                server::announce("Usage: /time <HH:MM>");
+                return;
+            }
+        }
+    }
+
+    let now = server::world_time();
+
+    server::announce(&format!("Time is {:02}:{:02}", now / clock_time(1, 0), now / clock_time(0, 1) % 60));
 }
 
 ferrosa_wit::plugin!(Sandbox);
