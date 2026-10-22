@@ -1,3 +1,5 @@
+use std::f32::consts::{FRAC_PI_2, PI};
+
 use bitflags::bitflags;
 use glam::Vec3;
 
@@ -21,13 +23,11 @@ bitflags! {
         const CROUCH = 1 << 3;
         const SHIFT = 1 << 4;
         const DROP_ITEM = 1 << 5;
-        /// Bits 6 to 10: keys that switch what the held item does, which block using it.
         const MODE_KEYS = 31 << 6;
         const GRAB = 1 << 11;
         const RELOAD = 1 << 12;
         const SWITCH_HANDS = 1 << 13;
         const DELETE = 1 << 18;
-        /// Go limp (movement state 2) while held.
         const RAGDOLL = 1 << 19;
     }
 }
@@ -36,7 +36,6 @@ bitflags! {
 pub struct ClientGamePacket {
     pub round_num: u32,
 
-    // All of the following fields are 24 bits each.
     pub gear_x: f32,
     pub left_right: f32,
     pub gear_y: f32,
@@ -49,27 +48,23 @@ pub struct ClientGamePacket {
     pub spin_yaw: f32,
     pub view_pitch_delta: f32,
 
-    // Go to next byte if in the middle of one from current written bits
     pub input_flags: u32,
     pub input_type: u8,
-    pub zoom_level: u8, // 4 bits
+    pub zoom_level: u8,
     pub received_events: u32,
 
-    // Go to next byte if in the middle of one from current written bits
     pub num_sent_objects: u32,
     pub camera_pos: Vec3,
 
-    pub packet_action_count: u8, // 4 bits
-    pub total_actions: u8,       // 8 bits
+    pub packet_action_count: u8,
+    pub total_actions: u8,
 
     pub actions: Vec<GameAction>,
     pub voice_data: VoiceData,
 
-    pub spectating_human_id: u8, // 8 bits
-    /// The pack ring entries the client has applied up to (11 bits), and the line links it has up to (8 bits).
+    pub spectating_human_id: u8,
     pub pack_ack: u16,
     pub link_ack: u8,
-    /// The client's packet count, and when it sent this one.
     pub packet_count: u32,
     pub sdl_tick: u32,
 }
@@ -77,26 +72,27 @@ pub struct ClientGamePacket {
 impl WireRead for ClientGamePacket {
     fn read(r: &mut Reader) -> Result<Self, crate::codec::CodecError> {
         let round_num = r.u32()?;
-        let gear_x = r.fixed_float()?;
-        let left_right = r.fixed_float()?;
-        let gear_y = r.fixed_float()?;
-        let forward_back = r.fixed_float()?;
-        let view_yaw_delta = r.fixed_float()?;
-        let view_pitch = r.fixed_float()?;
-        let free_look_yaw = r.fixed_float()?;
-        let free_look_pitch = r.fixed_float()?;
-        let view_yaw = r.fixed_float()?;
-        let spin_yaw = r.fixed_float()?;
-        let view_pitch_delta = r.fixed_float()?;
+        let gear_x = r.fixed_float()?.clamp(-1.0, 1.0);
+        let left_right = r.fixed_float()?.clamp(-1.0, 1.0);
+        let gear_y = r.fixed_float()?.clamp(-1.0, 1.0);
+        let forward_back = r.fixed_float()?.clamp(-1.0, 1.0);
+        let view_yaw_delta = r.fixed_float()?.clamp(-PI, PI);
+        let view_pitch = r.fixed_float()?.clamp(-FRAC_PI_2, FRAC_PI_2);
+        let free_look_yaw = r.fixed_float()?.clamp(-PI, PI);
+        let free_look_pitch = r.fixed_float()?.clamp(-FRAC_PI_2, FRAC_PI_2);
+        let view_yaw = r.fixed_float()?.clamp(-PI, PI);
+        let spin_yaw = r.fixed_float()?.clamp(-PI, PI);
+        let view_pitch_delta = r.fixed_float()?.clamp(-FRAC_PI_2, FRAC_PI_2);
 
-        let input_flags = r.u32()?;
+        let input_flags = r.u32()? & InputFlags::all().bits();
         let input_type = r.bits(8)? as u8;
-        let zoom_level = r.bits(4)? as u8;
+        let zoom_level = (r.bits(4)? as u8).min(2);
         let received_events = r.bits(16)?;
 
         let num_sent_objects = r.u32()?;
 
-        let camera_pos = Vec3::new(r.f32()?, r.f32()?, r.f32()?);
+        let camera = Vec3::new(r.f32()?, r.f32()?, r.f32()?);
+        let camera_pos = if camera.is_finite() { camera.clamp(Vec3::splat(-4096.0), Vec3::splat(4096.0)) } else { Vec3::ZERO };
 
         let packet_action_count = r.bits(4)?;
         let total_actions = r.bits(8)?;
