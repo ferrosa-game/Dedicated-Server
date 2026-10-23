@@ -1,4 +1,4 @@
-use ferrosa_wit::{GameState, Human, Menu, Player, SuitColour, Team, server};
+use ferrosa_wit::{GameState, Human, Menu, Player, PlayerId, SuitColour, Team, server};
 
 use crate::{
     Round, TEAM_NAMES,
@@ -10,11 +10,80 @@ use crate::{
 const COLOUR_NAMES: [&str; 6] = ["Black", "Red", "Blue", "Silver", "White", "Gold"];
 const TAB: u32 = 0x80;
 const TABS: [Menu; 6] = [Menu::RoundCorpWeapons, Menu::RoundCorpAmmo, Menu::RoundCorpEquip, Menu::RoundCorpVehicle, Menu::RoundCorpStock, Menu::WorldEmptyCorp];
-const WEAPONS: [&str; 5] = ["pistol", "mp5", "ak47", "m16", "uzi"];
-const AMMO: [&str; 5] = ["pistolmag", "mp5mag", "ak47mag", "m16mag", "uzimag"];
-const SUITS: [(SuitColour, i32); 3] = [(SuitColour::Navy, 5000), (SuitColour::Red, 20000), (SuitColour::White, 100000)];
-const NECKLACES: [(u8, i32); 2] = [(1, 10000), (2, 1000000)];
+const WEAPONS: [(&str, &str); 5] = [("pistol", "9mm"), ("mp5", "MP5"), ("ak47", "AK-47"), ("m16", "M-16"), ("uzi", "Uzi")];
+const AMMO: [(&str, &str); 5] = [
+    ("pistolmag", "9mm Magazine"),
+    ("mp5mag", "MP5 Magazine"),
+    ("ak47mag", "AK-47 Magazine"),
+    ("m16mag", "M-16 Magazine"),
+    ("uzimag", "Uzi Magazine"),
+];
+const EQUIPMENT: [(&str, &str); 3] = [("bandage", "Bandage"), ("grenade", "Grenade"), ("briefcase", "Briefcase")];
+const SUITS: [(SuitColour, i32, &str); 3] =
+    [(SuitColour::Navy, 5000, "Navy Suit"), (SuitColour::Red, 20000, "Red Suit"), (SuitColour::White, 100000, "White Suit")];
+const NECKLACES: [(u8, i32, &str); 2] = [(1, 10000, "Gold Chain"), (2, 1000000, "Diamond Chain")];
 const SHARE_AMOUNTS: [i32; 4] = [1, 10, 100, 1000];
+
+#[derive(Clone, Copy, Default, PartialEq)]
+pub(crate) enum Tab {
+    #[default]
+    Weapons,
+    Ammo,
+    Equipment,
+    Vehicles,
+    Stocks,
+    Manager,
+}
+
+impl Tab {
+    fn pressed(button: u32) -> Option<Self> {
+        Some(match button.checked_sub(TAB)? {
+            0 => Self::Weapons,
+            1 => Self::Ammo,
+            2 => Self::Equipment,
+            3 => Self::Vehicles,
+            4 => Self::Stocks,
+            5 => Self::Manager,
+            _ => return None,
+        })
+    }
+
+    fn menu(self) -> Menu {
+        match self {
+            Self::Stocks | Self::Manager => Menu::WorldEmptyCorp,
+            _ => Menu::RoundCorpVehicle,
+        }
+    }
+}
+
+fn shop_buttons(p: &Player, stock: &[(&str, &str)]) {
+    for (i, (name, label)) in stock.iter().enumerate() {
+        let price = server::find_item_kind(name).and_then(server::item_price).unwrap_or(0);
+
+        p.add_menu_button(i as i32, label, Some(price));
+    }
+}
+
+fn equipment_buttons(p: &Player) {
+    shop_buttons(p, &EQUIPMENT);
+
+    for (i, (_, price, label)) in SUITS.iter().enumerate() {
+        p.add_menu_button((EQUIPMENT.len() + i) as i32, label, Some(*price));
+    }
+
+    for (i, (_, price, label)) in NECKLACES.iter().enumerate() {
+        p.add_menu_button((EQUIPMENT.len() + SUITS.len() + i) as i32, label, Some(*price));
+    }
+}
+
+fn stock_buttons(p: &Player) {
+    for (i, n) in SHARE_AMOUNTS.into_iter().enumerate() {
+        let s = if n == 1 { "" } else { "s" };
+
+        p.add_menu_button(i as i32, &format!("Buy {n} Share{s}"), Some(0));
+        p.add_menu_button((SHARE_AMOUNTS.len() + i) as i32, &format!("Sell {n} Share{s}"), Some(0));
+    }
+}
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct VehicleOffer {
@@ -100,18 +169,31 @@ impl Round {
             let at_base = round_corp(p.team()).and_then(base).is_some_and(|b| b.contains(human.pos()));
 
             match p.menu() {
-                Menu::Empty if at_base => p.set_menu(Menu::RoundCorpWeapons),
+                Menu::Empty if at_base => p.set_menu(self.tab(p.id()).menu()),
                 menu if !at_base && is_buy_menu(menu) => p.set_menu(Menu::Empty),
                 _ => {}
             }
         }
     }
 
+    pub(crate) fn tab(&self, player: PlayerId) -> Tab {
+        self.shop_tab.get(&player).copied().unwrap_or_default()
+    }
+
     pub(crate) fn menu_buttons(&self) {
         let players = server::players();
+
         for p in &players {
-            match p.menu() {
-                Menu::RoundCorpVehicle => {
+            if !is_buy_menu(p.menu()) {
+                continue;
+            }
+
+            match self.tab(p.id()) {
+                Tab::Weapons => shop_buttons(p, &WEAPONS),
+                Tab::Ammo => shop_buttons(p, &AMMO),
+                Tab::Equipment => equipment_buttons(p),
+                Tab::Stocks => stock_buttons(p),
+                Tab::Vehicles => {
                     for (i, o) in self.vehicle_stock.iter().enumerate() {
                         if !o.active {
                             p.add_menu_button(8, "SOLD", Some(0));
@@ -124,12 +206,12 @@ impl Round {
                         p.add_menu_button(i as i32, &format!("{colour} {name}"), Some(o.price));
                     }
                 }
-                Menu::WorldEmptyCorp if p.manager_tab() => {
+                Tab::Manager if p.manager_tab() => {
                     for other in players.iter().filter(|o| o.id() != p.id() && o.team() == p.team()) {
-                        p.add_menu_button(((other.id() as i32) << 16) + 6, &format!("Fire {}", other.name()), None);
+                        p.add_menu_button(((other.id() as i32) << 16) + 6, &format!("Fire {}", other.name()), Some(0));
                     }
                 }
-                _ => {}
+                Tab::Manager => {}
             }
         }
     }
@@ -139,38 +221,42 @@ impl Round {
 
         let Some(human) = p.human() else { return true };
 
-        if (TAB..TAB + TABS.len() as u32).contains(&b) {
-            p.set_menu(TABS[(b - TAB) as usize]);
+        if let Some(tab) = Tab::pressed(b) {
+            self.shop_tab.insert(p.id(), tab);
+            p.set_menu(tab.menu());
+
+            return true;
         }
 
         let target = (packed as i32) >> 16;
+        let suit = EQUIPMENT.len() as u32;
+        let necklace = suit + SUITS.len() as u32;
+        let sell = SHARE_AMOUNTS.len() as u32;
 
-        match (p.menu(), b) {
-            (Menu::RoundCorpWeapons, 0..5) => self.buy_item(p, &human, WEAPONS[b as usize]),
-            (Menu::RoundCorpAmmo, 0..5) => self.buy_item(p, &human, AMMO[b as usize]),
-            (Menu::RoundCorpEquip, 0) => self.buy_item(p, &human, "bandage"),
-            (Menu::RoundCorpEquip, 6) => self.buy_item(p, &human, "grenade"),
-            (Menu::RoundCorpEquip, 7) => self.buy_item(p, &human, "briefcase"),
-            (Menu::RoundCorpEquip, 1..=3) => {
-                let (suit, price) = SUITS[b as usize - 1];
-
-                if p.money() >= price {
-                    p.set_money(p.money() - price);
-                    p.set_suit_colour(suit);
-                }
-            }
-            (Menu::RoundCorpEquip, 4 | 5) => {
-                let (necklace, price) = NECKLACES[b as usize - 4];
+        match (self.tab(p.id()), b) {
+            (Tab::Weapons, 0..5) => self.buy_item(p, &human, WEAPONS[b as usize].0),
+            (Tab::Ammo, 0..5) => self.buy_item(p, &human, AMMO[b as usize].0),
+            (Tab::Equipment, _) if b < suit => self.buy_item(p, &human, EQUIPMENT[b as usize].0),
+            (Tab::Equipment, _) if b < necklace => {
+                let (colour, price, _) = SUITS[(b - suit) as usize];
 
                 if p.money() >= price {
                     p.set_money(p.money() - price);
-                    p.set_necklace(necklace);
+                    p.set_suit_colour(colour);
                 }
             }
-            (Menu::RoundCorpVehicle, 0..8) => self.buy_vehicle(p, &human, b as usize),
-            (Menu::RoundCorpStock, 0..4) => p.buy_stocks(SHARE_AMOUNTS[b as usize]),
-            (Menu::RoundCorpStock, 4..8) => p.sell_stocks(SHARE_AMOUNTS[b as usize - 4]),
-            (Menu::WorldEmptyCorp, 6) => self.fire(p, &human, target),
+            (Tab::Equipment, _) if b < necklace + NECKLACES.len() as u32 => {
+                let (chain, price, _) = NECKLACES[(b - necklace) as usize];
+
+                if p.money() >= price {
+                    p.set_money(p.money() - price);
+                    p.set_necklace(chain);
+                }
+            }
+            (Tab::Vehicles, 0..8) => self.buy_vehicle(p, &human, b as usize),
+            (Tab::Stocks, _) if b < sell => p.buy_stocks(SHARE_AMOUNTS[b as usize]),
+            (Tab::Stocks, _) if b < sell + sell => p.sell_stocks(SHARE_AMOUNTS[(b - sell) as usize]),
+            (Tab::Manager, 6) => self.fire(p, &human, target),
             _ => {}
         }
 
@@ -250,7 +336,8 @@ impl Round {
 }
 
 fn strip_human(human: &Human) {
-    let stripped: Vec<u32> = WEAPONS.iter().chain(&AMMO).chain(&["key", "grenade", "bandage"]).filter_map(|n| server::find_item_kind(n)).collect();
+    let carried = WEAPONS.iter().chain(&AMMO).map(|(name, _)| *name).chain(["key", "grenade", "bandage"]);
+    let stripped: Vec<u32> = carried.filter_map(server::find_item_kind).collect();
 
     for slot in 0..7 {
         for item in human.slot(slot).into_iter().filter(|i| stripped.contains(&i.kind())) {

@@ -17,7 +17,6 @@ pub(crate) const TEAM_NAMES: Corps<&str> = Corps(["Goldmen Inc", "Monsota", "OXS
 
 const ROUND_START: i32 = game_seconds(90);
 
-/// The phones on each round corporation's table: 7.75 along its back, the second 0.5 beside it, numbered from 1111.
 const PHONE_BACK: f32 = 7.75;
 const PHONE_SIDE: f32 = 0.5;
 
@@ -101,6 +100,8 @@ pub(crate) struct Round {
     switch_timers: HashMap<PlayerId, i32>,
     pub(crate) managers: Corps<Option<PlayerId>>,
     pub(crate) fired: Corps<Vec<u32>>,
+    /// The buy menu page each player is on, since the client only tells us which tab was pressed.
+    pub(crate) shop_tab: HashMap<PlayerId, menus::Tab>,
     pub(crate) items_bought: HashMap<PlayerId, i32>,
     pub(crate) vehicles_bought: HashMap<PlayerId, i32>,
     pub(crate) vehicle_stock: [menus::VehicleOffer; 8],
@@ -485,6 +486,7 @@ impl Round {
         self.game_timer = game_minutes(2);
         self.missions.counter = 0;
 
+        self.shop_tab.clear();
         self.items_bought.clear();
         self.vehicles_bought.clear();
         self.reset_corporations();
