@@ -270,7 +270,7 @@ impl WireRead for Event {
                 let len = r.bits(7)? as usize;
                 ServerEvent::MissionText(EventMissionText { corporation: a & 0xff, mission: a >> 8, line, text: r.bytes(len)?.to_vec() })
             }
-            other => return Err(CodecError::BadEnum(other)),
+            _ => ServerEvent::Empty,
         };
         Ok(Self { tick_created, kind })
     }
