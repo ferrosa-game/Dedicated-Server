@@ -51,7 +51,7 @@ impl TryFrom<u32> for Sound {
             41 => Self::GearShift,
             49 => Self::Modem,
             50 => Self::Floppy,
-            _ => return Self::Unknown,
+            _ => Self::Unknown,
         })
     }
 }
