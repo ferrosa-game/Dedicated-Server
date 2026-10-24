@@ -34,6 +34,7 @@ pub enum Sound {
     Modem = 49,
     /// floppy.wav, a computer's disk drive.
     Floppy = 50,
+    Unknown = 255,
 }
 
 impl TryFrom<u32> for Sound {
