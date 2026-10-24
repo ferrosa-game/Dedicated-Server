@@ -283,7 +283,7 @@ impl ObjectDecoder {
             _ => ItemTail::None,
         };
         self.frame().items[i] = v;
-        let item_type = ItemKind::try_from(kind as u8).map_err(|k| CodecError::BadEnum(k as u32))?;
+        let item_type = ItemKind::try_from(kind as u8).ok();
         Ok(ServerItemObject { slot, item_id: i as u16, item_type, pos: unpack_position(&v[0..3]), rot: decode_quaternion(&v[3..7], 14), header, tail })
     }
 
@@ -348,7 +348,7 @@ impl ObjectDecoder {
             let base_index = r.bits(8)?;
             let vehicle = r.bits(1)? != 0;
             let kind_color = if r.bits(1)? == 1 {
-                let kind = VehicleKind::try_from(r.bits(6)? as u8).map_err(|k| CodecError::BadEnum(k as u32))?;
+                let kind = VehicleKind::try_from(r.bits(6)? as u8).unwrap_or_default();
                 Some((kind, r.bits(4)? as i32))
             } else {
                 None
@@ -555,7 +555,7 @@ impl ServerGamePacket {
         }
 
         let manager_tab = r.bits(1)? != 0;
-        let menu_type = MenuType::try_from(r.bits(8)?)?;
+        let menu_type = MenuType::try_from(r.bits(8)?).unwrap_or(MenuType::Empty);
         let menu_tab = r.bits(16)? as i32;
         let shop = if menu_type == MenuType::WorldStore {
             let n = r.bits(8)?;

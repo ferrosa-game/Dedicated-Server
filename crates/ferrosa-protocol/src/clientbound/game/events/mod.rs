@@ -168,7 +168,7 @@ impl WireRead for Event {
             }
             3 => {
                 let vehicle_id = r.bits(10)? as i32;
-                let vehicle_type = VehicleKind::try_from(r.bits(8)? as u8).map_err(|v| CodecError::BadEnum(v as u32))?;
+                let vehicle_type = VehicleKind::try_from(r.bits(8)? as u8).unwrap_or_default();
                 ServerEvent::UpdateVehicleTypeColor(EventUpdateVehicleTypeColor { vehicle_id, vehicle_type, vehicle_color: r.bits(4)? as u8 })
             }
             4 => {

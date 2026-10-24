@@ -729,7 +729,7 @@ impl Sim {
                 Some(ServerItemObject {
                     slot: (HUMAN_SLOTS + id) as u16,
                     item_id: id as u16,
-                    item_type: item.item_type,
+                    item_type: Some(item.item_type),
                     pos: body.pos,
                     rot,
                     header: Some(ferrosa_protocol::clientbound::game::ItemHeader {

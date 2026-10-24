@@ -240,7 +240,7 @@ impl ObjectPack {
 pub struct ServerItemObject {
     pub slot: u16,
     pub item_id: u16,
-    pub item_type: ItemKind,
+    pub item_type: Option<ItemKind>,
     pub pos: Vec3,
     pub rot: [f32; 4],
     /// The type (above), parents and a computer's lines, sent when the client is to take them afresh.
@@ -275,7 +275,7 @@ impl ServerItemObject {
         w.bits(self.header.is_some() as i32, 1);
 
         if let Some(h) = &self.header {
-            w.bits(self.item_type as i32, 8);
+            w.bits(self.item_type.map_or(0, |k| k as i32), 8);
             w.bits(h.parent_item, 10);
             w.bits(h.parent_human, 10);
             w.bits(h.parent_slot, 4);

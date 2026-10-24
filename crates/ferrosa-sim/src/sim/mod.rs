@@ -688,7 +688,7 @@ impl Sim {
                         let packed = client.packed.get(&i.slot).is_some_and(|p| p.kind == 1 && p.index == i.item_id);
                         if packed { dist <= UNPACK_RANGE } else { dist < PACK_RANGE }
                     })
-                    .map(|i| (i.slot, ObjectPack { slot: i.slot, unpack: false, kind: 1, item_type: i.item_type as u16, index: i.item_id })),
+                    .map(|i| (i.slot, ObjectPack { slot: i.slot, unpack: false, kind: 1, item_type: i.item_type.map_or(0, |k| k as u16), index: i.item_id })),
             )
             .collect();
         let queue = |client: &mut Client, pack: ObjectPack| {
