@@ -12,7 +12,7 @@ impl Plugin for ComputerGames {
         server::register_program("2048");
     }
 
-    fn program(&mut self, name: &str, computer: &Computer, _args: &str) -> Option<Box<dyn Program>> {
+    fn program(&mut self, name: &str, computer: &Computer, _args: &str) -> Option<Box<dyn Program<Self>>> {
         match name {
             "SNAKE" => Some(Box::new(snake::Snake::new(computer))),
             "2048" => Some(Box::new(tiles::Tiles::new(computer))),

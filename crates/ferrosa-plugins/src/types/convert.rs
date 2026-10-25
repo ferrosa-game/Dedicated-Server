@@ -1,7 +1,10 @@
 use ferrosa_physics::RotMatrix;
 use ferrosa_protocol::{
     GameMode, SuitColor, Team,
-    clientbound::game::{GameState, MenuType, events::chat::ChatType},
+    clientbound::game::{
+        GameState, MenuType,
+        events::{chat::ChatType, sound::Sound},
+    },
 };
 use ferrosa_sim::{BoneId, DamageCause};
 
@@ -69,6 +72,31 @@ impl From<types::Team> for Team {
             types::Team::Prodocon => Self::Prodocon,
             types::Team::Mission => Self::Mission,
             types::Team::Spectator => Self::Spectator,
+        }
+    }
+}
+
+impl From<types::Sound> for Sound {
+    fn from(sound: types::Sound) -> Self {
+        match sound {
+            types::Sound::CarCrash => Self::CarCrash,
+            types::Sound::BodyHit => Self::BodyHit,
+            types::Sound::PhoneRing => Self::PhoneRing,
+            types::Sound::PhoneKey0 => Self::PhoneKey0,
+            types::Sound::PhoneKey1 => Self::PhoneKey1,
+            types::Sound::PhoneKey2 => Self::PhoneKey2,
+            types::Sound::PhoneKey3 => Self::PhoneKey3,
+            types::Sound::PhoneKey4 => Self::PhoneKey4,
+            types::Sound::PhoneKey5 => Self::PhoneKey5,
+            types::Sound::PhoneKey6 => Self::PhoneKey6,
+            types::Sound::PhoneKey7 => Self::PhoneKey7,
+            types::Sound::PhoneKey8 => Self::PhoneKey8,
+            types::Sound::PhoneKey9 => Self::PhoneKey9,
+            types::Sound::PhoneBusy => Self::PhoneBusy,
+            types::Sound::Reload => Self::Reload,
+            types::Sound::GearShift => Self::GearShift,
+            types::Sound::Modem => Self::Modem,
+            types::Sound::Floppy => Self::Floppy,
         }
     }
 }

@@ -202,6 +202,11 @@ impl server::Host for HostState {
         Ok(())
     }
 
+    fn play_sound(&mut self, sound: types::Sound, pos: types::Vec3, volume: f32, pitch: f32) -> wasmtime::Result<()> {
+        self.sim_mut()?.play_sound(sound.into(), pos.into(), volume, pitch);
+        Ok(())
+    }
+
     fn get_mode(&mut self) -> wasmtime::Result<String> {
         Ok(self.sim()?.mode_name().to_string())
     }

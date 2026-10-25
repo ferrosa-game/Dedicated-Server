@@ -1,5 +1,7 @@
 use ferrosa_wit::{Computer, Key, Program, ScreenColour, ScreenShade};
 
+use crate::ComputerGames;
+
 const SIDE: usize = 4;
 const TILE_WIDTH: usize = 12;
 const TILE_HEIGHT: usize = 4;
@@ -181,8 +183,8 @@ impl Tiles {
     }
 }
 
-impl Program for Tiles {
-    fn key(&mut self, computer: &Computer, key: Key, ctrl: bool) -> bool {
+impl Program<ComputerGames> for Tiles {
+    fn key(&mut self, _plugin: &mut ComputerGames, computer: &Computer, key: Key, ctrl: bool) -> bool {
         if ctrl {
             return key != Key::Char('X');
         }

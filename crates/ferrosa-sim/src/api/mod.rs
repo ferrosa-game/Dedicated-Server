@@ -1,4 +1,10 @@
-use ferrosa_protocol::clientbound::game::GameState;
+use ferrosa_protocol::clientbound::game::{
+    GameState,
+    events::{
+        Event, ServerEvent,
+        sound::{EventSound, Sound},
+    },
+};
 use glam::Vec3;
 
 use crate::{
@@ -125,6 +131,12 @@ impl Sim {
 
     pub fn clear_bullets(&mut self) {
         self.bullets.clear();
+    }
+
+    pub fn play_sound(&mut self, sound: Sound, pos: Vec3, volume: f32, pitch: f32) {
+        let e = EventSound { sound_type: sound, pos, volume, pitch };
+
+        self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Sound(e) });
     }
 
     pub fn ground_below(&self, pos: Vec3) -> Option<f32> {

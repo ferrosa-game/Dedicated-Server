@@ -1,5 +1,7 @@
 use ferrosa_wit::{Computer, Key, Program, ScreenColour, ScreenShade, server};
 
+use crate::Sandbox;
+
 const TITLE: ScreenColour = ScreenColour { foreground: ScreenShade::Black, background: ScreenShade::White };
 const HIGHLIGHT: ScreenColour = ScreenColour { foreground: ScreenShade::DarkGrey, background: ScreenShade::Yellow };
 const BODY: ScreenColour = ScreenColour { foreground: ScreenShade::White, background: ScreenShade::Black };
@@ -49,8 +51,8 @@ impl PhoneBook {
     }
 }
 
-impl Program for PhoneBook {
-    fn key(&mut self, computer: &Computer, key: Key, ctrl: bool) -> bool {
+impl Program<Sandbox> for PhoneBook {
+    fn key(&mut self, _plugin: &mut Sandbox, computer: &Computer, key: Key, ctrl: bool) -> bool {
         if ctrl && key == Key::Char('X') {
             return false;
         }

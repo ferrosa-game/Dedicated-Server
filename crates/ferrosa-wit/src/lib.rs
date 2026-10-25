@@ -122,14 +122,16 @@ impl Key {
 }
 
 /// A program running on one computer, made by Plugin::program. The server keeps it for as long as it runs, so its
-/// fields are that computer's own state, and drops it once it ends.
-pub trait Program: 'static {
+/// fields are that computer's own state, and drops it once it ends. Its hooks are given the plugin as every other
+/// hook is, so what is shared between a plugin's programs, like a high score or a game two computers play, lives in
+/// the plugin's own fields.
+pub trait Program<P: Plugin>: 'static {
     /// A key pressed on it; false ends the program and gives the shell back. Ctrl-X is the key the game's own
     /// programs quit on.
-    fn key(&mut self, computer: &Computer, key: Key, ctrl: bool) -> bool;
+    fn key(&mut self, plugin: &mut P, computer: &Computer, key: Key, ctrl: bool) -> bool;
 
     /// Each tick while it runs. A program can end itself here with computer.exit().
-    fn tick(&mut self, _computer: &Computer) {}
+    fn tick(&mut self, _plugin: &mut P, _computer: &Computer) {}
 }
 
 /// A plugin. Every hook does nothing unless written. The server makes it once, with Default, and keeps it for as long
@@ -194,7 +196,7 @@ pub trait Plugin: Default + 'static {
     /// the typed line as `args`. None refuses it, and the computer answers BAD COMMAND OR FILE NAME as it does for
     /// any other unknown command; a program that refuses should draw nothing. The screen is then the program's to
     /// draw on, but nothing clears it first, so a program paints every line it wants to own.
-    fn program(&mut self, _name: &str, _computer: &Computer, _args: &str) -> Option<Box<dyn Program>> {
+    fn program(&mut self, _name: &str, _computer: &Computer, _args: &str) -> Option<Box<dyn Program<Self>>> {
         None
     }
 }
@@ -299,7 +301,7 @@ macro_rules! plugin {
             }
         }
 
-        struct __FerrosaProgram(::std::cell::RefCell<::std::boxed::Box<dyn $crate::Program>>);
+        struct __FerrosaProgram(::std::cell::RefCell<::std::boxed::Box<dyn $crate::Program<$plugin>>>);
 
         impl $crate::exports::ferrosa::plugin::programs::Guest for __FerrosaPlugin {
             type Program = __FerrosaProgram;
@@ -321,12 +323,12 @@ macro_rules! plugin {
                 let ::std::option::Option::Some(at) = $crate::server::get_computer(computer) else { return false };
                 let (key, ctrl) = $crate::Key::new(key);
 
-                self.0.borrow_mut().key(&at, key, ctrl)
+                __FERROSA.with_borrow_mut(|p| self.0.borrow_mut().key(p, &at, key, ctrl))
             }
 
             fn tick(&self, computer: $crate::ItemId) {
                 if let ::std::option::Option::Some(at) = $crate::server::get_computer(computer) {
-                    self.0.borrow_mut().tick(&at);
+                    __FERROSA.with_borrow_mut(|p| self.0.borrow_mut().tick(p, &at));
                 }
             }
         }

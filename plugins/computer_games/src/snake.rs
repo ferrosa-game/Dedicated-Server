@@ -1,5 +1,7 @@
 use ferrosa_wit::{Computer, Key, Program, ScreenColour, ScreenShade};
 
+use crate::ComputerGames;
+
 const WIDTH: usize = 32;
 const HEIGHT: usize = 24;
 const RING: usize = 64;
@@ -180,8 +182,8 @@ impl Snake {
     }
 }
 
-impl Program for Snake {
-    fn key(&mut self, _computer: &Computer, key: Key, ctrl: bool) -> bool {
+impl Program<ComputerGames> for Snake {
+    fn key(&mut self, _plugin: &mut ComputerGames, _computer: &Computer, key: Key, ctrl: bool) -> bool {
         if ctrl {
             return key != Key::Char('X');
         }
@@ -197,7 +199,7 @@ impl Program for Snake {
         true
     }
 
-    fn tick(&mut self, computer: &Computer) {
+    fn tick(&mut self, _plugin: &mut ComputerGames, computer: &Computer) {
         if self.over {
             return;
         }

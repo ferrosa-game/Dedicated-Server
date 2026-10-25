@@ -420,6 +420,37 @@ interface types {
         rate: f32,
     }
 
+    /// The sounds a plugin can ask clients to play, named for the file each one is. The client plays nothing for a
+    /// sound it has no clip for, so these are all of them.
+    enum sound {
+        /// carcrash02, a car hitting something; carries far.
+        car-crash,
+        /// bullethitbody02, a body being hit hard.
+        body-hit,
+        /// phonering01.
+        phone-ring,
+        /// The generated keypad tones, 0 to 9, and the busy tone: the only tones in the game.
+        phone-key0,
+        phone-key1,
+        phone-key2,
+        phone-key3,
+        phone-key4,
+        phone-key5,
+        phone-key6,
+        phone-key7,
+        phone-key8,
+        phone-key9,
+        phone-busy,
+        /// reload01, a magazine going in.
+        reload,
+        /// gearshift01.
+        gear-shift,
+        /// modem, a computer dialling in.
+        modem,
+        /// floppy, a disk drive working.
+        floppy,
+    }
+
     /// The kinds of message send-chat sends.
     enum chat-type {
         /// Said by a human, heard around it: `speaker` is the human.

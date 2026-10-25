@@ -14,7 +14,7 @@ impl Plugin for Sandbox {
         server::register_program("PHONEBOOK");
     }
 
-    fn program(&mut self, name: &str, computer: &Computer, args: &str) -> Option<Box<dyn Program>> {
+    fn program(&mut self, name: &str, computer: &Computer, args: &str) -> Option<Box<dyn Program<Self>>> {
         match name {
             "PHONEBOOK" => Some(Box::new(PhoneBook::new(computer, args))),
             _ => None,
