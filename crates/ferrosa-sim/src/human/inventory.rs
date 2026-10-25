@@ -10,16 +10,6 @@ use super::physics::HumanOutput;
 use crate::input::{Input, ItemInput};
 use crate::items::{Item, Touchables, attach_child, remove_link};
 
-const PICKUP_REACH: f32 = 1.5;
-const PICKUP_RADIUS: f32 = 0.5;
-const HAND_DROP_DISTANCE: f32 = 1.75;
-/// A computer in hand is let go farther than 1 from the 2 in front of the pelvis; a disk goes into a computer up to
-/// 0.5 from the 1.5 in front of the head.
-const COMPUTER_REACH: f32 = -2.0;
-const COMPUTER_HOLD: f32 = 1.0;
-const DISK_REACH: f32 = -1.5;
-const DISK_RADIUS: f32 = 0.5;
-
 /// point_segment_distance: how far `p` is from the segment `a`..`b`.
 pub fn point_segment_distance(a: Vec3, b: Vec3, p: Vec3) -> f32 {
     let e = b - a;
@@ -43,7 +33,7 @@ pub fn point_segment_distance(a: Vec3, b: Vec3, p: Vec3) -> f32 {
 }
 
 /// link_item with a human parent: puts the item into the human's inventory slot, taking it out of wherever it was.
-/// A hand holds one item and a pocket up to eight.
+/// A hand holds one item and up to 8 pocket items
 pub fn link_item_to_human(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut Touchables, item_id: usize, slot: usize) -> bool {
     let count = h.inventory[slot].count;
 
@@ -86,7 +76,7 @@ pub fn link_item_to_human(h: &mut Human, human_id: usize, bodies: &mut RigidBodi
     true
 }
 
-/// link_item with no parent: drops the item from the human's inventory.
+/// unlink_item: drops the item from the human's inventory.
 pub fn unlink_item(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchables, item_id: usize) {
     let Some(item) = touch.items.get(item_id) else { return };
 
@@ -95,7 +85,7 @@ pub fn unlink_item(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchabl
     }
 }
 
-/// item_detach_human: takes the item out of the slot (the last item takes its place); items leaving a pocket appear
+/// detach_item: takes the item out of the slot (the last item takes its place); items leaving a pocket appear
 /// in front of the chest.
 pub(crate) fn detach_item(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchables, item_id: usize, slot: usize) {
     if slot > 1 {
@@ -143,7 +133,7 @@ pub fn hand_grab_and_inventory(h: &mut Human, human_id: usize, bodies: &mut Rigi
             let (a, b) = (h.bones[hand].pos, item.pos);
             let d = a - b;
 
-            if d.length() > HAND_DROP_DISTANCE {
+            if d.length() > 1.75 {
                 unlink_item(h, bodies, touch, item_id);
 
                 continue;
@@ -217,10 +207,10 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
 
     if kind == ItemKind::Computer {
         let (p, [_, _, r2]) = (h.bones[0].pos, h.bones[0].rot);
-        let end = r2 * COMPUTER_REACH + p;
+        let end = r2 * -2.0 + p;
         let clicked = h.released(Input::LeftMouse);
 
-        if point_segment_distance(p, end, pos) > COMPUTER_HOLD || clicked {
+        if point_segment_distance(p, end, pos) > 1.0 || clicked {
             unlink_item(h, bodies, touch, item_id);
         }
 
@@ -232,8 +222,8 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
     }
 
     let (p, [_, _, r2]) = (h.bones[3].pos, h.bones[3].rot);
-    let end = r2 * DISK_REACH + p;
-    let mut best = DISK_RADIUS;
+    let end = r2 * -1.5 + p;
+    let mut best = 0.5;
     let mut found = None;
 
     for (id, c) in touch.items.iter() {
@@ -255,7 +245,7 @@ fn computer_and_disk(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Toucha
     attach_child(touch.items, touch.types, computer, item_id);
 }
 
-/// The hand swap key: the right hand's item goes to the left hand and the left hand's to the right.
+/// swap_hands: the right hand's item goes to the left hand and the left hand's to the right.
 fn swap_hands(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut Touchables) {
     let (right, left) = (h.inventory[0].count, h.inventory[1].count);
 
@@ -361,7 +351,7 @@ fn can_mount(h: &Human, touch: &Touchables, hand: usize) -> bool {
     }
 }
 
-/// link_item(item, -1, -1, -1) on a mounted item: it comes off and falls free.
+/// dismount: it comes off and falls free.
 fn dismount(touch: &mut Touchables, item: usize) {
     if let Some(parent) = touch.items.get(item).map(|i| i.parent_item).filter(|&p| p != -1) {
         remove_link(touch.items, item, parent as usize);
@@ -371,12 +361,9 @@ fn dismount(touch: &mut Touchables, item: usize) {
 /// Action 1: loads the item in one hand (a magazine) into the item in the other hand (its gun) over 30 ticks, or
 /// takes it out into an empty hand. Hand 3 picks: the hand whose item mounts on the other, or the empty hand next to
 /// a loaded gun. A loaded gun drops its old magazine at 87.5% and the loading starts over. Returns whether the
-/// action is finished.
+/// action is finished. Only the two hands can mount, so any other hand the client asks for does nothing, as the
+/// slot a pickup asks for is checked before it is used.
 fn mount(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut Touchables, f: usize, out: &mut Vec<HumanOutput>) -> bool {
-    const STEP: f32 = 1.0 / 30.0;
-    const EJECT_AT: f32 = 0.875;
-    const UNLOAD_PITCH: f32 = 0.875;
-
     let mut hand = h.actions[f].slot;
 
     if hand == 3 {
@@ -412,18 +399,19 @@ fn mount(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut T
         h.actions[f].slot = hand;
     }
 
-    if hand == -1 {
+    if !(0..2).contains(&hand) {
         h.action_hand = -1;
+        h.actions[f].slot = -1;
         return true;
     }
 
     h.action_hand = hand;
     let hand = hand as usize;
     let other = hand ^ 1;
-    let progress = STEP + h.actions[f].progress;
+    let progress = (1.0 / 30.0) + h.actions[f].progress;
     h.actions[f].progress = progress;
 
-    let complete = if progress < EJECT_AT {
+    let complete = if progress < 0.875 {
         !can_mount(h, touch, hand)
     } else if progress >= 1.0 {
         true
@@ -478,7 +466,7 @@ fn mount(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut T
                 && is_gun(touch, gun)
             {
                 let pos = held(h, hand).and_then(|m| touch.items.get(m)).and_then(|m| bodies.get(m.body)).map_or(Vec3::ZERO, |b| b.pos);
-                out.push(HumanOutput::Sound { sound: Sound::Reload, pos, volume: 1.0, pitch: UNLOAD_PITCH });
+                out.push(HumanOutput::Sound { sound: Sound::Reload, pos, volume: 1.0, pitch: 0.875 });
             }
         }
         _ => {}
@@ -487,7 +475,7 @@ fn mount(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut T
     true
 }
 
-/// human_action_possible for action 2: a full hand can put its item in the pocket when the item fits there and the
+/// can_move for action 2: a full hand can put its item in the pocket when the item fits there and the
 /// pocket holds at most one item; an empty hand can take from a pocket that holds something.
 fn can_move(h: &Human, touch: &Touchables, hand: i32, pocket: i32) -> bool {
     let held = &h.inventory[hand as usize];
@@ -637,8 +625,8 @@ fn drop(h: &mut Human, bodies: &mut RigidBodies, touch: &mut Touchables, f: usiz
 fn item_in_sight(h: &Human, touch: &Touchables, free: impl Fn(&Item) -> bool) -> Option<usize> {
     let head = &h.bones[3];
     let (p, r2) = (head.pos, head.rot[2]);
-    let end = r2 * -PICKUP_REACH + p;
-    let mut best = PICKUP_RADIUS;
+    let end = r2 * -1.5 + p;
+    let mut best = 0.5;
     let mut found = None;
 
     for (id, item) in touch.items.iter() {
@@ -697,8 +685,8 @@ fn pickup(h: &mut Human, human_id: usize, bodies: &mut RigidBodies, touch: &mut 
 
     let head = &h.bones[3];
     let (p, r2) = (head.pos, head.rot[2]);
-    let end = r2 * -PICKUP_REACH + p;
-    let mut best = PICKUP_RADIUS;
+    let end = r2 * -1.5 + p;
+    let mut best = 0.5;
     let mut found = None;
 
     for (id, item) in touch.items.iter() {
