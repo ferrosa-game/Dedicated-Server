@@ -304,6 +304,7 @@ impl Sim {
         }
 
         v.gas_control = g;
+
         let gd = if -1.0 > g {
             v.gas_control = -1.0;
             -1.0
@@ -313,6 +314,7 @@ impl Sim {
         } else {
             g as f64
         };
+
         v.gas_control = if CREEP > c.target_speed { -1.0 } else { (gd / ((c.steer.abs() as f64) + 1.0)) as f32 };
         v.controls = 0;
 

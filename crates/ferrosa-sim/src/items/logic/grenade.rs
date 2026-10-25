@@ -3,17 +3,11 @@ use glam::Vec3;
 
 use crate::{PlayerId, input::ItemInput, items::state::ItemState, plugin::DamageCause, sim::Sim};
 
-const GRENADE_KILL_RANGE: f32 = 4.0;
 const GRENADE_PUSH_RANGE: f32 = 8.0;
 const PUSH_FALLOFF: f32 = 3.0 / 32.0;
-const PUSH_STRENGTH: f32 = 1.5;
 const MIN_PUSH_WEIGHT: f32 = 0.125;
-/// The damage a grenade kill scores for the primer's criminal rating and team kill punishment.
-const GRENADE_SCORE: i32 = 100;
 
 impl Sim {
-    /// A grenade: the secondary key pulls the pin (or puts it back while still held); thrown, it counts down from
-    /// 239 and blows up.
     pub(crate) fn grenade_logic(&mut self, id: usize) {
         let item = self.items.get_mut(id).unwrap();
         let (rising, holder) = (item.pressed(ItemInput::Secondary), item.parent_human);
@@ -69,7 +63,7 @@ impl Sim {
     /// outwards. The primer is scored for each player killed other than themselves.
     fn grenade_explosion(&mut self, at: Vec3, primer: Option<PlayerId>) {
         let mut killed = Vec::new();
-        let in_range: Vec<usize> = self.humans.iter().filter(|(_, h)| h.bones[0].pos.distance(at) < GRENADE_KILL_RANGE).map(|(id, _)| id).collect();
+        let in_range: Vec<usize> = self.humans.iter().filter(|(_, h)| h.bones[0].pos.distance(at) < 4.0).map(|(id, _)| id).collect();
         let plugins = self.plugins;
 
         for id in in_range {
@@ -87,7 +81,7 @@ impl Sim {
         for (_, human) in self.humans.iter_mut() {
             let dist = human.bones[0].pos.distance(at);
 
-            if dist < GRENADE_PUSH_RANGE {
+            if dist < 8.0 {
                 for bone in &human.bones {
                     if let Some(body) = self.bodies.get_mut(bone.body) {
                         body.vel += blast_push(body.pos - at, bone.mass);
@@ -98,21 +92,15 @@ impl Sim {
 
         let Some(primer) = primer else { return };
 
-        for victim in killed.into_iter().filter(|&v| v != primer) {
-            if self.same_team(primer, victim) {
-                self.handle_team_kill(primer, GRENADE_SCORE);
-            }
-
-            self.handle_criminal_rating(primer, victim, GRENADE_SCORE);
+        for victim in killed {
+            self.score_hurt(Some(primer), Some(victim), 100);
         }
     }
 }
 
-/// The velocity a blast gives a bone `offset` away from it: outwards, growing with the square of how far inside the
-/// push range it is, and less for heavier bones (but never under an eighth).
 fn blast_push(offset: Vec3, mass: f32) -> Vec3 {
     let dist = offset.length();
-    let weight = (GRENADE_PUSH_RANGE / (mass + GRENADE_PUSH_RANGE)).max(MIN_PUSH_WEIGHT);
+    let weight = (8.0 / (mass + 8.0)).max(MIN_PUSH_WEIGHT);
     let falloff = (GRENADE_PUSH_RANGE - dist) * PUSH_FALLOFF;
-    offset.normalize_or_zero() * (falloff * falloff * PUSH_STRENGTH * weight)
+    offset.normalize_or_zero() * (falloff * falloff * 1.5 * weight)
 }

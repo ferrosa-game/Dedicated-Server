@@ -8,40 +8,8 @@ use glam::Vec3;
 use super::Sim;
 use crate::{
     items::state::ItemState,
-    vehicle::{NETWORKED_VEHICLES, physics, spawn_vehicle},
+    vehicle::{physics, spawn_vehicle},
 };
-
-const HIDDEN_STATE: i32 = 3;
-/// The update_vehicle kinds: a window broken, a tyre burst, the vehicle wrecked.
-pub(crate) const WINDOW_BROKEN: i32 = 0;
-pub(crate) const TYRE_BURST: i32 = 1;
-const WRECKED: i32 = 2;
-const DELETED: i32 = 3;
-/// A despawn time above this never runs out.
-const NEVER_DESPAWNS: i32 = 65534;
-const ITEM_FRICTION: f32 = 0.4;
-const ITEM_DEPTH_SCALE: f32 = 1.0 / 64.0;
-const ITEM_SOFTNESS: f32 = 1.0 / 32.0;
-const NETWORKED_WHEELS: usize = 4;
-
-/// Each vehicle's priority grows by up to 256 a packet, more the nearer it is to the camera, the less it steers and the
-/// faster it goes (at least 32), and by 1024 within 4 of the camera (12 for a train); the client gets the 16 most
-/// overdue, the first two at tier 0 and the next six at tier 1 (both starting over), the rest at tier 2, and only the
-/// first two while it is more than 22 events behind.
-const PRIORITY_SCALE: f32 = 256.0;
-const PRIORITY_FALLOFF: f32 = 1.0 / 256.0;
-const PRIORITY_MIN: i32 = 32;
-const STEER_WEIGHT: f64 = 4.0;
-const MOVING: f32 = 1.0 / 60.0;
-const MOVING_WEIGHT: f32 = 5.0;
-const CLOSE: f32 = 4.0;
-const TRAIN_CLOSE: f32 = 12.0;
-const CLOSE_PRIORITY: i32 = 1024;
-const SENT_PER_PACKET: usize = 16;
-const TIER_0: usize = 2;
-const TIER_1: usize = 8;
-const BACKLOG: u16 = 22;
-const BACKLOGGED_SENT: usize = 2;
 
 /// What a vehicle's priority is worked out from: its position, steering input, velocity and whether it is a train.
 #[derive(Clone, Copy, Debug)]
@@ -60,18 +28,18 @@ pub(crate) fn vehicle_section(
     camera: Vec3,
     backlog: u16,
 ) -> Vec<ServerVehicleObject> {
-    priority.resize(NETWORKED_VEHICLES, 0);
+    priority.resize(128, 0);
 
     for (o, s) in vehicles {
         let d = camera - s.pos;
         let dist = d.length();
-        let near = (dist as f64 / ((s.steer_control.abs() as f64) * STEER_WEIGHT + 1.0)) as f32;
+        let near = (dist as f64 / ((s.steer_control.abs() as f64) * 4.0 + 1.0)) as f32;
         let speed = s.vel.length();
-        let k = if MOVING <= speed { MOVING_WEIGHT } else { speed * 60.0 * 4.0 + 1.0 };
-        let mut p = (((1.0 - (near / k) * PRIORITY_FALLOFF) * PRIORITY_SCALE) as i32).max(PRIORITY_MIN);
+        let k = if 1.0 / 60.0 <= speed { 5.0 } else { speed * 60.0 * 4.0 + 1.0 };
+        let mut p = (((1.0 - (near / k) * (1.0 / 256.0)) * 256.0) as i32).max(32);
 
-        if dist < CLOSE || (s.train && dist < TRAIN_CLOSE) {
-            p = CLOSE_PRIORITY;
+        if dist < 4.0 || (s.train && dist < 12.0) {
+            p = 1024;
         }
 
         priority[o.vehicle_id as usize] += p;
@@ -83,13 +51,13 @@ pub(crate) fn vehicle_section(
     let sent: Vec<ServerVehicleObject> = order
         .into_iter()
         .rev()
-        .take(SENT_PER_PACKET)
+        .take(16)
         .enumerate()
         .map(|(rank, i)| {
             let o = &vehicles[i].0;
-            let tier = if rank < TIER_0 {
+            let tier = if rank < 2 {
                 0
-            } else if rank < TIER_1 {
+            } else if rank < 8 {
                 1
             } else {
                 2
@@ -103,10 +71,9 @@ pub(crate) fn vehicle_section(
         })
         .collect();
 
-    let cap = if backlog > BACKLOG { BACKLOGGED_SENT } else { SENT_PER_PACKET };
+    let cap = if backlog > 22 { 2 } else { 16 };
     sent.into_iter().take(cap).collect()
 }
-const BYTE: f64 = 255.0;
 
 fn to_byte(v: f32, min: i32) -> i32 {
     ((v * 255.0) as i32).clamp(min, 255)
@@ -135,15 +102,15 @@ impl Sim {
     pub(crate) fn vehicle_objects(&self) -> Vec<(ServerVehicleObject, VehicleSight)> {
         self.vehicles
             .iter()
-            .filter(|(id, v)| *id < NETWORKED_VEHICLES && v.controllable_state != HIDDEN_STATE)
+            .filter(|(id, v)| *id < 128 && v.controllable_state != 3)
             .map(|(id, v)| {
-                let steer = ((v.steer as f64 / 180.0_f64.to_radians() * BYTE) as i32).clamp(-255, 255);
+                let steer = ((v.steer as f64 / 180.0_f64.to_radians() * 255.0) as i32).clamp(-255, 255);
                 let wheels = std::array::from_fn(|k| match v.rotor.as_ref().and_then(|r| r.angles.get(k)) {
                     Some(&angle) => [to_byte(angle, 0), 0, 0],
                     None => v
                         .wheels
                         .get(k)
-                        .filter(|_| k < NETWORKED_WHEELS)
+                        .filter(|_| k < 4)
                         .map_or([0; 3], |w| [to_byte(w.visual_height, 0), to_byte(w.spin, -255), to_byte(w.skid, 0)]),
                 });
                 let object = ServerVehicleObject {
@@ -215,33 +182,33 @@ impl Sim {
     /// vehicle_take_damage: a vehicle's health worn down; at nothing it is wrecked (update_vehicle kind 2). Trains
     /// cannot be hurt.
     pub(crate) fn vehicle_take_damage(&mut self, id: usize, amount: i32) {
-        let Some(v) = self.vehicles.get_mut(id) else { return };
+        let Some(vehicle) = self.vehicles.get_mut(id) else { return };
         
-        if v.train || v.health <= 0 {
+        if vehicle.train || vehicle.health <= 0 {
             return;
         }
 
-        v.health -= amount;
+        vehicle.health -= amount;
 
-        if v.health <= 0 {
-            let e = EventUpdateVehicle { vehicle_id: id as i32, kind: WRECKED, part: 0, pos: v.pos, velocity: v.vel };
+        if vehicle.health <= 0 {
+            let event = EventUpdateVehicle { vehicle_id: id as i32, kind: 2, part: 0, pos: vehicle.pos, velocity: vehicle.vel };
 
-            self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateVehicle(e) });
+            self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateVehicle(event) });
         }
     }
 
     /// delete_vehicle: anyone inside is let go, the chassis and wheel bodies removed and the clients told (update_vehicle
     /// kind 3).
     pub(crate) fn delete_vehicle(&mut self, id: usize) {
-        for (_, h) in self.humans.iter_mut() {
-            if h.vehicle == Some(id) {
-                h.vehicle = None;
+        for (_, human) in self.humans.iter_mut() {
+            if human.vehicle == Some(id) {
+                human.vehicle = None;
             }
         }
 
-        for c in &mut self.traffic.cars {
-            if c.vehicle == id as i32 {
-                c.vehicle = -1;
+        for car in &mut self.traffic.cars {
+            if car.vehicle == id as i32 {
+                car.vehicle = -1;
             }
         }
 
@@ -254,40 +221,40 @@ impl Sim {
             }
         }
 
-        let Some(v) = self.vehicles.remove(id) else { return };
+        let Some(vehicle) = self.vehicles.remove(id) else { return };
 
-        for w in &v.wheels {
+        for w in &vehicle.wheels {
             self.bodies.remove(w.body);
         }
 
-        if let Some(r) = &v.rotor {
+        if let Some(r) = &vehicle.rotor {
             self.bodies.remove_bond(r.point_bond);
             self.bodies.remove_bond(r.angular_bond);
             self.bodies.remove(r.body);
         }
 
-        for &(bogie, turn) in &v.bogies {
+        for &(bogie, turn) in &vehicle.bogies {
             self.bodies.remove_bond(turn);
             self.bodies.remove(bogie);
         }
 
-        self.bodies.remove(v.body);
+        self.bodies.remove(vehicle.body);
 
-        let e = EventUpdateVehicle { vehicle_id: id as i32, kind: DELETED, part: 0, pos: v.pos, velocity: Vec3::ZERO };
+        let e = EventUpdateVehicle { vehicle_id: id as i32, kind: 3, part: 0, pos: vehicle.pos, velocity: Vec3::ZERO };
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::UpdateVehicle(e) });
     }
 
     /// cleanup_vehicles: each vehicle's despawn time runs down and the vehicle is deleted when it runs out.
     pub(crate) fn cleanup_vehicles(&mut self) {
         for id in self.vehicles.ids() {
-            let Some(v) = self.vehicles.get_mut(id) else { continue };
-            let t = v.despawn_time as i32;
+            let Some(vehicle) = self.vehicles.get_mut(id) else { continue };
+            let t = vehicle.despawn_time as i32;
 
-            if t > NEVER_DESPAWNS {
+            if t > 65534 {
                 continue;
             }
 
-            v.despawn_time = (t - 1) as u16;
+            vehicle.despawn_time = (t - 1) as u16;
 
             if t - 1 <= 0 {
                 self.delete_vehicle(id);
@@ -322,7 +289,7 @@ impl Sim {
                 for c in &contacts {
                     let (first, second) = if c.swapped { (item_body, v.body) } else { (v.body, item_body) };
 
-                    self.bodies.add_body_contact(first, second, c.offset_a, c.offset_b, c.normal, c.depth, ITEM_FRICTION, ITEM_DEPTH_SCALE, ITEM_SOFTNESS);
+                    self.bodies.add_body_contact(first, second, c.offset_a, c.offset_b, c.normal, c.depth, 0.4, 1.0 / 64.0, 1.0 / 32.0);
                 }
 
                 if !contacts.is_empty()

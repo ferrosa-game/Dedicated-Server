@@ -17,9 +17,6 @@ use crate::{
 pub mod actions;
 pub mod voice;
 
-/// create_player's starting money.
-const BOT_MONEY: i32 = 50000;
-
 /// A player's movement and view controls, from their game packet or set by the bot AI.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Controls {
@@ -31,9 +28,7 @@ pub struct Controls {
     pub look_pitch: f32,
     pub free_look_yaw: f32,
     pub free_look_pitch: f32,
-    /// The body yaw the client reports.
     pub body_yaw: f32,
-    /// The spin a jump starts with, about the head's up and side axes.
     pub spin_yaw: f32,
     pub spin_pitch: f32,
 }
@@ -222,7 +217,7 @@ impl Player {
             input: InputFlags::empty(),
             team: Team::Spectator,
             username: String::new(),
-            money: BOT_MONEY,
+            money: 50_000,
             stocks: 0,
             corp_rating: 0,
             crim_rating: 0,
@@ -321,7 +316,6 @@ impl Player {
     }
 }
 
-/// The player records: a new player takes the lowest free slot, as create_player does.
 #[derive(Default)]
 pub struct PlayerTable {
     slots: Vec<Option<Player>>,
@@ -333,6 +327,7 @@ impl PlayerTable {
         self.slots.iter().position(Option::is_none).unwrap_or(self.slots.len())
     }
 
+    /// insert: insert a player into slot, returning the slot ID
     pub(crate) fn insert(&mut self, p: Player) -> usize {
         let k = self.next_key();
 
@@ -347,12 +342,13 @@ impl PlayerTable {
         k
     }
 
+    /// remove: remove a player from slot `k`
     pub(crate) fn remove(&mut self, k: usize) -> Player {
-        let p = self.slots.get_mut(k).and_then(Option::take).expect("no player in that slot");
+        let player = self.slots.get_mut(k).and_then(Option::take).expect("no player in that slot");
 
         self.count -= 1;
 
-        p
+        player
     }
 
     pub(crate) fn get(&self, k: usize) -> Option<&Player> {

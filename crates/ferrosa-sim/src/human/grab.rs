@@ -11,16 +11,6 @@ use glam::Vec3;
 use super::{BoneId, Human, inventory::point_segment_distance};
 use crate::input::Input;
 
-/// How far from a bone's axis a hand can take hold of it.
-const GRAB_REACH: f32 = 0.25;
-/// How far the hand may be from the spot it holds before it lets go.
-const GRAB_SLIP: f32 = 0.125;
-/// At or below this much stamina a hand cannot keep hold.
-const GRAB_STAMINA: i32 = 7;
-/// The hand bones of hand 0 (right) and hand 1 (left).
-pub const HAND_BONES: [usize; 2] = [BoneId::HandRight as usize, BoneId::HandLeft as usize];
-
-/// What a hand holds on to.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Grab {
     pub holding: bool,
@@ -46,7 +36,7 @@ fn to_local(b: &HeldBone, p: Vec3) -> Vec3 {
     unrotate(&b.rot, p - b.pos)
 }
 
-/// Each hand of each living, standing human: let go without the grab key or with something in the hand, take hold
+/// grab_hands: let go without the grab key or with something in the hand, take hold
 /// of the nearest other human's bone in reach, and while holding pull the hand and that bone together at the cost of
 /// a point of stamina every 4 ticks, letting go once the stamina runs low or the hand slips off.
 pub fn grab_hands(humans: &mut Table<Human>, bodies: &mut RigidBodies, ticks: u32) {
@@ -59,7 +49,7 @@ pub fn grab_hands(humans: &mut Table<Human>, bodies: &mut RigidBodies, ticks: u3
     for id in humans.ids() {
         let Some(h) = humans.get_mut(id) else { continue };
 
-        for (hand, &bone) in HAND_BONES.iter().enumerate() {
+        for (hand, &bone) in [BoneId::HandRight as usize, BoneId::HandLeft as usize].iter().enumerate() {
             let free = h.health.vitality > 0 && h.vehicle.is_none() && h.inventory[hand].count == 0;
 
             if !free || !h.has_input(Input::Grab) {
@@ -75,7 +65,7 @@ pub fn grab_hands(humans: &mut Table<Human>, bodies: &mut RigidBodies, ticks: u3
                     .filter(|o| o.0 != id && o.1)
                     .flat_map(|o| o.2.iter().enumerate().map(move |(j, b)| (o.0, j, b)))
                     .map(|(human, j, b)| (point_segment_distance(b.capsule[0], b.capsule[1], palm), human, j, b))
-                    .filter(|&(d, ..)| d <= GRAB_REACH)
+                    .filter(|&(d, ..)| d <= 0.25)
                     .min_by(|a, b| a.0.total_cmp(&b.0));
 
                 if let Some((_, human, j, b)) = nearest {
@@ -94,7 +84,7 @@ pub fn grab_hands(humans: &mut Table<Human>, bodies: &mut RigidBodies, ticks: u3
 
             let spot = to_world(&held, g.point);
 
-            if palm.distance(spot) > GRAB_SLIP || h.stamina <= GRAB_STAMINA {
+            if palm.distance(spot) > 0.125 || h.stamina <= 7 {
                 h.grabs[hand].holding = false;
                 continue;
             }

@@ -10,23 +10,6 @@ use crate::{
     items::{logic::phone::PhoneStatus, state::ItemState},
 };
 
-/// A speaker's reach by volume level: whisper, talk and shout.
-const WHISPER_RANGE: f32 = 8.0;
-const TALK_RANGE: f32 = 64.0;
-const SHOUT_RANGE: f32 = 128.0;
-/// Where everyone is heard from while the round restarts, and between players without humans.
-const NEAR_DISTANCE: f32 = 4.0;
-/// How far an earshot's volume moves towards the line of sight each tick.
-const SMOOTHING: f32 = 0.125;
-/// Keeps a silent earshot's distance / volume finite when an earshot is evicted.
-const EVICT_EPSILON: f32 = 0.01;
-/// Line of sight is only traced this far; past it, or through the level, a voice is at half volume.
-const SIGHT_RANGE: f32 = 128.0;
-const BLOCKED_VOLUME: f32 = 0.5;
-/// The channels walkie-talkies can be on, and how many radios each lists.
-pub(crate) const RADIO_CHANNELS: usize = 128;
-const CHANNEL_RADIOS: usize = 256;
-
 /// What calculate_voice reads of an item: its type and position, who holds it in which slot, the phone it is on a
 /// call with and whether the call is connected, and a radio's channel and whether it is transmitting.
 #[derive(Clone, Copy, Debug)]
@@ -43,9 +26,9 @@ pub(crate) struct VoiceItem {
 
 fn range(level: u8) -> f32 {
     match level {
-        0 => WHISPER_RANGE,
-        1 => TALK_RANGE,
-        _ => SHOUT_RANGE,
+        0 => 8.0,
+        1 => 64.0,
+        _ => 128.0,
     }
 }
 
@@ -58,7 +41,7 @@ fn add_earshot(earshots: &mut [Option<Earshot>; 8], e: Earshot) {
     }
 
     if let Some(first) = earshots[0]
-        && first.distance / (first.volume + EVICT_EPSILON) > e.distance / e.volume
+        && first.distance / (first.volume + 0.01) > e.distance / e.volume
     {
         earshots[0] = Some(e);
     }
@@ -67,13 +50,13 @@ fn add_earshot(earshots: &mut [Option<Earshot>; 8], e: Earshot) {
 impl Sim {
     /// The walkie-talkie channel lists logic_item rebuilds each tick: every radio, in item order, on its channel.
     pub(crate) fn build_radio_channels(&mut self) {
-        self.radio_channels = vec![Vec::new(); RADIO_CHANNELS];
+        self.radio_channels = vec![Vec::new(); 128];
 
         for (id, item) in self.items.iter() {
             if let ItemState::Radio { channel, .. } = item.state {
                 let list = &mut self.radio_channels[(channel & 0x7f) as usize];
 
-                if list.len() < CHANNEL_RADIOS {
+                if list.len() < 256 {
                     list.push(id);
                 }
             }
@@ -122,12 +105,12 @@ impl Sim {
         let map = &ctx.world.map;
 
         let line_of_sight = |from: Vec3, to: Vec3| -> f32 {
-            if to.distance(from) <= SIGHT_RANGE
+            if to.distance(from) <= 128.0
                 && trace::line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, from, to).is_none()
             {
                 1.0
             } else {
-                BLOCKED_VOLUME
+                0.5
             }
         };
 
@@ -165,7 +148,7 @@ impl Sim {
                 }
 
                 e.distance = it.pos.distance(at);
-                e.volume = (line_of_sight(it.pos, at) - e.volume) * SMOOTHING + e.volume;
+                e.volume = (line_of_sight(it.pos, at) - e.volume) * 0.125 + e.volume;
 
                 if !keep || e.distance > e.volume {
                     *slot = None;
@@ -198,7 +181,7 @@ impl Sim {
                     };
 
                     e.distance = pos.distance(at);
-                    e.volume = (line_of_sight(pos, at) - e.volume) * SMOOTHING + e.volume;
+                    e.volume = (line_of_sight(pos, at) - e.volume) * 0.125 + e.volume;
                 }
             }
 
@@ -215,7 +198,7 @@ impl Sim {
             }
 
             let (d, volume) = if restarting || (own.is_none() && p.human.is_none()) {
-                (NEAR_DISTANCE, 1.0)
+                (4.0, 1.0)
             } else {
                 let Some(&(pos, alive)) = p.human.and_then(|h| ctx.heads.get(&h)) else { continue };
 

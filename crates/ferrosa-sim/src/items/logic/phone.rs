@@ -5,10 +5,6 @@ use ferrosa_protocol::clientbound::game::{
 
 use crate::{input::ItemInput, sim::Sim, time::game_seconds};
 
-const PHONE_BUSY_TICKS: i32 = 359;
-const PHONE_RING_TICKS: i32 = 767;
-const PHONE_DIAL_COOLDOWN: i32 = 180;
-
 enum PhoneCall {
     Answer,
     HangUp(usize),
@@ -88,7 +84,7 @@ impl Sim {
                     self.phone_sound(Sound::PhoneBusy, id, 1.0);
                 }
 
-                if timer > PHONE_BUSY_TICKS || rising {
+                if timer > game_seconds(6) || rising {
                     let p = self.items.get_mut(id).unwrap().state.phone_mut().unwrap();
                     p.status = PhoneStatus::Idle;
                     p.ring_timer = 0;
@@ -118,7 +114,7 @@ impl Sim {
                 }
 
                 p.entered_number = 0;
-                p.cooldown = PHONE_DIAL_COOLDOWN;
+                p.cooldown = game_seconds(3);
 
                 return self.place_call(id, number);
             }
@@ -163,7 +159,7 @@ impl Sim {
                 let p = self.items.get_mut(id).unwrap().state.phone_mut().unwrap();
                 p.ring_timer += 1;
 
-                if p.ring_timer > PHONE_RING_TICKS {
+                if p.ring_timer > game_seconds(12) {
                     p.status = PhoneStatus::Idle;
 
                     if let Some(q) = self.items.get_mut(o).and_then(|i| i.state.phone_mut()) {

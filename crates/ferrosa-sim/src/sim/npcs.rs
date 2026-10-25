@@ -8,18 +8,7 @@ use ferrosa_protocol::{
 use glam::Vec3;
 
 use super::Sim;
-use crate::{PlayerId, items, time::TICKS_PER_SECOND};
-
-pub const MAX_NPCS: usize = 1024;
-/// An NPC's bot comes in when a living player is within 96 of it, stays while one is within 104, and leaves when
-/// none is; a killed one is back 18000 ticks later. Each NPC is looked at every 32 ticks, in turn.
-const NEAR: f32 = 96.0;
-const KEEP: f32 = 104.0;
-const CHECK_MASK: u32 = 0x1f;
-const GUARD: i32 = 0;
-const ZOMBIE: i32 = 1;
-const NPC_TEAM: Team = Team::Mission;
-const GUARD_MAGAZINES: i32 = 3;
+use crate::{PlayerId, items, time::game_seconds};
 
 /// NpcData: a guard or zombie waiting at its post, brought in as a bot near players.
 #[derive(Clone, Debug)]
@@ -43,7 +32,7 @@ impl Sim {
             return Some(i);
         }
 
-        if self.npcs.len() >= MAX_NPCS {
+        if self.npcs.len() >= 1024 {
             return None;
         }
 
@@ -61,7 +50,7 @@ impl Sim {
                 npc.timer -= 1;
             }
 
-            if (self.tick ^ idx as u32) & CHECK_MASK != 0 {
+            if (self.tick ^ idx as u32) & 31 != 0 {
                 continue;
             }
 
@@ -88,9 +77,9 @@ impl Sim {
                 let (dx, dz) = (centre.x - b.x, centre.z - b.z);
                 let d = ((dx * dx + 0.0) + dz * dz).sqrt();
 
-                if NEAR > d {
+                if 96.0 > d {
                     state = 2;
-                } else if KEEP > d {
+                } else if 104.0 > d {
                     state = 1;
                 }
             }
@@ -122,7 +111,7 @@ impl Sim {
 
         let bot = self.npcs[idx].as_mut().and_then(|n| {
             n.human = None;
-            n.timer = 5 * TICKS_PER_SECOND;
+            n.timer = game_seconds(5);
             n.bot.take()
         });
 
@@ -202,7 +191,7 @@ impl Sim {
 
         let Some(p) = self.players.get_mut(pid.idx()) else { return };
 
-        p.team = NPC_TEAM;
+        p.team = Team::Mission;
         p.username = String::new();
         p.is_bot = true;
         p.customization.gender = Gender::Male;
@@ -239,14 +228,14 @@ impl Sim {
         }
 
         match npc.kind {
-            ZOMBIE => {
+            1 => {
                 if let Some(p) = self.players.get_mut(pid.idx()) {
                     p.bot.is_zombie = true;
                 }
             }
-            GUARD => {
+            0 => {
                 let gun = if rand::random::<bool>() { ItemKind::Pistol } else { ItemKind::Mp5 };
-                self.give_weapon(h, gun, GUARD_MAGAZINES);
+                self.give_weapon(h, gun, 3);
             }
             _ => {}
         }

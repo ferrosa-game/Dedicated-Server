@@ -1,4 +1,4 @@
-use crate::sim::{economy::SELL_RATE, traffic::TRAFFIC_CARS};
+use crate::sim::traffic::TRAFFIC_CARS;
 
 /// What a game mode turns on and off, set by reset_game from the mode's hooks. Code outside the modes asks these rather
 /// than which mode it is. The default is a plain mode; each built-in mode changes what it needs from there, and a plugin
@@ -55,7 +55,7 @@ impl Default for ModeRules {
     fn default() -> Self {
         Self {
             team_damage: 0,
-            stock_sell_rate: SELL_RATE,
+            stock_sell_rate: 0.95,
             reset_traffic: Some(TRAFFIC_CARS),
             parked_cars: false,
             coop_traffic: false,

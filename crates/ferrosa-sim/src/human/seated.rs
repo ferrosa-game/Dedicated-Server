@@ -13,18 +13,12 @@ use super::{
 };
 use crate::{input::Input, items::Touchables};
 use crate::{
-    vehicle::{HANDBRAKE, Vehicle},
+    vehicle::Vehicle,
     world::{map::Map, trace::line_intersect_level},
 };
 
-const LAST_VEHICLE_TICKS: i32 = 100;
 const SEAT_PARAMS: IkParams =
     IkParams { length: 1.0, twist: 0.0, max_turn: 45_f32.to_radians(), clamp_max: 1.0546875_f32.to_radians(), spin_limit: [1.0 / 64.0; 3], flags: 0 };
-
-/// A vehicle's seat offset in the world, in the order human_action_simulation adds it.
-fn seat_point(v: &Vehicle, s: Vec3) -> Vec3 {
-    v.pos + rotate(&v.rot, s)
-}
 
 /// The pickup action with nothing in reach (human_action_simulation): the free seat nearest a point ahead of the head,
 /// within 1.375.
@@ -37,7 +31,7 @@ pub(super) fn find_seat(h: &Human, touch: &Touchables) -> Option<(usize, usize)>
 
     for (vid, v) in touch.vehicles.iter() {
         for (k, &s) in v.seats.iter().enumerate() {
-            let q = seat_point(v, s);
+            let q = v.pos + rotate(&v.rot, s);
 
             let d = q.distance(at);
 
@@ -239,7 +233,7 @@ pub(super) fn simulate_seated(human: &mut Human, bodies: &mut RigidBodies, map: 
     let Some(v) = touch.vehicles.get(vid) else { return };
     place_pelvis(human, bodies, v, scale);
     pose_bones(human, bodies, map, has_item, scale);
-    human.last_vehicle_cooldown = LAST_VEHICLE_TICKS;
+    human.last_vehicle_cooldown = 100;
     human.last_vehicle = vid as i32;
 
     if !human.has_input(Input::Grab) {
@@ -283,7 +277,7 @@ fn leave_seat(human: &mut Human, touch: &mut Touchables, vid: usize) {
     touch.occupied.retain(|&o| o != (vid, human.seat));
 
     if let Some(v) = touch.vehicles.get_mut(vid) {
-        v.controls = HANDBRAKE;
+        v.controls = 4;
     }
 }
 

@@ -9,17 +9,10 @@ use crate::time::TICKS_PER_SECOND;
 use crate::{PlayerId, player::Player};
 
 pub const CORPORATIONS: usize = 6;
-const MAX_STOCKS: i32 = 9999;
-/// The share of the price a sale pays.
-pub(crate) const SELL_RATE: f32 = 0.95;
-const TAX_FREE: i32 = 10000;
-const TAX_RATE: f32 = 0.05;
-const STOCK_TAX_FREE: f32 = 10000.0;
 
 /// A corporation's share market.
 #[derive(Clone, Copy, Debug)]
 pub struct Corporation {
-    /// Shares held by players.
     pub shares: i32,
     pub price: f32,
 }
@@ -71,10 +64,10 @@ impl Sim {
         let Some(c) = corporation_of(player.team) else { return };
 
         let held = player.stocks;
-        let (n, count) = if held > MAX_STOCKS {
+        let (n, count) = if held > 9999 {
             (0, 0.0)
         } else {
-            let n = if held + n > MAX_STOCKS { (MAX_STOCKS + 1) - held } else { n };
+            let n = if held + n > 9999 { (9999 + 1) - held } else { n };
             (n, n as f32)
         };
 
@@ -92,21 +85,21 @@ impl Sim {
 /// The corporation a player's team trades in, if it is one.
 pub fn corporation_of(team: Team) -> Option<usize> {
     let t = team as usize;
-    (t < CORPORATIONS).then_some(t)
+    (t < 6).then_some(t)
 }
 
 /// wealth_tax: takes 5% of the money over 10000 and sells off a twentieth of the shares worth more than 10000.
-pub fn wealth_tax(player: &mut Player, corps: &mut [Corporation; CORPORATIONS]) {
+pub fn wealth_tax(player: &mut Player, corps: &mut [Corporation; 6]) {
     let money = player.money;
-    let excess = money - TAX_FREE;
+    let excess = money - 10_000;
 
     if excess > 0 {
-        player.money = money - (excess as f32 * TAX_RATE) as i32;
+        player.money = money - (excess as f32 * 0.05) as i32;
     }
 
     let Some(c) = corporation_of(player.team) else { return };
     let price = corps[c].price;
-    let over = ((player.stocks as f32 * price - STOCK_TAX_FREE) / price) as i32;
+    let over = ((player.stocks as f32 * price - 10_000.0) / price) as i32;
 
     if over > 0 {
         let sold = over / 20;
@@ -118,15 +111,15 @@ pub fn wealth_tax(player: &mut Player, corps: &mut [Corporation; CORPORATIONS]) 
 /// some_cash_penalty: the wealth tax on the money of an account whose player has left.
 pub fn account_wealth_tax(account: &mut SrkPlayerData) {
     let money = account.money as i32;
-    let excess = money - TAX_FREE;
+    let excess = money - 10_000;
 
     if excess > 0 {
-        account.money = (money - (excess as f32 * TAX_RATE) as i32) as u32;
+        account.money = (money - (excess as f32 * 0.05) as i32) as u32;
     }
 }
 
 /// create_event_update_stock: the first five share prices in tenths.
-pub fn stock_event(corps: &[Corporation; CORPORATIONS], tick: u32) -> Event {
+pub fn stock_event(corps: &[Corporation; 6], tick: u32) -> Event {
     let tenths: Vec<i32> = corps.iter().map(|c| (c.price * 10.0) as i32).collect();
     Event {
         tick_created: tick,
@@ -134,27 +127,17 @@ pub fn stock_event(corps: &[Corporation; CORPORATIONS], tick: u32) -> Event {
     }
 }
 
-/// A new account's money and corporate rating (create_account_from_join_ticket), before world mode's startcash.
-const NEW_ACCOUNT_MONEY: u32 = 1000;
-const NEW_ACCOUNT_RATING: u32 = 1000;
-/// The longest name an account or player keeps.
-const NAME_LEN: usize = 31;
-
-/// The name as an account stores it: at most 31 bytes.
-/// An account on the Steam ban list is banned for this long.
-const STEAM_BAN_TIME: u32 = 100000000;
-
 fn account_name_bytes(name: &str) -> [u8; 32] {
     let mut buf = [0u8; 32];
     let src = name.as_bytes();
-    let n = src.len().min(NAME_LEN);
+    let n = src.len().min(31);
     buf[..n].copy_from_slice(&src[..n]);
     buf
 }
 
 /// sanitize_name: slashes become spaces, the spaces at either end go, and an empty name is "Noname".
 pub fn sanitize_name(raw: &[u8]) -> String {
-    let end = raw.iter().take(NAME_LEN).position(|&b| b == 0).unwrap_or(raw.len().min(NAME_LEN));
+    let end = raw.iter().take(31).position(|&b| b == 0).unwrap_or(raw.len().min(31));
     let bytes: Vec<u8> = raw[..end].iter().map(|&b| if b == b'/' { b' ' } else { b }).collect();
     let start = bytes.iter().position(|&b| b != b' ').unwrap_or(bytes.len());
     let stop = bytes.iter().rposition(|&b| b != b' ').map_or(start, |i| i + 1);
@@ -162,8 +145,8 @@ pub fn sanitize_name(raw: &[u8]) -> String {
     if name.is_empty() { "Noname".into() } else { name }
 }
 
-const SUIT_COLORS: [SuitColor; CORPORATIONS] = [SuitColor::Tan, SuitColor::DarkNavy, SuitColor::DarkGrey, SuitColor::Grey, SuitColor::Black, SuitColor::Grey];
-const TIE_COLORS: [u8; CORPORATIONS] = [2, 9, 8, 3, 7, 1];
+const SUIT_COLORS: [SuitColor; 6] = [SuitColor::Tan, SuitColor::DarkNavy, SuitColor::DarkGrey, SuitColor::Grey, SuitColor::Black, SuitColor::Grey];
+const TIE_COLORS: [u8; 6] = [2, 9, 8, 3, 7, 1];
 
 /// Suit colours a team change leaves alone.
 fn keeps_suit(suit: SuitColor) -> bool {
@@ -302,8 +285,8 @@ impl Sim {
 
         if !accounts.players.iter().any(|a| a.account_id == auth.account_id) {
             let mut a = SrkPlayerData::new(auth.account_id, &auth.player_name, auth.phone_number, auth.steam_id);
-            a.money = if self.rules.saved_accounts { self.modes.world.cfg.startcash as u32 } else { NEW_ACCOUNT_MONEY };
-            a.corp_rating = NEW_ACCOUNT_RATING;
+            a.money = if self.rules.saved_accounts { self.modes.world.cfg.startcash as u32 } else { 10000 };
+            a.corp_rating = 1000;
             a.eye_color = rand::random_range(0..3) as u32;
             a.hair_color = rand::random_range(0..8) as u32;
             a.skin_color = rand::random_range(0..4) as u32;
@@ -316,7 +299,7 @@ impl Sim {
         a.steam_id = auth.steam_id;
 
         if self.admin.steam_bans.contains(&a.steam_id) {
-            a.ban_time = STEAM_BAN_TIME;
+            a.ban_time = 100_000_000;
         }
 
         a.player_name = account_name_bytes(&auth.player_name);

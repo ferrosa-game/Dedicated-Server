@@ -4,60 +4,15 @@ use ferrosa_protocol::{
     clientbound::game::GameState,
     serverbound::game::actions::{GameAction, InventoryAction},
 };
-use glam::Vec3;
+use glam::{Vec2, Vec3, Vec3Swizzles};
 
 use super::Sim;
-use crate::input::Input;
+use crate::{input::Input, time::game_seconds};
 use crate::{PlayerId, player::BotTarget, world::trace::line_intersect_level};
 
 /// How far the view may turn from the body, either way.
 const MAX_LOOK: f64 = 7.0 * f64::consts::PI / 8.0;
-const LOOK_LIMIT: f32 = 157.5_f32.to_radians();
-/// A bot remembers up to 16 enemies within 128 of its chest, sure of them up to 16; every other tick it looks again
-/// and its memory fades (x 31/32) until it forgets below 0.875.
-const MAX_TARGETS: usize = 16;
-const SIGHT_RANGE: f32 = 128.0;
-const MAX_AWARENESS: f32 = 16.0;
-const FADE: f32 = 31.0 / 32.0;
-const FORGET: f32 = 0.875;
-const TARGET_TIMER: i32 = 600;
-/// Each sighting pulls the remembered place an eighth of the way to where the enemy is going (4 ticks ahead), give or
-/// take a spread that shrinks as the bot grows sure.
-const SIGHTING_KEEP: f32 = 0.875;
-const SIGHTING_STEP: f32 = 0.125;
-const LEAD_TICKS: f32 = 4.0;
-const SPREAD_SCALE: f32 = 0.25;
-/// Thresholds on awareness: below 2 a bot goes to look, above 8 it aims, above 12 it attacks on foot.
-const INVESTIGATE: f32 = 2.0;
-const AIM: f32 = 8.0;
-const ATTACK: f32 = 12.0;
-/// On foot a bot stops walking within 32 of its target and fires within 64; in a vehicle it fires within 32.
-const STOP_RANGE: f32 = 32.0;
-const FIRE_RANGE: f32 = 64.0;
-const TEAMMATE_RANGE_FOOT: f32 = 128.0;
-const TEAMMATE_RANGE_SEATED: f32 = 64.0;
-const SHOT_LENGTH: f32 = -64.0;
-const SHOT_RADIUS: f32 = 0.25;
-/// Aim is good when within 0.125 of the target in yaw and pitch, and a seated bot's gun must point within 0.9975.
-const AIM_TOLERANCE: f32 = 0.125;
-const GUN_ALIGNMENT: f32 = -399.0 / 400.0;
-const EYE_DROP: f32 = 0.25;
-const TURN_RATE: f32 = 0.125;
-const HALF: f32 = 0.5;
-/// A waypoint counts as reached within 2.
-const WAYPOINT_RADIUS: f32 = 2.0;
-/// A bot whose pelvis tips past this lies down and crouches half the time.
-const UPRIGHT: f32 = 0.9;
-/// The seated bots look out at these headings: front passenger, then the back seats left and right.
-const SEAT_YAW: [f32; 3] = [45.0_f32.to_radians(), -135.0_f32.to_radians(), 135.0_f32.to_radians()];
-const WRECK_PATIENCE: i32 = 179;
-/// The driver's gear stick: second gear, forward; reversing out of a jam after 180 and 280 stuck ticks.
-const DRIVE_GEAR_X: f32 = 2.0;
-const DRIVE_GEAR_Y: f32 = -1.0;
-const STUCK_FORWARD: i32 = 179;
-const STUCK_REVERSE: i32 = 279;
-const THROTTLE_SCALE: f32 = 8.0;
-const MIN_TARGET_SPEED: f32 = 0.05;
+
 /// The difference from `a` to `b` taken the short way, the way player_ai wraps it: `b` is moved up a turn when `a`
 /// is half a turn past it, then the difference has `a` moved up a turn when still half a turn out.
 fn wrap(a: f32, b: f32) -> f32 {
@@ -130,7 +85,7 @@ impl Sim {
         if wrecked {
             p.bot.wrecked_ticks += 1;
 
-            if p.bot.wrecked_ticks > WRECK_PATIENCE {
+            if p.bot.wrecked_ticks > game_seconds(3) {
                 p.input_bits |= Input::Grab.mask();
             }
         } else {
@@ -141,13 +96,13 @@ impl Sim {
     /// The gun in the right hand: an empty chamber is filled from the magazine, an empty magazine swapped for one in the
     /// left hand or a pocket, now and then.
     fn bot_reload(&mut self, pid: PlayerId, hid: usize) {
-        let Some(h) = self.humans.get(hid) else { return };
+        let Some(human) = self.humans.get(hid) else { return };
 
-        if h.action_type != -1 || h.inventory[0].count <= 0 {
+        if human.action_type != -1 || human.inventory[0].count <= 0 {
             return;
         }
 
-        let Some(gun) = self.items.get(h.inventory[0].items[0] as usize) else { return };
+        let Some(gun) = self.items.get(human.inventory[0].items[0] as usize) else { return };
 
         if gun.state.left() != 0 {
             return;
@@ -159,18 +114,18 @@ impl Sim {
             let rounds = self.items.get(mag).map_or(0, |m| m.state.left());
 
             if rounds <= 0 {
-                if rand::random_ratio(1, 32) {
+                if rand::random_bool(1.0 / 32.0) {
                     self.push_bot_action(pid, 1);
                 }
-            } else if rand::random_ratio(1, 32) {
+            } else if rand::random_bool(1.0 / 32.0) {
                 self.players.get_mut(pid.idx()).unwrap().input_bits |= Input::Reload.mask();
             }
 
             return;
         }
 
-        if h.inventory[1].count <= 0 {
-            let pockets: Vec<(usize, Option<usize>)> = (3..7).map(|s| (s, (h.inventory[s].count > 0).then(|| h.inventory[s].items[0] as usize))).collect();
+        if human.inventory[1].count <= 0 {
+            let pockets: Vec<(usize, Option<usize>)> = (3..7).map(|s| (s, (human.inventory[s].count > 0).then(|| human.inventory[s].items[0] as usize))).collect();
 
             for (s, first) in pockets {
                 let Some(kind) = first.and_then(|i| self.items.get(i)).map(|i| i.item_type as usize) else { continue };
@@ -183,9 +138,9 @@ impl Sim {
             return;
         }
 
-        let rounds = self.items.get(h.inventory[1].items[0] as usize).map_or(0, |m| m.state.left());
+        let rounds = self.items.get(human.inventory[1].items[0] as usize).map_or(0, |m| m.state.left());
 
-        if rand::random_ratio(1, 32) {
+        if rand::random_bool(1.0 / 32.0) {
             self.push_bot_action(pid, if rounds <= 0 { 2 } else { 1 });
         }
     }
@@ -216,9 +171,7 @@ impl Sim {
                 continue;
             }
 
-            let d = chest - h.bones[3].pos;
-
-            if d.length() >= SIGHT_RANGE {
+            if chest.distance(h.bones[3].pos) >= 128.0 {
                 continue;
             }
 
@@ -242,29 +195,29 @@ impl Sim {
             let k = match found {
                 Some(k) => k,
                 None => {
-                    if p.bot.targets.len() >= MAX_TARGETS {
+                    if p.bot.targets.len() >= 16 {
                         continue;
                     }
 
-                    p.bot.targets.push(BotTarget { human: j as i32, pos: seen, awareness: 0.0, timer: TARGET_TIMER });
+                    p.bot.targets.push(BotTarget { human: j as i32, pos: seen, awareness: 0.0, timer: game_seconds(10) });
                     p.bot.targets.len() - 1
                 }
             };
             let t = &mut p.bot.targets[k];
             let mut aw = 1.0 + t.awareness;
 
-            if aw > MAX_AWARENESS {
-                aw = MAX_AWARENESS;
+            if aw > 16.0 {
+                aw = 16.0;
             }
 
             t.awareness = aw;
-            t.pos *= SIGHTING_KEEP;
-            let unsure = (MAX_AWARENESS - aw) * SIGHTING_STEP;
-            let spread = unsure * SPREAD_SCALE + (SPREAD_SCALE * range) * SIGHTING_STEP;
+            t.pos *= 0.875;
+            let unsure = (16.0 - aw) * 0.125;
+            let spread = unsure * 0.25 + (0.25 * range) * 0.125;
             let out = crate::human::arms::calculate_spread_vector(&mut self.noise_seed, spread, 0.0);
-            let ahead = out + seen + h.bones[0].vel * LEAD_TICKS;
+            let ahead = out + seen + h.bones[0].vel * 4.0;
             let t = &mut self.players.get_mut(pid.idx()).unwrap().bot.targets[k];
-            t.pos = ahead * SIGHTING_STEP + t.pos;
+            t.pos = ahead * 0.125 + t.pos;
         }
 
         let my_pos = self.humans.get(hid).unwrap().pos;
@@ -274,9 +227,9 @@ impl Sim {
         let mut i = 0;
 
         while i < targets.len() {
-            targets[i].awareness *= FADE;
+            targets[i].awareness *= 31.0 / 32.0;
 
-            if FORGET > targets[i].awareness {
+            if 0.875 > targets[i].awareness {
                 let last = targets.len() - 1;
                 targets[i] = targets[last];
                 targets.truncate(last);
@@ -288,16 +241,14 @@ impl Sim {
         p.bot.target = 0;
         let pos_of = |t: &BotTarget| humans.get(t.human as usize).map_or(Vec3::ZERO, |h| h.pos);
         let first = targets.first().map_or(Vec3::ZERO, pos_of);
-        let d = my_pos - first;
-        let mut best = d.length();
+        let mut best = my_pos.distance(first);
 
         for (k, t) in targets.iter().enumerate().skip(1) {
-            if t.awareness <= AIM {
+            if t.awareness <= 8.0 {
                 continue;
             }
 
-            let d = my_pos - pos_of(t);
-            let r = d.length();
+            let r = my_pos.distance(pos_of(t));
 
             if best > r {
                 p.bot.target = k as i32;
@@ -320,14 +271,14 @@ impl Sim {
         p.controls.body_yaw = body_yaw;
 
         if -MAX_LOOK > look as f64 {
-            look = -LOOK_LIMIT;
+            look = -157.5_f32.to_radians();
         } else if look as f64 > MAX_LOOK {
-            look = LOOK_LIMIT;
+            look = 157.5_f32.to_radians();
         }
 
         p.controls.look_yaw = look;
 
-        if UPRIGHT > pelvis_up {
+        if 0.9 > pelvis_up {
             if (tick & 0x7f) > 64 {
                 p.input_bits |= Input::Crouch.mask();
             }
@@ -340,16 +291,12 @@ impl Sim {
         if p.bot.waypoint < p.bot.waypoint_count {
             p.controls.walk = 1.0;
             let wp = p.bot.waypoint_pos(p.bot.waypoint);
-            let (dx, dz) = (wp.x - pos.x, wp.z - pos.z);
-            let d = ((dx * dx + 0.0) + dz * dz).sqrt();
-            yaw_to = if d == 0.0 {
-                0.0f64.atan2(-0.0) as f32
-            } else {
-                let inv = 1.0 / d;
-                ((dx * inv) as f64).atan2((-(inv * dz)) as f64) as f32
-            };
+            let flat = Vec2::new(wp.x - pos.x, wp.z - pos.z);
+            let d = flat.length();
+            let to = flat.normalize_or_zero();
+            yaw_to = (to.x as f64).atan2((-to.y) as f64) as f32;
 
-            if WAYPOINT_RADIUS > d {
+            if 2.0 > d {
                 p.bot.waypoint += 1;
 
                 if !(p.bot.waypoint < p.bot.waypoint_count) {
@@ -364,7 +311,7 @@ impl Sim {
             let t = p.bot.targets[p.bot.target as usize];
             let mut aw = t.awareness;
 
-            if INVESTIGATE > aw && INVESTIGATE > (t.pos.y - pos.y).abs() {
+            if 2.0 > aw && 2.0 > (t.pos.y - pos.y).abs() {
                 if rand::random_ratio(1, 32) {
                     let p = self.players.get_mut(pid.idx()).unwrap();
                     p.bot.waypoint = 0;
@@ -374,9 +321,9 @@ impl Sim {
 
                 let p = self.players.get(pid.idx()).unwrap();
                 aw = p.bot.targets.get(p.bot.target as usize).map_or(0.0, |t| t.awareness);
-                attack = !p.bot.targets.is_empty() && aw > ATTACK;
+                attack = !p.bot.targets.is_empty() && aw > 12.0;
             } else {
-                attack = aw > ATTACK;
+                attack = aw > 12.0;
             }
         }
 
@@ -393,11 +340,11 @@ impl Sim {
         }
 
         let d = wrap(facing, yaw_to);
-        p.controls.look_yaw += d * HALF;
-        p.controls.look_pitch = (TURN_RATE * (pitch_to - p.controls.look_pitch)) * HALF + p.controls.look_pitch;
+        p.controls.look_yaw += d * 0.5;
+        p.controls.look_pitch = (0.125 * (pitch_to - p.controls.look_pitch)) * 0.5 + p.controls.look_pitch;
         p.zoom_level = 1;
 
-        if p.bot.targets.first().is_some_and(|t| t.awareness > AIM) {
+        if p.bot.targets.first().is_some_and(|t| t.awareness > 8.0) {
             p.zoom_level = 0;
         }
     }
@@ -410,36 +357,35 @@ impl Sim {
         let (zombie, pitch_now, team) = (p.bot.is_zombie, p.controls.look_pitch, p.team);
         let h = self.humans.get(hid).unwrap();
         let eye = h.bones[7].pos;
-        let (dx, dz) = (t.pos.x - eye.x, t.pos.z - eye.z);
-        let dy = (t.pos.y - eye.y) - EYE_DROP;
-        let d = ((dy * dy + dx * dx) + dz * dz).sqrt();
-        let yaw = (dx as f64).atan2((-dz) as f64) as f32;
-        let horiz = ((dx * dx + dz * dz) as f64).sqrt();
-        let pitch = ((-dy) as f64).atan2(horiz) as f32;
+        let aim = t.pos - eye - Vec3::Y * 0.25;
+        let d = aim.length();
+        let yaw = (aim.x as f64).atan2((-aim.z) as f64) as f32;
+        let horiz = (aim.xz().length_squared() as f64).sqrt();
+        let pitch = ((-aim.y) as f64).atan2(horiz) as f32;
         let p = self.players.get_mut(pid.idx()).unwrap();
 
         if zombie {
             p.controls.walk = 1.0;
-        } else if STOP_RANGE > d {
+        } else if 32.0 > d {
             p.controls.walk = 0.0;
         }
 
-        if d >= FIRE_RANGE {
+        if d >= 64.0 {
             return (yaw, pitch);
         }
 
         let yaw_diff = wrap(h.view_yaw, yaw).abs();
         let pitch_diff = wrap(pitch_now, pitch).abs();
 
-        if yaw_diff >= AIM_TOLERANCE || pitch_diff >= AIM_TOLERANCE {
+        if yaw_diff >= 0.125 || pitch_diff >= 0.125 {
             return (yaw, pitch);
         }
 
         let head = &h.bones[9];
         let (start, up) = (head.pos, head.rot[1]);
-        let end = up * SHOT_LENGTH + start;
+        let end = up * -64.0 + start;
 
-        if self.teammate_in_line(hid, team, h.bones[3].pos, start, end, TEAMMATE_RANGE_FOOT) {
+        if self.teammate_in_line(hid, team, h.bones[3].pos, start, end, 128.0) {
             return (yaw, pitch);
         }
 
@@ -460,11 +406,11 @@ impl Sim {
                 return false;
             }
 
-            let d = chest - h.bones[3].pos;
-            range > d.length() && crate::human::damage::trace_ray_human(h, start, end, SHOT_RADIUS).is_some()
+            range > chest.distance(h.bones[3].pos) && crate::human::damage::trace_ray_human(h, start, end, 0.25).is_some()
         })
     }
 
+    /// bot_gun_loaded, its the gun being held loaded
     fn bot_gun_loaded(&self, hid: usize) -> bool {
         let h = self.humans.get(hid).unwrap();
         h.inventory[0].count > 0 && self.items.get(h.inventory[0].items[0] as usize).is_some_and(|g| g.state.left() > 0)
@@ -474,46 +420,48 @@ impl Sim {
     /// aimed within 32 with neither a teammate nor its own vehicle's body in the way, fires.
     fn bot_seated(&mut self, pid: PlayerId, hid: usize, veh: usize, seat: usize) {
         self.bot_find_targets(pid, hid);
+
         let mut yaw = match seat {
-            1 => SEAT_YAW[0],
-            2 | 4 => SEAT_YAW[1],
-            3 | 5 => SEAT_YAW[2],
+            1 => 45.0_f32.to_radians(),
+            2 | 4 => -135.0_f32.to_radians(),
+            3 | 5 => 135.0_f32.to_radians(),
             _ => 0.0,
         };
+
         let mut pitch = 0.0;
-        let p = self.players.get(pid.idx()).unwrap();
-        let team = p.team;
-        let aimed_at = p.bot.targets.get(p.bot.target as usize).filter(|t| !p.bot.targets.is_empty() && t.awareness > AIM).copied();
+        let player = self.players.get(pid.idx()).unwrap();
+        let team = player.team;
+        let aimed_at = player.bot.targets.get(player.bot.target as usize).filter(|t| !player.bot.targets.is_empty() && t.awareness > 8.0).copied();
 
         if let Some(t) = aimed_at {
-            let h = self.humans.get(hid).unwrap();
-            let eye = h.bones[9].pos;
-            let (dx, dz) = (t.pos.x - eye.x, t.pos.z - eye.z);
-            let dy = (t.pos.y - eye.y) - EYE_DROP;
-            let d = ((dx * dx + dy * dy) + dz * dz).sqrt();
-            let n = if d == 0.0 {
-                Vec3::ZERO
-            } else {
-                let inv = 1.0 / d;
-                Vec3::new(dx * inv, dy * inv, inv * dz)
-            };
+            let human = self.humans.get(hid).unwrap();
+            let eye = human.bones[9].pos;
+
+            let aim = t.pos - eye - Vec3::Y * 0.25;
+            let d = aim.length();
+            let n = aim.normalize_or_zero();
+
             let [r0, r1, r2] = self.vehicles.get(veh).map_or(ferrosa_physics::rotation::IDENTITY, |v| v.rot);
+
             let lx = r0.dot(n);
             let ly = r1.dot(n);
             let lz = n.dot(r2);
+
             yaw = (lx as f64).atan2((-lz) as f64) as f32;
+
             let horiz = ((lx * lx + lz * lz) as f64).sqrt();
             pitch = ((-ly) as f64).atan2(horiz) as f32;
+
             let p = self.players.get(pid.idx()).unwrap();
 
-            if STOP_RANGE > d && AIM_TOLERANCE > wrap(p.controls.look_yaw, yaw).abs() && AIM_TOLERANCE > wrap(p.controls.look_pitch, pitch).abs() {
+            if 32.0 > d && 0.125 > wrap(p.controls.look_yaw, yaw).abs() && 0.125 > wrap(p.controls.look_pitch, pitch).abs() {
                 self.bot_seated_fire(pid, hid, veh, team, n);
             }
         }
 
         let p = self.players.get_mut(pid.idx()).unwrap();
-        p.controls.look_yaw = ((yaw - p.controls.look_yaw) * TURN_RATE) * HALF + p.controls.look_yaw;
-        p.controls.look_pitch = ((pitch - p.controls.look_pitch) * TURN_RATE) * HALF + p.controls.look_pitch;
+        p.controls.look_yaw = ((yaw - p.controls.look_yaw) * 0.125) * 0.5 + p.controls.look_yaw;
+        p.controls.look_pitch = ((pitch - p.controls.look_pitch) * 0.125) * 0.5 + p.controls.look_pitch;
     }
 
     /// The seated bot's shot along its gun's magazine, when the gun points at the enemy (`n`, a unit vector).
@@ -524,14 +472,14 @@ impl Sim {
         let r2 = body.rot[2];
         let along = n.dot(r2);
 
-        if along >= GUN_ALIGNMENT {
+        if along >= -399.0 / 400.0 {
             return;
         }
 
         let start = mag.pos;
-        let end = r2 * SHOT_LENGTH + start;
+        let end = r2 * -64.0 + start;
 
-        if self.teammate_in_line(hid, team, h.bones[3].pos, start, end, TEAMMATE_RANGE_SEATED) {
+        if self.teammate_in_line(hid, team, h.bones[3].pos, start, end, 64.0) {
             return;
         }
 
@@ -548,34 +496,39 @@ impl Sim {
     }
 
     /// player_ai_control_vehicle: the driver lets its traffic car's AI (made aggressive) steer and sets the gas from how
-    /// far the car is below the speed the AI wants, slowing for sharp turns; a car stuck for 180 ticks drives on and
-    /// after 280 reverses.
+    /// far the car is below the speed the AI wants, slowing for sharp turns
     fn player_ai_control_vehicle(&mut self, pid: PlayerId, veh: usize) {
         let Some(car) = self.vehicles.get(veh).and_then(|v| usize::try_from(v.traffic_car).ok()) else { return };
         self.traffic.cars[car].is_aggressive = 1;
+
         crate::traffic::ai::ai_traffic_car(&mut self.traffic, &self.world.map.streets, car);
-        let v = self.vehicles.get(veh).unwrap();
-        let Some(car) = usize::try_from(v.traffic_car).ok() else { return };
-        let c = &self.traffic.cars[car];
-        let (steer, target, stuck) = (c.steer, c.target_speed, c.stuck);
-        let (vel, r2) = (v.vel, v.rot[2]);
-        let p = self.players.get_mut(pid.idx()).unwrap();
-        p.controls.gear_x = DRIVE_GEAR_X;
-        p.controls.gear_y = DRIVE_GEAR_Y;
-        p.controls.strafe = steer;
-        let gas = (vel.dot(r2) + target) * THROTTLE_SCALE;
+
+        let vehicle = self.vehicles.get(veh).unwrap();
+        let Some(car) = usize::try_from(vehicle.traffic_car).ok() else { return };
+
+        let traffic_car = &self.traffic.cars[car];
+        let (steer, target, stuck) = (traffic_car.steer, traffic_car.target_speed, traffic_car.stuck);
+        let (vel, r2) = (vehicle.vel, vehicle.rot[2]);
+
+        let player = self.players.get_mut(pid.idx()).unwrap();
+        player.controls.gear_x = 2.0;
+        player.controls.gear_y = -1.0;
+        player.controls.strafe = steer;
+
+        let gas = (vel.dot(r2) + target) * 8.0;
         let gas = if gas > 1.0 { 1.0 } else { gas };
-        p.controls.walk = if MIN_TARGET_SPEED > target { -1.0 } else { (gas as f64 / ((steer.abs() as f64) + 1.0)) as f32 };
-        p.input_bits = 0;
+        player.controls.walk = if 0.05 > target { -1.0 } else { (gas as f64 / ((steer.abs() as f64) + 1.0)) as f32 };
 
-        if stuck > STUCK_FORWARD {
-            p.controls.walk = 1.0;
-            p.controls.strafe = 0.0;
-            p.controls.gear_x = DRIVE_GEAR_X;
-            p.controls.gear_y = 1.0;
+        player.input_bits = 0;
 
-            if stuck > STUCK_REVERSE {
-                p.controls.walk = -1.0;
+        if stuck > game_seconds(3) {
+            player.controls.walk = 1.0;
+            player.controls.strafe = 0.0;
+            player.controls.gear_x = 2.0;
+            player.controls.gear_y = 1.0;
+
+            if stuck > game_seconds(5) {
+                player.controls.walk = -1.0;
             }
         }
     }

@@ -3,28 +3,14 @@ use glam::Vec3;
 
 use super::{DRIVEN, Traffic};
 use crate::{
-    vehicle::types::VehicleType,
-    world::{map::Map, streets::StreetMap, trace::line_intersect_level},
+    time::game_minutes, vehicle::types::VehicleType, world::{map::Map, streets::StreetMap, trace::line_intersect_level},
 };
 
-const CYCLE: i32 = 800;
-const AMBER_AT: i32 = 671;
-const GREEN: i32 = 2;
-const AMBER: i32 = 1;
 /// Away from players the car speeds up by at most 1/720 and slows by at most 1/180 a tick.
-const ACCEL_GAIN: f32 = 16.0;
 const ACCEL_MAX: f32 = 1.0 / 720.0;
-const ACCEL_SCALE: f32 = 5.0;
-const BRAKE_GAIN: f32 = 32.0;
 const BRAKE_MAX: f32 = -1.0 / 180.0;
-const BRAKE_SCALE: f32 = 10.0;
-const BRAKE_LIMIT: f32 = 2.0;
-const TICKS2: f32 = 3600.0;
 const PARK_TARGET: f32 = 1.0 / 30.0;
 const PARK_SPEED: f32 = 1.0 / 60.0;
-/// The ground under a virtual car is traced from 2 above to 32 below, and it rides 0.875 of a wheel up.
-const GROUND_DEPTH: f32 = -32.0;
-const WHEEL_RIDE: f32 = 0.875;
 
 /// Each intersection's lights: every 800 ticks the green moves to the next way in, skipping missing streets,
 /// with amber for the last 128; a way in with no street to its right gets the opposite way's green instead of a
@@ -32,9 +18,9 @@ const WHEEL_RIDE: f32 = 0.875;
 pub fn update_signals(traffic: &mut Traffic, map: &StreetMap) {
     for (sg, i) in traffic.signals.iter_mut().zip(&map.intersections) {
         sg.timer += 1;
-        sg.cycle = CYCLE;
+        sg.cycle = 800;
 
-        if sg.timer > CYCLE - 1 {
+        if sg.timer > 799 {
             sg.phase = (sg.phase + 1) & 3;
 
             if i.streets[sg.phase as usize] == -1 {
@@ -51,18 +37,18 @@ pub fn update_signals(traffic: &mut Traffic, map: &StreetMap) {
         sg.lights = [0; 8];
         let p = sg.phase as usize;
 
-        sg.lights[p] = GREEN;
+        sg.lights[p] = 2;
         let second = if i.streets[(p + 1) & 3] != -1 { p + 4 } else { (p + 2) & 3 };
 
-        sg.lights[second] = GREEN;
+        sg.lights[second] = 2;
 
-        if sg.timer > AMBER_AT {
-            sg.lights[p] = AMBER;
-            sg.lights[second] = AMBER;
+        if sg.timer > 671 {
+            sg.lights[p] = 1;
+            sg.lights[second] = 1;
         }
 
         if i.streets.iter().filter(|&&s| s == -1).count() > 1 {
-            sg.lights = [GREEN; 8];
+            sg.lights = [2; 8];
         }
     }
 }
@@ -111,12 +97,12 @@ pub fn move_virtual_car(traffic: &mut Traffic, map: &Map, types: &[VehicleType],
     let target = c.target_speed;
 
     if target > along {
-        let d = (target - along) * ACCEL_GAIN;
+        let d = (target - along) * 16.0;
 
         let (a, lift) = if d > 1.0 {
             (ACCEL_MAX, 0.0)
         } else {
-            let a = (d * ACCEL_SCALE) / TICKS2;
+            let a = (d * 5.0) / game_minutes(1) as f32;
             (a, 0.0 * a)
         };
 
@@ -124,12 +110,12 @@ pub fn move_virtual_car(traffic: &mut Traffic, map: &Map, types: &[VehicleType],
         vy += lift;
         vz += a * s;
     } else {
-        let d = (along - target) * BRAKE_GAIN;
+        let d = (along - target) * 32.0;
 
-        let a = if d > BRAKE_LIMIT {
+        let a = if d > 2.0 {
             BRAKE_MAX
         } else {
-            let a = (-d * BRAKE_SCALE) / TICKS2;
+            let a = (-d * 10.0) / game_minutes(1) as f32;
             vy += 0.0 * a;
             a
         };
@@ -145,11 +131,11 @@ pub fn move_virtual_car(traffic: &mut Traffic, map: &Map, types: &[VehicleType],
     c.vel = Vec3::new(vx, vy, vz);
     c.pos = Vec3::new(vx + c.pos.x, vy + c.pos.y, vz + c.pos.z);
 
-    let ride = WHEEL_RIDE * radius - wheel_y;
+    let ride = 0.875 * radius - wheel_y;
     let up = Vec3::Y;
     let p = c.pos;
     let start = up + up + p;
-    let end = p + up * GROUND_DEPTH;
+    let end = p + up * -32.0;
 
     if let Some(h) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, start, end) {
         c.pos.y = ride + h.hit.pos.y;
@@ -165,7 +151,7 @@ pub fn move_virtual_car(traffic: &mut Traffic, map: &Map, types: &[VehicleType],
     let back = -c.wheelbase;
     let p = c.pos;
     let rear = rot[2] * back + p;
-    let end = rear + up * GROUND_DEPTH;
+    let end = rear + up * -32.0;
 
     if let Some(h) = line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, rear, end) {
         let hy = ride + h.hit.pos.y;

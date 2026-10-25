@@ -17,41 +17,20 @@ pub mod sets;
 pub mod state;
 pub use ferrosa_world::item_types as types;
 
+use crate::human::MAX_HUMANS;
 use crate::{human::inventory, sim::tps::timed};
 use crate::{
     items::{grid::ItemGrid, state::ItemState, types::ItemType},
     sim::{
         Sim,
         hull::collide_convex_hulls,
-        humans::{HUMAN_SLOTS, OBJECT_SLOTS},
     },
     world::trace::line_intersect_level,
 };
 
 pub const MAX_ITEMS: usize = 1024;
-
-/// A disk in a computer sits in the drive: 0.15625 down and 0.09375 back from the computer.
-/// A door hangs from two hinges 0.4375 across and 0.5 up and down from its middle.
-const DOOR_HINGE_ACROSS: f32 = -7.0 / 16.0;
-const DOOR_HINGE_UP: f32 = 0.5;
-const DRIVE_DOWN: f32 = -5.0 / 32.0;
-const DRIVE_BACK: f32 = 3.0 / 32.0;
 const SETTLE_SPEED: f32 = 1.0 / 240.0;
-const SETTLE_TICKS: i32 = 60;
-const CONTACT_FRICTION: f32 = 0.6;
-const CONTACT_DEPTH_SCALE: f32 = 1.0 / 64.0;
-const ITEM_HEALTH: i32 = 100;
-const ITEM_FRICTION: f32 = 0.4;
-const CONTACT_SOFTNESS: f32 = 1.0 / 32.0;
-/// The soccer ball: a sphere of 0.11 kicked by any bone but the arms' within 0.36 of it, and slowed spinning while it
-/// touches the level.
-const BALL_RADIUS: f32 = 0.11;
-const KICK_REACH: f32 = 0.36;
 const KICK_SKIPPED_BONES: [usize; 4] = [5, 6, 8, 9];
-const KICK_FRICTION: f32 = 0.4;
-const KICK_DEPTH_SCALE: f32 = 1.0 / 32.0;
-const KICK_SOFTNESS: f32 = 1.0 / 16.0;
-const BALL_SPIN_DAMPING: f32 = 15.0 / 16.0;
 
 pub struct Item {
     pub item_type: ItemKind,
@@ -93,7 +72,7 @@ pub struct Item {
     /// The file system volume of a disk or computer, 0 until one is given.
     pub volume: i32,
     /// The line links the item's text is sent through, and which of them are in use.
-    pub links: [i32; crate::computer::links::ITEM_SLOTS],
+    pub links: [i32; 64],
     pub link_mask: u64,
     /// num_item_events: bumped when what the item shows changes (a computer's line committed); a client that has not
     /// seen the latest count gives the item's packet more priority.
@@ -136,7 +115,7 @@ impl Sim {
         let item = Item {
             item_type,
             body,
-            health: ITEM_HEALTH,
+            health: 100,
             pos,
             vel: vel.unwrap_or(Vec3::ZERO),
             physics_sim: false,
@@ -160,7 +139,7 @@ impl Sim {
             last_input_flags: 0,
             set_origin: None,
             volume: 0,
-            links: [0; crate::computer::links::ITEM_SLOTS],
+            links: [0; 64],
             link_mask: 0,
             events: 0,
         };
@@ -183,8 +162,8 @@ impl Sim {
         match item_type {
             ItemKind::Door => {
                 let [r0, r1, r2] = rot;
-                let hinge = |up: f32| r0 * DOOR_HINGE_ACROSS + pos + r1 * up;
-                item.state = ItemState::Door { axis: r2, hinges: [hinge(-DOOR_HINGE_UP), hinge(DOOR_HINGE_UP)] };
+                let hinge = |up: f32| r0 * (-7.0 / 16.0) + pos + r1 * up;
+                item.state = ItemState::Door { axis: r2, hinges: [hinge(-0.5), hinge(0.5)] };
             }
             ItemKind::PhonePay => {
                 if let Some(p) = item.state.phone_mut() {
@@ -344,6 +323,7 @@ impl Sim {
         }
     }
 
+    /// item_simulation: for every item, do its ticking, settling, and physics
     fn item_simulation(&mut self) {
         for id in self.items.ids() {
             let in_pocket = self.items.get(id).is_some_and(|item| {
@@ -481,13 +461,9 @@ impl Sim {
                 if SETTLE_SPEED <= v.length() || SETTLE_SPEED <= w.length() {
                     item.settled_timer = 0;
                 } else {
-                    let t = item.settled_timer;
-
-                    if t < SETTLE_TICKS {
-                        item.settled_timer = t + 1;
-                    }
-
-                    if t >= SETTLE_TICKS - 1 {
+                    if item.settled_timer < 60 {
+                        item.settled_timer += 1;
+                    } else if item.settled_timer >= 60 {
                         item.physics_settled = true;
                     }
                 }
@@ -506,11 +482,6 @@ impl Sim {
     /// The child part of logic_item: a mounted item sits on its parent, cash fanned out across an open briefcase and
     /// anything else 0.0625 below the parent's middle.
     fn place_mounted_items(&mut self) {
-        const CASH_SPREAD: f32 = 3.0 / 16.0;
-        const CASH_SCALE: f32 = 0.75;
-        const CASH_START: f32 = 27.0 / 128.0;
-        const BELOW: f32 = -1.0 / 16.0;
-
         for id in self.items.ids() {
             let item = self.items.get(id).unwrap();
 
@@ -526,14 +497,15 @@ impl Sim {
             let pos = match parent.item_type {
                 ItemKind::Briefcase | ItemKind::BriefcaseOpen => {
                     if matches!(kind, ItemKind::CashRound | ItemKind::CashWorld) {
-                        let k = slot as f32 * CASH_SPREAD * CASH_SCALE * CASH_SCALE - CASH_START;
+                        let k = slot as f32 * (3.0 / 16.0) * 0.75 * 0.75 - (27.0 / 128.0);
+
                         p + r0 * k
                     } else {
                         p
                     }
                 }
-                ItemKind::Computer => p + r1 * DRIVE_DOWN + r2 * DRIVE_BACK,
-                _ => p + r1 * BELOW,
+                ItemKind::Computer => p + r1 * (-5.0 / 32.0) + r2 * (3.0 / 32.0),
+                _ => p + r1 * (-1.0 / 16.0),
             };
             let item = self.items.get_mut(id).unwrap();
             item.mount_pose = Some((pos, rot));
@@ -601,7 +573,7 @@ impl Sim {
 
             for c in &contacts {
                 let (first, second) = if c.swapped { (body_b, body_a) } else { (body_a, body_b) };
-                self.bodies.add_body_contact(first, second, c.offset_a, c.offset_b, c.normal, c.depth, ITEM_FRICTION, CONTACT_DEPTH_SCALE, CONTACT_SOFTNESS);
+                self.bodies.add_body_contact(first, second, c.offset_a, c.offset_b, c.normal, c.depth, 0.4, 1.0 / 64.0, 1.0 / 32.0);
             }
 
             if contacts.is_empty() {
@@ -625,12 +597,12 @@ impl Sim {
         let Some(center) = self.bodies.get(body_id).map(|b| b.pos) else { return };
         let level = &self.world.map.level;
 
-        let Some((p, n, dist)) = sphere_cast::sphere_cast_level(&level.area, &level.meshes, center, BALL_RADIUS) else { return };
+        let Some((p, n, dist)) = sphere_cast::sphere_cast_level(&level.area, &level.meshes, center, 0.11) else { return };
 
-        self.bodies.add_world_contact(body_id, p - center, n, BALL_RADIUS - dist, CONTACT_FRICTION, CONTACT_DEPTH_SCALE, CONTACT_SOFTNESS);
+        self.bodies.add_world_contact(body_id, p - center, n, 0.11 - dist, 0.6, 1.0 / 64.0, 1.0 / 32.0);
 
         if let Some(b) = self.bodies.get_mut(body_id) {
-            b.ang_momentum *= BALL_SPIN_DAMPING;
+            b.ang_momentum *= 15.0 / 16.0;
         }
     }
 
@@ -646,16 +618,16 @@ impl Sim {
             let d = ball - bone.pos;
             let len = d.length();
 
-            if len >= KICK_REACH {
+            if len >= 0.36 {
                 continue;
             }
 
             let Some(bone_pos) = self.bodies.get(bone.body).map(|b| b.pos) else { continue };
 
             let n = if len != 0.0 { -(d * (1.0 / len)) } else { Vec3::splat(-0.0) };
-            let p = n * BALL_RADIUS + ball;
+            let p = n * 0.11 + ball;
 
-            self.bodies.add_body_contact(bone.body, ball_body, p - bone_pos, p - ball_pos, n, KICK_REACH - len, KICK_FRICTION, KICK_DEPTH_SCALE, KICK_SOFTNESS);
+            self.bodies.add_body_contact(bone.body, ball_body, p - bone_pos, p - ball_pos, n, 0.36 - len, 0.4, 1.0 / 32.0, 1.0 / 16.0);
         }
     }
 
@@ -678,7 +650,7 @@ impl Sim {
             let offset = hp - pos;
             let depth = (n.x * (hp.x - corner.x) + (hp.y - corner.y) * n.y) + (hp.z - corner.z) * n.z;
 
-            self.bodies.add_world_contact(body_id, offset, n, depth, CONTACT_FRICTION, CONTACT_DEPTH_SCALE, CONTACT_SOFTNESS);
+            self.bodies.add_world_contact(body_id, offset, n, depth, 0.6, 1.0 / 64.0, 1.0 / 32.0);
 
             if let Some(set) = h.set {
                 self.spawn_hit_set(set, h.block);
@@ -707,7 +679,7 @@ impl Sim {
     pub(crate) fn item_objects(&self) -> Vec<ServerItemObject> {
         self.items
             .iter()
-            .filter(|&(id, _)| HUMAN_SLOTS + id < OBJECT_SLOTS)
+            .filter(|&(id, _)| MAX_HUMANS + id < 1024)
             .filter_map(|(id, item)| {
                 let body = self.bodies.get(item.body)?;
                 let rot = rot_matrix_to_quaternion(&body.rot);
@@ -728,7 +700,7 @@ impl Sim {
                 };
 
                 Some(ServerItemObject {
-                    slot: (HUMAN_SLOTS + id) as u16,
+                    slot: (MAX_HUMANS + id) as u16,
                     item_id: id as u16,
                     item_type: Some(item.item_type),
                     pos: body.pos,

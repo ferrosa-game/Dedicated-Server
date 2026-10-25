@@ -4,70 +4,37 @@ use ferrosa_protocol::clientbound::game::{
 };
 use glam::{IVec3, Vec3};
 
-use super::{
-    Sim,
-    vehicles::{TYRE_BURST, WINDOW_BROKEN},
-};
+use super::Sim;
 use crate::{
-    PlayerId,
-    human::{
+    PlayerId, human::{
         BoneId,
         damage::{BoneHit, damage_human, trace_ray_human},
         physics::{HumanOutput, add_bullet_hole},
-    },
-    plugin::DamageCause,
-    time::TICKS_PER_SECOND_F32,
-    vehicle::physics::{VehicleHit, VehiclePart, trace_vehicle_parts},
-    world::{
+    }, plugin::DamageCause, time::{TICKS_PER_SECOND_F32, game_seconds}, vehicle::physics::{VehicleHit, VehiclePart, trace_vehicle_parts}, world::{
         capsule::CapsuleHit,
         trace::{LevelHit, line_intersect_level},
     },
 };
 
-pub const MAX_BULLETS: usize = 16384;
-const LIFETIME: i32 = 600;
-const BULLET_GRAVITY: f32 = 9.8 / 60.0 / 60.0;
-const HIT_WORLD: i32 = 0;
-const HIT_BODY: i32 = 1;
-const HIT_VEHICLE: i32 = 2;
-const VEHICLE_DAMAGE_SCALE: f32 = 1.5;
-const TYRE_BURST_RADIUS: f32 = 0.75;
-const DAMAGE_SCALE: f32 = 5.5;
-const DAMAGE_FLOOR: f32 = 2.0;
-const LIGHT_BONE: f32 = 6.0;
-const LIGHT_BONE_MASS: f32 = 3.0;
-const IMPULSE: f32 = 3.0;
-
 /// bullet_data: each bullet type's mass (damage and recoil) and drag.
 pub const BULLET_DATA: [(f32, f32); 4] = [(0.01, 0.00456), (0.0062, 0.003916), (0.008, 0.007952), (0.016, 0.005832)];
 
-/// A bullet in flight.
 #[derive(Clone, Debug)]
 pub struct Bullet {
     pub kind: i32,
-    /// Ticks left; a hit sets it to 0.
-    pub time: i32,
+    pub life: i32,
     pub player: Option<PlayerId>,
     pub mass: f32,
-    /// Taken from the vertical speed every tick: create_bullet stores the bytes "Pg2;", a little under
-    /// 9.8 / 60².
     pub gravity: f32,
-    /// Where it was before this tick's move and where it is now.
-    pub prev: Vec3,
+    pub prev_pos: Vec3,
     pub pos: Vec3,
     pub vel: Vec3,
 }
 
 /// create_bullet: a bullet of `kind` leaving `pos` at `vel`, fired by `player`.
-pub fn create_bullet(bullets: &mut Vec<Bullet>, kind: i32, pos: Vec3, vel: Vec3, player: Option<PlayerId>, gravity_scale: f32) -> bool {
-    if bullets.len() >= MAX_BULLETS {
-        return false;
-    }
-
+pub fn create_bullet(bullets: &mut Vec<Bullet>, kind: i32, pos: Vec3, vel: Vec3, player: Option<PlayerId>, gravity_scale: f32) {
     let mass = BULLET_DATA.get(kind as usize).map_or(0.0, |d| d.0);
-    bullets.push(Bullet { kind, time: LIFETIME, player, mass, gravity: BULLET_GRAVITY * gravity_scale, prev: pos, pos, vel });
-
-    true
+    bullets.push(Bullet { kind, life: game_seconds(10), player, mass, gravity: (9.8 / 60.0 / 60.0) * gravity_scale, prev_pos: pos, pos, vel });
 }
 
 /// What a bullet's path ran into this tick.
@@ -79,62 +46,62 @@ enum Target {
 
 /// One tick of flight: gravity, then drag against the speed squared, then the move. Returns where it went from and to.
 fn fly(b: &mut Bullet) -> (Vec3, Vec3) {
-    b.prev = b.pos;
+    b.prev_pos = b.pos;
     b.vel.y -= b.gravity;
 
-    let v = b.vel;
-    let speed = ((v.y * v.y + v.x * v.x) + v.z * v.z).sqrt();
+    let vel = b.vel;
+    let speed = ((vel.y * vel.y + vel.x * vel.x) + vel.z * vel.z).sqrt();
     let drag = BULLET_DATA.get(b.kind as usize).map_or(0.0, |d| d.1);
-    let dir = if speed != 0.0 { v * (1.0 / speed) } else { Vec3::ZERO };
+    let dir = if speed != 0.0 { vel * (1.0 / speed) } else { Vec3::ZERO };
 
-    b.vel = dir * ((-speed * speed) * drag) + v;
+    b.vel = dir * ((-speed * speed) * drag) + vel;
     b.pos = b.vel + b.pos;
-    (b.prev, b.pos)
+    (b.prev_pos, b.pos)
 }
 
 impl Sim {
     /// A bullet stopped by a vehicle: a tyre loses health and bursts, a window breaks, or the vehicle is hurt.
     fn bullet_hit_vehicle(&mut self, i: usize, vid: usize, hit: VehicleHit) {
         let b = self.bullets[i].clone();
-        self.bullets[i].time = 0;
+        self.bullets[i].life = 0;
 
         let v = b.vel;
         let speed = v.length();
-        let damage = ((b.mass * (speed * VEHICLE_DAMAGE_SCALE)) * TICKS_PER_SECOND_F32 - DAMAGE_FLOOR) as i32;
+        let damage = ((b.mass * (speed * 1.5)) * TICKS_PER_SECOND_F32 - 2.0) as i32;
         let damage = if damage >= 0 { damage } else { 0 };
         let Some(vehicle) = self.vehicles.get_mut(vid) else { return };
         let update = |kind: i32, part: usize| EventUpdateVehicle { vehicle_id: vid as i32, kind, part: part as i32, pos: hit.pos, velocity: v };
 
         let event = match hit.part {
             VehiclePart::Wheel(k) => {
-                let Some(w) = vehicle.wheels.get_mut(k) else { return };
+                let Some(wheel) = vehicle.wheels.get_mut(k) else { return };
 
-                if w.health <= 0 {
+                if wheel.health <= 0 {
                     return;
                 }
 
-                w.health -= damage;
+                wheel.health -= damage;
 
-                if w.health > 0 {
+                if wheel.health > 0 {
                     return;
                 }
 
-                w.drive |= 1;
-                w.radius *= TYRE_BURST_RADIUS;
-                w.popped = 1;
+                wheel.drive |= 1;
+                wheel.radius *= 0.75;
+                wheel.popped = 1;
 
-                ServerEvent::UpdateVehicle(update(TYRE_BURST, k))
+                ServerEvent::UpdateVehicle(update(1, k))
             }
             _ if vehicle.train => return,
             VehiclePart::Window(k) => {
-                if let Some(w) = vehicle.broken_windows.get_mut(k) {
-                    *w = true;
+                if let Some(window) = vehicle.broken_windows.get_mut(k) {
+                    *window = true;
                 }
 
-                ServerEvent::UpdateVehicle(update(WINDOW_BROKEN, k))
+                ServerEvent::UpdateVehicle(update(0, k))
             }
             VehiclePart::Body(_) => {
-                let e = EventBulletHit { unk: 0, hit_type: HIT_VEHICLE, pos: hit.pos, normal: hit.normal };
+                let e = EventBulletHit { unk: 0, hit_type: 2, pos: hit.pos, normal: hit.normal };
 
                 self.events.push(Event { tick_created: self.tick, kind: ServerEvent::BulletHit(e) });
                 self.vehicle_take_damage(vid, damage);
@@ -234,10 +201,10 @@ impl Sim {
     /// A bullet stopped by the level: an item-set cell makes its items real (a watermelon hit bursts); otherwise glass
     /// gets a hole or the surface shows a hit.
     fn bullet_hit_level(&mut self, i: usize, level: LevelHit) {
-        let b = &mut self.bullets[i];
-        b.pos = level.hit.pos;
-        b.time = 0;
-        let vel = b.vel;
+        let bullet = &mut self.bullets[i];
+        bullet.pos = level.hit.pos;
+        bullet.life = 0;
+        let vel = bullet.vel;
 
         if let Some(set) = level.set {
             for (index, id) in self.spawn_hit_set(set, level.block) {
@@ -261,7 +228,9 @@ impl Sim {
             face_attr: level.face_attr,
             set: level.set,
         };
+
         let mut out = Vec::new();
+
         let kind = if add_bullet_hole(&mut self.world.map, hole, level.hit.pos, vel, &mut out)
             && let Some(HumanOutput::Glass(b)) = out.pop()
         {
@@ -276,8 +245,9 @@ impl Sim {
                 vel: b.vel,
             })
         } else {
-            ServerEvent::BulletHit(EventBulletHit { unk: 0, hit_type: HIT_WORLD, pos: level.hit.pos, normal: level.hit.normal })
+            ServerEvent::BulletHit(EventBulletHit { unk: 0, hit_type: 0, pos: level.hit.pos, normal: level.hit.normal })
         };
+
         self.events.push(Event { tick_created: self.tick, kind });
     }
 
@@ -294,16 +264,16 @@ impl Sim {
             }
         }
 
-        self.bullets[i].time = 0;
+        self.bullets[i].life = 0;
     }
 
     /// A bullet stopped by a human: damage from its mass and speed (more on the head) and a push on the bone hit.
     fn bullet_hit_human(&mut self, i: usize, id: usize, hit: BoneHit) {
         let bullet = self.bullets[i].clone();
-        let mut damage = (bullet.mass * (bullet.vel.length() * DAMAGE_SCALE) * TICKS_PER_SECOND_F32 - DAMAGE_FLOOR) as i32;
+        let mut damage = (bullet.mass * (bullet.vel.length() * 5.5) * TICKS_PER_SECOND_F32 - 2.0) as i32;
 
         if damage > 0 {
-            let e = EventBulletHit { unk: 0, hit_type: HIT_BODY, pos: hit.pos, normal: hit.normal };
+            let e = EventBulletHit { unk: 0, hit_type: 1, pos: hit.pos, normal: hit.normal };
             self.events.push(Event { tick_created: self.tick, kind: ServerEvent::BulletHit(e) });
 
             if hit.bone == BoneId::Head {
@@ -326,10 +296,10 @@ impl Sim {
         damage_human(human, hit.bone, damage);
 
         let bone = &human.bones[hit.bone.index()];
-        let weight = if LIGHT_BONE > bone.mass { LIGHT_BONE_MASS } else { 0.5 * bone.mass };
+        let weight = if 6.0 > bone.mass { 3.0 } else { 0.5 * bone.mass };
 
-        let f = IMPULSE * (bullet.mass / (weight + bullet.mass));
-        self.bullets[i].time = 0;
+        let f = 3.0 * (bullet.mass / (weight + bullet.mass));
+        self.bullets[i].life = 0;
 
         let Some(body) = self.bodies.get_mut(bone.body) else { return };
         body.vel = f * bullet.vel + body.vel;
@@ -346,10 +316,10 @@ impl Sim {
         while i < self.bullets.len() {
             let b = &mut self.bullets[i];
 
-            if b.time <= 65535 {
-                b.time -= 1;
+            if b.life <= 65535 {
+                b.life -= 1;
 
-                if b.time <= 0 {
+                if b.life <= 0 {
                     self.bullets.swap_remove(i);
 
                     continue;

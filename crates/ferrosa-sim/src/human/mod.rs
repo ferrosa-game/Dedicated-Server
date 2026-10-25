@@ -82,7 +82,6 @@ impl Default for HumanHealth {
 
 pub struct Human {
     pub player: Option<PlayerId>,
-    /// The account of the player this human belongs to, kept after the player leaves.
     pub account: Option<u32>,
     /// The player's share count, copied every tick so a returning player can buy them back.
     pub stocks: i32,
@@ -92,11 +91,9 @@ pub struct Human {
     pub stamina: i32,
     pub max_stamina: i32,
     pub vehicle: Option<usize>,
-    /// The seat taken in `vehicle`.
     pub seat: usize,
     /// Ticks the human has been getting out of its seat (0 when not), which slides it outwards.
     pub seat_exit: i32,
-    /// The gear stick a driver moves (controls 0 and 2).
     pub gear_x_input: f32,
     pub gear_y_input: f32,
     pub last_vehicle_cooldown: i32,
@@ -119,12 +116,8 @@ pub struct Human {
     pub lean_forward: f32,
     pub lean_side: f32,
     pub pain: i32,
-    /// The spin a jump starts with, about the head's up and side axes (from the player's
-    /// controls).
     pub jump_spin_yaw: f32,
     pub jump_spin_pitch: f32,
-    /// Where the player looks around without turning (controls 6 and 7): the waist and
-    /// chest turn part of the way, and a pointing arm follows them.
     pub free_look_yaw: f32,
     pub free_look_pitch: f32,
     pub hand_sway: Vec3,

@@ -1,8 +1,6 @@
 use crate::{items::state::ItemState, sim::Sim};
 
 impl Sim {
-    /// The key part of logic_item: a key keeps while its vehicle stands, and locks it unless whoever holds the key
-    /// sits in it, who then owns it.
     pub(crate) fn key_logic(&mut self, id: usize) {
         let Some(item) = self.items.get(id) else { return };
         let ItemState::Key { vehicle: Some(vid) } = item.state else { return };
@@ -15,6 +13,7 @@ impl Sim {
         }
 
         let Some(vehicle) = self.vehicles.get_mut(vid) else { return };
+
         vehicle.locked = true;
 
         if let Some(h) = usize::try_from(holder).ok().and_then(|h| self.humans.get(h))

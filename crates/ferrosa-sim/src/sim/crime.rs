@@ -1,13 +1,9 @@
-use ferrosa_protocol::{Team, clientbound::game::events::chat::ChatType};
+use ferrosa_protocol::Team;
 use ferrosa_world::skeleton::BoneId;
 use glam::Vec3;
 
 use super::Sim;
 use crate::{PlayerId, human::damage::damage_human};
-
-const MAX_CRIMINAL_RATING: i32 = 1023;
-pub(crate) const VERSUS_TEAM_DAMAGE: i32 = 50;
-const RUN_OVER_SCORE: i32 = 100;
 
 impl Sim {
     /// handle_criminal_rating: in world mode, a player who hurts another gains criminal rating by their teams
@@ -30,6 +26,7 @@ impl Sim {
         let (victim_pos, last_vehicle) = (vh.bones[0].pos, vh.last_vehicle);
         let owner = (last_vehicle != -1).then(|| self.vehicles.get(last_vehicle as usize)).flatten().map_or(-1, |v| v.owner);
         let (a_team, v_team) = (attacker_player.team as i32, attacker_victim.team as i32);
+
         let rate = if attacker_player.team == Team::Spectator {
             if last_vehicle != -1 && attacker.idx() as i32 == owner && owner != -1 {
                 return;
@@ -55,6 +52,7 @@ impl Sim {
                 cfg.crimeteamteam
             }
         };
+
         let mut k = rate as f32 / 100.0;
 
         if attacker_victim.crim_rating > 0 {
@@ -74,9 +72,7 @@ impl Sim {
             a.crim_rating += gain;
         }
 
-        if a.crim_rating > MAX_CRIMINAL_RATING {
-            a.crim_rating = MAX_CRIMINAL_RATING;
-        }
+        a.crim_rating = a.crim_rating.min(1023);
 
         if cfg.crimekick <= a.crim_rating
             && let Some(h) = self.humans.get_mut(attacker_human)
@@ -87,15 +83,6 @@ impl Sim {
 
     fn in_base(&self, team: i32, pos: Vec3) -> bool {
         usize::try_from(team).ok().and_then(|t| self.world.map.level.bases.get(t)).is_some_and(|b| b.contains(pos))
-    }
-
-    /// The /godmode chat command: the player's god mode on or off, announced to admins.
-    pub(crate) fn godmode_command(&mut self, pid: PlayerId) {
-        let Some(p) = self.players.get_mut(pid.idx()) else { return };
-        p.god_mode = !p.god_mode;
-
-        let line = if p.god_mode { "godmode on" } else { "godmode off" };
-        self.send_chat(line, ChatType::AdminChat, -1, 0);
     }
 
     /// handle_team_kill: the team damage is logged and dealt to the player's head, and the player's details resent.
@@ -146,11 +133,11 @@ impl Sim {
         let Some(victim) = victim else { return };
 
         if driver != victim {
-            self.handle_criminal_rating(driver, victim, RUN_OVER_SCORE);
+            self.handle_criminal_rating(driver, victim, 100);
         }
 
         if self.same_team(driver, victim) {
-            self.handle_team_kill(driver, RUN_OVER_SCORE);
+            self.handle_team_kill(driver, 100);
         }
     }
 }

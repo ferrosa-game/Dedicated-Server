@@ -2,8 +2,7 @@ use ferrosa_protocol::clientbound::game::ItemKind;
 
 use crate::{
     PlayerId,
-    items::{logic::phone::Phone, types::ItemType},
-    sim::memos,
+    items::{logic::phone::Phone, types::ItemType}
 };
 
 /// The part of an item record that depends on its type. The binary keeps all of these in one record and reuses
@@ -35,7 +34,7 @@ pub enum ItemState {
     Cash(Cash),
     /// A computer's screen, shell and programs.
     Computer(Box<crate::computer::Computer>),
-    Memo(Box<[u8; memos::MEMO_LEN]>),
+    Memo(Box<[u8; 1024]>),
     /// A door on its hinges: its axis and the two points it hangs from.
     Door { axis: glam::Vec3, hinges: [glam::Vec3; 2] },
 }
@@ -56,6 +55,7 @@ impl Cash {
         (self.codes >> ((k * 3) & 31)) & 7
     }
 
+    /// value: calculate the value of this stack of cash from its bills
     pub(crate) fn value(&self) -> i32 {
         (0..=self.bills).map(|k| BILL_VALUES[self.code(k) as usize]).sum()
     }
@@ -137,7 +137,6 @@ impl Cash {
 }
 
 impl ItemState {
-    /// The state a freshly created item of this type starts in.
     pub(crate) fn new(kind: ItemKind, ty: &ItemType) -> Self {
         let left = ty.magazine_ammo;
 
@@ -150,7 +149,7 @@ impl ItemState {
             ItemKind::Arcade => Self::Arcade { frame: 0, top_line: 0 },
             ItemKind::Key => Self::Key { vehicle: None },
             ItemKind::CashWorld => Self::Cash(Cash::default()),
-            ItemKind::Paper | ItemKind::PaperWorld => Self::Memo(Box::new([0; memos::MEMO_LEN])),
+            ItemKind::Paper | ItemKind::PaperWorld => Self::Memo(Box::new([0; 1024])),
             _ if ty.is_gun => Self::Gun { rounds: left, cooldown: 0, trigger_ticks: 0 },
             _ if left > 0 => Self::Stock { left },
             _ => Self::Plain,

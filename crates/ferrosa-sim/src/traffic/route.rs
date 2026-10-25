@@ -1,13 +1,5 @@
-use super::{MAX_ROUTE, TrafficCar};
+use super::TrafficCar;
 use crate::world::streets::StreetMap;
-
-const SEARCH_STEPS: usize = 4096;
-const NO_BEST: f32 = 65536.0;
-const HEURISTIC: f32 = 1.0 / 128.0;
-const STEP_COST: f32 = 1.0;
-const DEAD_END_COST: f32 = 256.0;
-const OPEN: i32 = 1;
-const CLOSED: i32 = 2;
 
 #[derive(Clone, Copy, Default)]
 struct SearchNode {
@@ -20,16 +12,16 @@ struct SearchNode {
 /// closed and its neighbours opened; reaching the goal fills `path` from the goal back to the start.
 fn search_step(map: &StreetMap, nodes: &mut [SearchNode], from: usize, to: usize, path: &mut Vec<usize>) {
     let goal = map.route_nodes[to].pos;
-    let mut best = NO_BEST;
+    let mut best = 65536.0;
     let mut sel = 0;
 
     for (i, n) in map.route_nodes.iter().enumerate() {
-        if nodes[i].state != OPEN {
+        if nodes[i].state != 1 {
             continue;
         }
 
         let d = goal - n.pos;
-        let f = d.length() * HEURISTIC + nodes[i].cost;
+        let f = d.length() * (1.0 / 128.0) + nodes[i].cost;
 
         if best > f {
             sel = i;
@@ -37,21 +29,21 @@ fn search_step(map: &StreetMap, nodes: &mut [SearchNode], from: usize, to: usize
         }
     }
 
-    if nodes[sel].state != OPEN {
+    if nodes[sel].state != 1 {
         return;
     }
 
-    nodes[sel].state = CLOSED;
+    nodes[sel].state = 2;
 
     for &j in &map.route_nodes[sel].neighbors {
         let j = j as usize;
-        let cost = nodes[sel].cost + STEP_COST;
+        let cost = nodes[sel].cost + 1.0;
         let dead_end = map.route_nodes[j].dead_end != 0;
 
         match nodes[j].state {
-            CLOSED => continue,
+            2 => continue,
             0 => {
-                nodes[j] = SearchNode { state: OPEN, cost: if dead_end { cost + DEAD_END_COST } else { cost }, parent: sel };
+                nodes[j] = SearchNode { state: 1, cost: if dead_end { cost + 256.0 } else { cost }, parent: sel };
             }
             _ => {
                 if nodes[j].cost <= cost {
@@ -59,7 +51,7 @@ fn search_step(map: &StreetMap, nodes: &mut [SearchNode], from: usize, to: usize
                 }
 
                 nodes[j].parent = sel;
-                nodes[j].cost = if dead_end { cost + DEAD_END_COST } else { cost };
+                nodes[j].cost = if dead_end { cost + 256.0 } else { cost };
             }
         }
 
@@ -87,9 +79,9 @@ pub fn plan_route(car: &mut TrafficCar, map: &StreetMap, from_street: i32, from_
 
     if from < count && to < count {
         let mut nodes = vec![SearchNode::default(); count];
-        nodes[from].state = OPEN;
+        nodes[from].state = 1;
 
-        for _ in 0..SEARCH_STEPS {
+        for _ in 0..4096 {
             search_step(map, &mut nodes, from, to, &mut path);
 
             if !path.is_empty() {
@@ -102,29 +94,29 @@ pub fn plan_route(car: &mut TrafficCar, map: &StreetMap, from_street: i32, from_
     car.route_len = 0;
     car.route[0].turn = 0;
 
-    let n = path.len();
+    let path_len = path.len();
 
-    if n == 0 {
+    if path_len == 0 {
         return;
     }
 
     let (mut from_way, mut to_way) = (0, 0);
-    let mut street = map.route_nodes[path[n - 1]].street as i32;
+    let mut street = map.route_nodes[path[path_len - 1]].street as i32;
 
-    for i in 1..=n.min(MAX_ROUTE) {
-        let end = map.route_nodes[path[n - i]].end;
+    for path_step in 1..=path_len.min(63) {
+        let end = map.route_nodes[path[path_len - path_step]].end;
 
-        car.route[i - 1].street = street;
-        car.route[i - 1].end = end;
-        car.route_len = i as i32;
+        car.route[path_step - 1].street = street;
+        car.route[path_step - 1].end = end;
+        car.route_len = path_step as i32;
 
-        if i == n || i == MAX_ROUTE {
+        if path_step == path_len || path_step == 63 {
             break;
         }
 
         let st = &map.streets[street as usize];
         let at = &map.intersections[st.intersections[if end != 0 { 0 } else { 1 }]];
-        let next = map.route_nodes[path[n - 1 - i]].street as i32;
+        let next = map.route_nodes[path[path_len - 1 - path_step]].street as i32;
 
         for (k, &s) in at.streets.iter().enumerate() {
             if s == street {
@@ -144,7 +136,7 @@ pub fn plan_route(car: &mut TrafficCar, map: &StreetMap, from_street: i32, from_
             diff -= 4;
         }
 
-        car.route[i].turn = if diff == -1 { -1 } else { (diff == 1) as i32 };
+        car.route[path_step].turn = if diff == -1 { -1 } else { (diff == 1) as i32 };
         street = next;
     }
 }

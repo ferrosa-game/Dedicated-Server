@@ -2,27 +2,9 @@ use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::clientbound::game::VehicleKind;
 use glam::Vec3;
 
-use super::{DRIVEN, HIDDEN_STREET, LOOP_STREET, MAX_ROUTE, PARKED, RouteStep, Traffic, TrafficCar, route::plan_route};
+use super::{RouteStep, Traffic, TrafficCar, route::plan_route};
 use crate::{vehicle::types::VehicleType, world::map::Map};
 
-/// The rounded pi the binary turns a new car with: std's pi gives a different last bit (checked by the traffic
-/// dumps).
-const SPAWN_PI: f64 = 180.0_f64.to_radians();
-const SPAWN_HALF_PI: f64 = 90.0_f64.to_radians();
-const COLORS: i32 = 6;
-const PROGRESS_STEP: f32 = 1.0 / 256.0;
-/// The ground is found by tracing 128 down from two above the street's higher end.
-const TRACE_LIFT: f32 = 2.0;
-const TRACE_DEPTH: f32 = -128.0;
-const RIDE_HEIGHT: f32 = 0.375;
-const FRONT: f32 = 3.5;
-const REAR: f32 = -0.5;
-const WHEELBASE: f32 = 3.0;
-/// The eliminator spawns some cars parked in a third lane of the flat three lane streets.
-const PARKING_LANE: i32 = 2;
-
-/// The traffic's vehicle types by a roll of 0 to 15: town cars most often, then vans and minivans, and a few
-/// hatchbacks.
 fn car_kind(roll: u32) -> VehicleKind {
     match roll {
         0..=2 => VehicleKind::Van,
@@ -44,7 +26,7 @@ pub fn create_traffic(traffic: &mut Traffic, map: &Map, types: &[VehicleType], p
         let mut street = rand::random_range(0..n);
 
         if traffic.roundcity {
-            while street == HIDDEN_STREET || street == LOOP_STREET {
+            while street == 23 || street == 67 {
                 street = rand::random_range(0..n);
             }
         }
@@ -60,11 +42,11 @@ pub fn create_traffic(traffic: &mut Traffic, map: &Map, types: &[VehicleType], p
 
         let kind = car_kind(rand::random_range(0..16));
         let byte = rand::random_range(0..256);
-        let color = rand::random_range(0..COLORS);
-        let id = create_traffic_car(traffic, map, types, kind, color, street, slot, lane, byte as f32 * PROGRESS_STEP);
+        let color = rand::random_range(0..6);
+        let id = create_traffic_car(traffic, map, types, kind, color, street, slot, lane, byte as f32 * 1.0 / 256.0);
 
-        if lane == PARKING_LANE {
-            traffic.cars[id].is_bot = PARKED;
+        if lane == 2 {
+            traffic.cars[id].is_bot = 0;
         }
     }
 }
@@ -112,15 +94,15 @@ pub fn create_traffic_car(
     let mut yaw = if st.north_south != 0 { -90.0_f32.to_radians() } else { -180.0_f32.to_radians() };
 
     if slot == 0 {
-        yaw = (yaw as f64 + SPAWN_PI) as f32;
+        yaw = (yaw as f64 + 180.0_f64.to_radians()) as f32;
     }
 
     let pos = dir * p + from;
     let ends = st.intersections.map(|i| streets.intersections[i].world_pos.y);
-    let top = ends[1].max(ends[0].max(pos.y)) + TRACE_LIFT;
+    let top = ends[1].max(ends[0].max(pos.y)) + 2.0;
     let up = Vec3::Y;
     let start = Vec3::new(pos.x, top, pos.z);
-    let end = Vec3::new(pos.x + up.x * TRACE_DEPTH, top + up.y * TRACE_DEPTH, TRACE_DEPTH * up.z + pos.z);
+    let end = Vec3::new(pos.x + up.x * -128.0, top + up.y * -128.0, -128.0 * up.z + pos.z);
     let ground = crate::world::trace::line_intersect_level(&map.ground, &map.level.area, &map.level.meshes, start, end).map_or(top, |h| h.hit.pos.y);
     let wheel_y = types.get(kind as usize).and_then(|t| t.wheels.first()).map_or(0.0, |w| w.local_pos.y);
     let left = st.left_lanes;
@@ -132,22 +114,22 @@ pub fn create_traffic_car(
         human: -1,
         vehicle: -1,
         state: 0,
-        pos: Vec3::new(pos.x, (RIDE_HEIGHT - wheel_y) + ground, pos.z),
+        pos: Vec3::new(pos.x, (0.375 - wheel_y) + ground, pos.z),
         vel: Vec3::ZERO,
         yaw,
         rot: IDENTITY,
         steer: 0.0,
         target_speed: 0.0,
-        front: FRONT,
-        rear: REAR,
-        wheelbase: WHEELBASE,
+        front: 3.5,
+        rear: -0.5,
+        wheelbase: 3.0,
         bounds_min: Vec3::ZERO,
         bounds_max: Vec3::ZERO,
-        is_bot: DRIVEN,
+        is_bot: 1,
         is_aggressive: 0,
         route_index: 0,
         route_len: 0,
-        route: [RouteStep::default(); MAX_ROUTE],
+        route: [RouteStep::default(); 63],
         street,
         intersection: -1,
         lane: car_lane,
@@ -171,7 +153,7 @@ pub fn create_traffic_car(
 
     let mut rot = IDENTITY;
     let axis = rot[1];
-    rotate_orientation(&mut rot, axis, (yaw as f64 + SPAWN_HALF_PI) as f32);
+    rotate_orientation(&mut rot, axis, (yaw as f64 + 90.0_f64.to_radians()) as f32);
 
     car.rot = rot;
     traffic.cars.push(car);

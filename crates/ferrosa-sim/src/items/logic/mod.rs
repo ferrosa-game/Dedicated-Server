@@ -82,11 +82,6 @@ impl Sim {
     /// fire_rate ticks (once per pull for the 9mm and Magnum, the Magnum on the trigger's sixth tick). The shot
     /// leaves along the gun's barrel with spread, and the recoil pushes and turns the gun.
     fn fire_gun(&mut self, id: usize) {
-        const FIRE_TICK: i32 = 2;
-        const MAGNUM_FIRE_TICK: i32 = 6;
-        const LEVER_BACK: f32 = -0.625;
-        const LEVER_UP: f32 = 1.0 / 32.0;
-
         let Some(item) = self.items.get(id) else { return };
         let (kind, holder, trigger, body_id) = (item.item_type, item.parent_human, item.has_input(ItemInput::Use), item.body);
 
@@ -107,7 +102,7 @@ impl Sim {
         }
 
         let semi = matches!(kind, ItemKind::Magnum | ItemKind::Pistol);
-        let fire_tick = if kind == ItemKind::Magnum { MAGNUM_FIRE_TICK } else { FIRE_TICK };
+        let fire_tick = if kind == ItemKind::Magnum { 6 } else { 2 };
 
         if trigger {
             if kind == ItemKind::Magnum || *trigger_ticks <= 1 || semi {
@@ -159,9 +154,9 @@ impl Sim {
         let muzzle = r2 * 0.0 + p;
         let shooter = self.humans.get(holder as usize).and_then(|h| h.player);
 
-        if create_bullet(&mut self.bullets, bullet_type, muzzle, vel, shooter, self.bodies.gravity_scale) {
-            self.stats.bullets += 1;
-        }
+        create_bullet(&mut self.bullets, bullet_type, muzzle, vel, shooter, self.bodies.gravity_scale);
+        self.stats.bullets += 1;
+
 
         let shown = p - bv;
         let e = EventBullet { bullet_type, item_id: id as i32, pos: shown, vel };
@@ -171,7 +166,7 @@ impl Sim {
         let r = vel + s;
         let bm = BULLET_DATA.get(bullet_type as usize).map_or(0.0, |d| d.0);
         let push = -((bm + bm) / gun_mass);
-        let lever = r2 * LEVER_BACK + r1 * LEVER_UP;
+        let lever = r2 * -0.625 + r1 * (1.0 / 32.0);
         let turn = lever.cross(r);
 
         if let Some(body) = self.bodies.get_mut(body_id) {

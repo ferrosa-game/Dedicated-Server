@@ -2,47 +2,10 @@ use glam::Vec3;
 
 use super::{LOOP_STREET, LOOP_STREET_2, Traffic, grid::lane_clearance, lane_count, left_lanes, random_street, route::plan_route};
 use crate::{
-    time::TICKS_PER_SECOND_F32,
-    world::streets::{Lane, MapStreet, StreetMap},
+    time::{TICKS_PER_SECOND_F32, game_seconds}, world::streets::{Lane, MapStreet, StreetMap},
 };
 
-/// Ticks a car may sit still before it backs out (until 319, when the count starts over).
-const STUCK_TICKS: i32 = 179;
-const STUCK_RESET: i32 = 319;
-const STOPPED: f32 = 1.0 / 60.0;
-const PUSHING: f32 = 1.0 / 15.0;
-/// The lane change eases in at an eighth of the car's speed, at most this much a tick.
-const LANE_CHANGE_RATE: f32 = 0.125;
-const LANE_CHANGE_MAX: f32 = 1.0 / 120.0;
-/// The car steers for a point up to 10 ahead, less the further it is off its lane.
-const LOOK_AHEAD: f32 = 10.0;
-const LOOK_FALLOFF: f32 = 0.25;
-const STREET_STEER: f64 = 45.0_f64.to_radians();
-const STREET_STEER_MAX: f32 = 45.0_f32.to_radians();
-const TURN_STEER: f64 = 56.25_f64.to_radians();
-const TURN_STEER_MAX: f32 = 56.25_f32.to_radians();
-const STEER_RATE: f32 = 1.0 / 16.0;
-const TURN_STEER_RATE: f32 = 0.25;
-const CRUISE: f32 = 4.0 / 15.0;
-const SLOW: f32 = 2.0 / 15.0;
-const CRAWL: f32 = 0.3;
-const MIN_SPEED: f32 = 2.0 / 15.0;
-const AGGRESSIVE_MIN: f32 = 0.2;
-/// The point ahead of the car the remaining distance is measured from, and where the intersection begins.
-const NOSE: f32 = 4.0;
-const AT_JUNCTION: f32 = 1.0;
-const STOP_LINE: f32 = 4.0;
-const BRAKING: f32 = 6.0;
-const FAST_DISTANCE: f32 = 40.0;
-const QUEUE_DISTANCE: f32 = 32.0;
-const QUEUE_REACH: f32 = 12.0;
-const SCAN_AHEAD: f32 = 12.0;
-const AMBER: i32 = 1;
-const LEFT_LIGHTS: i32 = 4;
 const BEZIER_EPSILON: f32 = 1.0 / 65536.0;
-const CORNER_BIAS: f32 = 0.125;
-const NEXT_LOOK: f32 = 4.0;
-const SHARP: f32 = 0.5;
 
 fn lane_at(st: &MapStreet, i: i32) -> Lane {
     usize::try_from(i).ok().and_then(|i| st.lanes.get(i)).copied().unwrap_or_default()
@@ -87,10 +50,10 @@ fn coop_speed(traffic: &Traffic, per: i32) -> f32 {
 fn update_stuck(traffic: &mut Traffic, id: usize) {
     let c = &mut traffic.cars[id];
 
-    if c.stuck > STUCK_TICKS {
+    if c.stuck > game_seconds(3) {
         c.stuck += 1;
 
-        if c.stuck > STUCK_RESET {
+        if c.stuck > game_seconds(5) {
             c.stuck = 0;
         }
 
@@ -100,7 +63,7 @@ fn update_stuck(traffic: &mut Traffic, id: usize) {
     let v = c.vel;
     let speed = v.length();
 
-    if STOPPED > speed && (c.rot[2].dot(v)) + c.target_speed > PUSHING {
+    if 1.0 / 60.0 > speed && (c.rot[2].dot(v)) + c.target_speed > 1.0 / 15.0 {
         c.stuck += 1;
     } else {
         c.stuck = 0;
@@ -235,13 +198,13 @@ pub fn ai_traffic_car(traffic: &mut Traffic, map: &StreetMap, id: usize) {
     let Some(blocked) = slow_for_clearance(traffic, map, id, st, queued) else { return };
     let c = &mut traffic.cars[id];
 
-    if blocked && CRAWL > c.target_speed && c.next_lane == lane {
+    if blocked && 0.3 > c.target_speed && c.next_lane == lane {
         let nl = c.next_lane + if rand::random::<bool>() { 1 } else { -1 };
         c.next_lane = nl.max(0).min(st.lanes.len() as i32 - 1);
     }
 
-    if MIN_SPEED > c.target_speed {
-        c.target_speed = MIN_SPEED;
+    if 2.0 / 15.0 > c.target_speed {
+        c.target_speed = 2.0 / 15.0;
     }
 }
 
@@ -287,7 +250,7 @@ fn steer_along_lane(traffic: &mut Traffic, map: &StreetMap, id: usize, street: i
     if lane != nl {
         let p = c.lane_change;
         let s = (p * p) * (3.0 - (p + p));
-        let np = (c.vel.length() * LANE_CHANGE_RATE).min(LANE_CHANGE_MAX) + p;
+        let np = (c.vel.length() * 0.125).min(1.0 / 120.0) + p;
         c.lane_change = np;
 
         if np > 1.0 {
@@ -302,14 +265,14 @@ fn steer_along_lane(traffic: &mut Traffic, map: &StreetMap, id: usize, street: i
     let d = if reverse { -st.dir } else { st.dir };
     let pos = c.pos;
     let off = (from - pos).dot(st.side).abs();
-    let a = d * (LOOK_AHEAD - off * LOOK_FALLOFF).max(0.0) + pos;
+    let a = d * (10.0 - off * 0.25).max(0.0) + pos;
     let proj = (a - from).dot(d);
     let aim_z = proj * d.z + from.z - pos.z;
     let aim_x = from.x + d.x * proj - pos.x;
     let target_yaw = (aim_z as f64).atan2(aim_x as f64) as f32;
-    let want = steer_toward(c.yaw, target_yaw, STREET_STEER, STREET_STEER_MAX);
+    let want = steer_toward(c.yaw, target_yaw, 45.0_f64.to_radians(), 45.0_f32.to_radians());
 
-    c.steer += (want - c.steer).clamp(-STEER_RATE, STEER_RATE);
+    c.steer += (want - c.steer).clamp(-(1.0 / 16.0), 1.0 / 16.0);
 
     to
 }
@@ -339,7 +302,7 @@ fn approach_junction(traffic: &mut Traffic, map: &StreetMap, id: usize, st: &Map
     let d = if cur.end != 0 { -st.dir } else { st.dir };
     let (s, co) = sincos(c.yaw);
     let pos = c.pos;
-    let remaining = (d.x * (to.x - (co * NOSE + pos.x)) + d.y * 0.0) + d.z * (to.z - (s * NOSE + pos.z));
+    let remaining = (d.x * (to.x - (co * 4.0 + pos.x)) + d.y * 0.0) + d.z * (to.z - (s * 4.0 + pos.z));
     let junction = st.intersections[(cur.end ^ 1) as usize];
     let ways = map.intersections[junction].streets;
     let mut way = if ways[2] == cur.street { 2 } else { (ways[1] == cur.street) as i32 };
@@ -348,7 +311,7 @@ fn approach_junction(traffic: &mut Traffic, map: &StreetMap, id: usize, st: &Map
         way = 3;
     }
 
-    if AT_JUNCTION > remaining {
+    if 1.0 > remaining {
         c.intersection = junction as i32;
         c.street = -1;
     }
@@ -362,21 +325,21 @@ fn slow_for_signal(traffic: &mut Traffic, id: usize, remaining: f32, junction: u
     let c = &traffic.cars[id];
     let next_turn = c.step(c.route_index + 1).turn;
     let aggressive = c.is_aggressive != 0;
-    let fast = aggressive && (remaining > FAST_DISTANCE || next_turn == 0);
-    let base = if fast { coop_speed(traffic, 8) } else { CRUISE };
+    let fast = aggressive && (remaining > 40.0 || next_turn == 0);
+    let base = if fast { coop_speed(traffic, 8) } else { 4.0 / 15.0 };
     let c = &mut traffic.cars[id];
-    let mut approach = (((remaining - STOP_LINE) * 0.5) / TICKS_PER_SECOND_F32).max(0.0);
+    let mut approach = (((remaining - 4.0) * 0.5) / TICKS_PER_SECOND_F32).max(0.0);
 
-    if remaining < BRAKING {
+    if remaining < 6.0 {
         approach = 0.0;
     }
 
     c.target_speed = ((id & 7) as f32 * 0.5) / TICKS_PER_SECOND_F32 + base;
 
     if !aggressive {
-        let light = if next_turn == -1 { way + LEFT_LIGHTS } else { way };
+        let light = if next_turn == -1 { way + 4 } else { way };
 
-        if traffic.signals.get(junction).is_some_and(|sg| sg.lights[light as usize] <= AMBER) && c.target_speed > approach {
+        if traffic.signals.get(junction).is_some_and(|sg| sg.lights[light as usize] <= 1) && c.target_speed > approach {
             c.target_speed = approach;
         }
     }
@@ -390,7 +353,7 @@ fn slow_for_queue(traffic: &mut Traffic, id: usize, remaining: f32, mut approach
     let c = &traffic.cars[id];
     let nxt = c.step(c.route_index + 1);
 
-    if !(QUEUE_DISTANCE > remaining && nxt.street != -1) {
+    if !(32.0 > remaining && nxt.street != -1) {
         return false;
     }
 
@@ -406,12 +369,12 @@ fn slow_for_queue(traffic: &mut Traffic, id: usize, remaining: f32, mut approach
         }
 
         if aggressive {
-            approach = AGGRESSIVE_MIN.max(approach);
+            approach = 0.2_f32.max(approach);
         }
 
         let o = &cars[j];
 
-        if o.near[(nxt.end & 1) as usize] >= QUEUE_REACH || o.vel.length() >= PUSHING {
+        if o.near[(nxt.end & 1) as usize] >= 12.0 || o.vel.length() >= 1.0 / 15.0 {
             continue;
         }
 
@@ -434,7 +397,7 @@ fn slow_for_clearance(traffic: &mut Traffic, map: &StreetMap, id: usize, st: &Ma
     let aggressive = c.is_aggressive != 0;
     let (s, co) = sincos(c.yaw);
     let pos = c.pos;
-    let look = Vec3::new(co * SCAN_AHEAD + pos.x, pos.y + 0.0, pos.z + SCAN_AHEAD * s);
+    let look = Vec3::new(co * 12.0 + pos.x, pos.y + 0.0, pos.z + 12.0 * s);
     let ps = c.physical_street;
     let ahead = map
         .streets
@@ -450,7 +413,7 @@ fn slow_for_clearance(traffic: &mut Traffic, map: &StreetMap, id: usize, st: &Ma
         let mut clr = lane_clearance(traffic, map, id, ps, mask, 0.0 > dot, c.front_proj);
 
         if aggressive {
-            clr = AGGRESSIVE_MIN.max(clr);
+            clr = 0.2_f32.max(clr);
         }
 
         let c = &mut traffic.cars[id];
@@ -487,7 +450,7 @@ fn slow_for_clearance(traffic: &mut Traffic, map: &StreetMap, id: usize, st: &Ma
         return None;
     }
 
-    let clr = AGGRESSIVE_MIN.max(clr);
+    let clr = 0.2_f32.max(clr);
 
     if c.target_speed > clr {
         c.target_speed = clr;
@@ -520,7 +483,7 @@ fn cross_intersection(traffic: &mut Traffic, map: &StreetMap, id: usize) {
     let mut a = ds.dot(delta).abs();
     let b = dn.dot(ds).abs();
 
-    if b > SHARP {
+    if b > 0.5 {
         a *= 0.5;
     }
 
@@ -548,8 +511,8 @@ fn cross_intersection(traffic: &mut Traffic, map: &StreetMap, id: usize) {
             break 'bez clamped_end;
         }
 
-        let w = c.wheelbase + NEXT_LOOK;
-        let t = ((((w * 0.0 + pos.y) - p0.y) * u.y + ((co * w + pos.x) - p0.x) * u.x) + ((s * w + pos.z) - p0.z) * u.z) / len + CORNER_BIAS;
+        let w = c.wheelbase + 4.0;
+        let t = ((((w * 0.0 + pos.y) - p0.y) * u.y + ((co * w + pos.x) - p0.x) * u.x) + ((s * w + pos.z) - p0.z) * u.z) / len + 0.125;
 
         if 0.0 > t {
             (0.0, 1.0, p0, p1 * 0.0 * 0.0)
@@ -564,14 +527,14 @@ fn cross_intersection(traffic: &mut Traffic, map: &StreetMap, id: usize) {
     let b = q0 + (ctrl + ctrl) * om * t + q1 - pos;
     let dist = b.length();
     let target_yaw = if dist > BEZIER_EPSILON { (b.z as f64).atan2(b.x as f64) as f32 } else { c.yaw };
-    let want = steer_toward(c.yaw, target_yaw, TURN_STEER, TURN_STEER_MAX);
+    let want = steer_toward(c.yaw, target_yaw, 56.25_f64.to_radians(), 56.25_f32.to_radians());
     let mut dsteer = want - c.steer;
 
-    let factor = if -TURN_STEER_RATE > dsteer {
-        dsteer = -TURN_STEER_RATE;
+    let factor = if -0.25 > dsteer {
+        dsteer = -0.25;
         0.5
-    } else if dsteer > TURN_STEER_RATE {
-        dsteer = TURN_STEER_RATE;
+    } else if dsteer > 0.25 {
+        dsteer = 0.25;
         0.5
     } else {
         let h = 0.5 - dsteer.abs() as f64;
@@ -580,10 +543,10 @@ fn cross_intersection(traffic: &mut Traffic, map: &StreetMap, id: usize) {
 
     let aggressive = c.is_aggressive != 0;
     let k = c.step(ri + 1).turn;
-    let mut base = SLOW as f64;
+    let mut base = 2.0 / 15.0;
 
     if k == 0 {
-        base = CRUISE as f64;
+        base = 4.0 / 15.0;
 
         if aggressive {
             base = 0.4_f32 as f64;
@@ -599,8 +562,8 @@ fn cross_intersection(traffic: &mut Traffic, map: &StreetMap, id: usize) {
     c.target_speed = (factor * base) as f32;
 
     let dn2 = if c.step(ri + 1).end != 0 { -dn } else { dn };
-    let qx = (p1.x - (dn2.x * NEXT_LOOK + pos.x)) * dn2.x;
-    let qz = (p1.z - (NEXT_LOOK * dn2.z + pos.z)) * dn2.z;
+    let qx = (p1.x - (dn2.x * 4.0 + pos.x)) * dn2.x;
+    let qz = (p1.z - (4.0 * dn2.z + pos.z)) * dn2.z;
     let q = qz + (0.0 * dn2.y + qx);
 
     if 1.0 > q {

@@ -12,6 +12,8 @@ use crate::{human::BoneId, player::Player, time::game_minutes};
 
 const JOINT_ORDER: [usize; 15] = [1, 2, 3, 10, 11, 12, 13, 14, 15, 4, 5, 6, 7, 8, 9];
 
+/// create_human, spawn an empty human at a pos, its up to you to set its properties after to your liking.
+/// This assumes nothing
 pub fn create_human(humans: &mut Table<Human>, bodies: &mut RigidBodies, pos: Vec3, rot: &RotMatrix, player: Option<&Player>) -> Option<usize> {
     let id = humans.vacant()?;
     let spawn_protection = (rand::random_range(0..4) + 3) * game_minutes(1);
@@ -70,7 +72,7 @@ pub fn create_human(humans: &mut Table<Human>, bodies: &mut RigidBodies, pos: Ve
 
     let (team, customization) = match player {
         Some(p) => (Some(p.team), p.customization),
-        None => (None, bot_customization()),
+        None => (None, CharacterCustomization { gender: Gender::Female, head: 0, skin: 0, hair_color: 0, hair_style: 0, eye_color: 0, model: Model::Casual, necklace: 0, suit_color: SuitColor::Brown, tie_color: 0 }),
     };
 
     let human = Human {
@@ -148,10 +150,7 @@ pub fn create_human(humans: &mut Table<Human>, bodies: &mut RigidBodies, pos: Ve
     humans.insert(human)
 }
 
-fn bot_customization() -> CharacterCustomization {
-    CharacterCustomization { gender: Gender::Female, head: 0, skin: 0, hair_color: 0, hair_style: 0, eye_color: 0, model: Model::Casual, necklace: 0, suit_color: SuitColor::Brown, tie_color: 0 }
-}
-
+/// build_attachments: create the bone groups and tie them together into `Attachments`
 fn build_attachments(bones: &[Bone]) -> Attachments {
     let body = |b: BoneId| bones[b as usize].body;
     let anchor = |child: BoneId| {

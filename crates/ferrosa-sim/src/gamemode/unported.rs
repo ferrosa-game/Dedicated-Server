@@ -2,8 +2,7 @@ use ferrosa_protocol::GameMode;
 
 use super::{ModeHooks, ModeSync, rules::ModeRules};
 use crate::{
-    sim::{Sim, crime::VERSUS_TEAM_DAMAGE},
-    time::TICKS_PER_SECOND,
+    sim::Sim, time::game_seconds,
 };
 
 /// The binary's modes this server does not run (driving, racing, co-op, versus and none), with what the shared code
@@ -15,9 +14,6 @@ pub static RACING: Unported = Unported(GameMode::Racing, "racing");
 pub static COOP: Unported = Unported(GameMode::CoOp, "coop");
 pub static VERSUS: Unported = Unported(GameMode::Versus, "versus");
 pub static NONE: Unported = Unported(GameMode::None, "none");
-
-/// A versus player joins with 250.
-const VERSUS_MONEY: i32 = 250;
 
 /// config_versus.txt (load_conf_versus).
 #[derive(Clone, Copy, Debug, Default)]
@@ -68,10 +64,10 @@ impl ModeHooks for Unported {
             GameMode::Racing => ModeRules { reset_traffic: None, intermission_lobby: true, ..base },
             GameMode::CoOp => ModeRules { coop_traffic: true, intermission_lobby: true, ..base },
             GameMode::Versus => ModeRules {
-                team_damage: VERSUS_TEAM_DAMAGE,
+                team_damage: 50,
                 corp_buy_menus: true,
                 intermission_lobby: true,
-                move_delay: Some(sim.modes.versus.movedelay * TICKS_PER_SECOND),
+                move_delay: Some(game_seconds(sim.modes.versus.movedelay)),
                 ..base
             },
             _ => base,
@@ -79,7 +75,7 @@ impl ModeHooks for Unported {
     }
 
     fn joining_money(&self, _sim: &Sim, money: i32) -> i32 {
-        if self.0 == GameMode::Versus { VERSUS_MONEY } else { money }
+        if self.0 == GameMode::Versus { 250 } else { money }
     }
 
     fn sync(&self, sim: &Sim) -> ModeSync {

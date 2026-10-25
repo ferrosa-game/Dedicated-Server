@@ -27,9 +27,6 @@ use crate::{
     world::skeleton::BoneId,
 };
 
-pub const HUMAN_SLOTS: usize = crate::human::MAX_HUMANS;
-pub const OBJECT_SLOTS: usize = 1024;
-
 impl Sim {
     pub(crate) fn spawn_human(&mut self, pos: Vec3, rot: &RotMatrix, player: Option<PlayerId>) -> Option<usize> {
         let player = player.and_then(|p| self.players.get(p.idx()));

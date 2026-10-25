@@ -21,33 +21,7 @@ use crate::{
     },
 };
 
-const WATER_LEVEL: f32 = 23.0;
-const FALLEN: f32 = -32.0;
-const DRIVEN: i32 = 1;
-const ROTOR: i32 = 2;
-const UNCONTROLLED: i32 = -1;
-const CLUTCH_HELD: i32 = 2;
-const HANDBRAKE: i32 = 4;
-const HUGE: f32 = 65536.0;
-const BLOCK_SCALE: f32 = 0.25;
-const DAMAGE_SPEED: f32 = 7.0 / 60.0;
-const CRASH_SPEED: f32 = 1.0 / 30.0;
-const SHIFT_DELAY: i32 = 30;
-const MAX_RPM: i32 = 8191;
-const TINY: f32 = 1.0 / 65536.0;
-const QUARTER_TURN: f64 = 90.0_f64.to_radians();
-const FULL_TURN: f64 = 360.0_f64.to_radians();
 const GEAR_RATIOS: [(i32, f32); 5] = [(1, 10.85), (2, 7.7), (3, 5.25), (4, 3.5), (-1, -10.5)];
-const WHEEL_FRICTION: f32 = 1.2;
-const WHEEL_DEPTH_SCALE: f32 = 1.0 / 32.0;
-const WHEEL_SOFTNESS: f32 = 0.125;
-const CHASSIS_FRICTION: f32 = 0.6;
-const MAX_CHASSIS_DEPTH: f32 = 0.125;
-/// A vehicle in this controllable state is out of play: not sent to clients and not collided with.
-const HIDDEN: i32 = 3;
-const VEHICLE_FRICTION: f32 = 0.4;
-const VEHICLE_DEPTH_SCALE: f32 = 1.0 / 64.0;
-const VEHICLE_SOFTNESS: f32 = 1.0 / 32.0;
 
 /// What a vehicle step asks of the sim.
 pub enum VehicleOutput {
@@ -75,7 +49,7 @@ pub fn update_vehicle_bounds(v: &mut Vehicle, bodies: &RigidBodies, types: &[Veh
         v.ang_vel = b.ang_vel;
 
         let (pos, [r0, r1, r2]) = (v.pos, v.rot);
-        let (mut mn, mut mx) = ([HUGE; 3], [-HUGE; 3]);
+        let (mut mn, mut mx) = ([65536.0; 3], [-65536.0; 3]);
 
         for q in &t.render_verts {
             let w = [
@@ -97,8 +71,8 @@ pub fn update_vehicle_bounds(v: &mut Vehicle, bodies: &RigidBodies, types: &[Veh
 
         v.bounds_min = Vec3::from_array(mn);
         v.bounds_max = Vec3::from_array(mx);
-        v.block_min = mn.map(|x| (x * BLOCK_SCALE) as i32);
-        v.block_max = mx.map(|x| (x * BLOCK_SCALE) as i32);
+        v.block_min = mn.map(|x| (x * 0.25) as i32);
+        v.block_max = mx.map(|x| (x * 0.25) as i32);
     }
 }
 
@@ -118,17 +92,17 @@ fn crash_and_drag(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, out: &mu
 
     v.prev_vel = vel;
 
-    if FALLEN > v.pos.y {
+    if -32.0 > v.pos.y {
         v.despawn_time = 0;
         v.spawned_state = 0;
     }
 
     if v.kind != VehicleKind::NoClip {
-        if dv > DAMAGE_SPEED {
+        if dv > 7.0 / 60.0 {
             out.push(VehicleOutput::Damage { vehicle: id, amount: (dv * TICKS_PER_SECOND_F32 + 10.0) as i32 });
         }
 
-        if dv > CRASH_SPEED {
+        if dv > 1.0 / 30.0 {
             v.crash += dv * TICKS_PER_SECOND_F32 * 0.125;
 
             if v.crash > 2.0 {
@@ -149,7 +123,7 @@ fn crash_and_drag(id: usize, v: &mut Vehicle, bodies: &mut RigidBodies, out: &mu
     let speed = vel.length();
     let dir = vel.normalize_or_zero();
     let s2 = speed * speed;
-    let under = b.pos.y <= WATER_LEVEL;
+    let under = b.pos.y <= 23.0;
     let (hi, lo) = (speed * 0.125, -speed * 0.125);
 
     let clamp = |x: f32| {
@@ -196,7 +170,7 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
 
     v.auto_shift = 0;
 
-    v.clutch = if flags & CLUTCH_HELD == 0 {
+    v.clutch = if flags & 2 == 0 {
         if 0.875 > v.clutch { v.clutch + 0.125 } else { 1.0 }
     } else if v.clutch > 0.125 {
         v.clutch - 0.125
@@ -216,7 +190,7 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
         v.gear = gear;
         v.brake = 0.0;
 
-        if flags == UNCONTROLLED {
+        if flags == -1 {
             uncontrolled(v);
 
             if v.prev_gear != 0 {
@@ -254,13 +228,13 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
             } else {
                 if gear != 1 && 250.0_f64.to_radians() > v.engine_speed as f64 {
                     gear -= 1;
-                    v.shift_delay = SHIFT_DELAY;
+                    v.shift_delay = 30;
                     v.gear = gear;
                 }
 
                 if gear <= 3 && v.engine_speed > threshold {
                     gear += 1;
-                    v.shift_delay = SHIFT_DELAY;
+                    v.shift_delay = 30;
                     v.gear = gear;
                 }
             }
@@ -269,7 +243,7 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
                 v.gear = 4;
                 v.brake = 0.0;
 
-                if flags == UNCONTROLLED {
+                if flags == -1 {
                     uncontrolled(v);
                     v.gear_ratio = 0.0;
                 } else {
@@ -279,7 +253,7 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
                 v.gear = -1;
                 v.brake = 0.0;
 
-                if flags == UNCONTROLLED {
+                if flags == -1 {
                     uncontrolled(v);
                     v.gear_ratio = 0.0;
                 } else {
@@ -288,7 +262,7 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
             } else {
                 v.brake = 0.0;
 
-                if flags == UNCONTROLLED {
+                if flags == -1 {
                     uncontrolled(v);
                     v.gear_ratio = 0.0;
                 } else {
@@ -314,7 +288,7 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
         v.brake = -v.gas_control;
     }
 
-    if v.controls & HANDBRAKE != 0 {
+    if v.controls & 4 != 0 {
         v.brake = 2.0;
     }
 
@@ -325,9 +299,9 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
 
     let a = steer.abs();
     let outer = if a > 0.0 {
-        let t = (QUARTER_TURN - a as f64).tan();
+        let t = (90.0_f64.to_radians() - a as f64).tan();
         let y = (t * v.wheelbase as f64 + v.track as f64) as f32;
-        (QUARTER_TURN - (y as f64).atan2(v.wheelbase as f64)) as f32
+        (90.0_f64.to_radians() - (y as f64).atan2(v.wheelbase as f64)) as f32
     } else {
         0.0
     };
@@ -343,15 +317,15 @@ fn update_car_drivetrain(v: &mut Vehicle, out: &mut Vec<VehicleOutput>) {
     }
 
     if v.health > 0 && !v.locked {
-        let rpm = ((v.engine_speed * TICKS_PER_SECOND_F32 * TICKS_PER_SECOND_F32) as f64 / FULL_TURN) as i32;
+        let rpm = ((v.engine_speed * TICKS_PER_SECOND_F32 * TICKS_PER_SECOND_F32) as f64 / 360.0_f64.to_radians()) as i32;
 
         if rpm >= 0 {
             v.engine_rpm = rpm;
 
             if v.gear > 0 && rpm == 0 {
                 v.engine_rpm = 1;
-            } else if rpm > MAX_RPM {
-                v.engine_rpm = MAX_RPM;
+            } else if rpm > 8191 {
+                v.engine_rpm = 8191;
             }
         } else {
             v.engine_rpm = if v.gear > 0 { 1 } else { 0 };
@@ -382,11 +356,11 @@ fn wheel_collision(map: &Map, bodies: &mut RigidBodies, v: &Vehicle, k: usize) {
         let c = axle * side + p;
 
         if let Some(hit) = sphere_intersect_level(&map.ground, &map.level.area, &map.level.meshes, c, axle, r) {
-            bodies.add_world_contact(w.body, hit.pos - p, hit.normal, r - hit.dist, WHEEL_FRICTION, WHEEL_DEPTH_SCALE, WHEEL_SOFTNESS);
+            bodies.add_world_contact(w.body, hit.pos - p, hit.normal, r - hit.dist, 1.2, 0.03125, 0.125);
         }
 
         if let Some(hit) = crate::world::sphere::sphere_intersect_triangles(&tris, c, axle, r) {
-            bodies.add_world_contact(w.body, hit.pos - p, hit.normal, r - hit.dist, WHEEL_FRICTION, WHEEL_DEPTH_SCALE, WHEEL_SOFTNESS);
+            bodies.add_world_contact(w.body, hit.pos - p, hit.normal, r - hit.dist, 1.2, 0.03125, 0.125);
         }
     }
 }
@@ -475,14 +449,14 @@ fn sweep_chassis(map: &mut Map, bodies: &mut RigidBodies, v: &Vehicle, t: &Vehic
 
         let (depth_scale, softness) = if broke { (1.0 / 512.0, 1.0 / 256.0) } else { (1.0 / 64.0, 1.0 / 32.0) };
 
-        if depth > MAX_CHASSIS_DEPTH {
-            depth = MAX_CHASSIS_DEPTH;
+        if depth > 0.125 {
+            depth = 0.125;
         }
 
         let Some(cb) = bodies.get(v.body) else { continue };
         let offset = at - cb.pos;
 
-        bodies.add_world_contact(v.body, offset, normal, depth, CHASSIS_FRICTION, depth_scale, softness);
+        bodies.add_world_contact(v.body, offset, normal, depth, 0.6, depth_scale, softness);
     }
 
     glass
@@ -490,11 +464,6 @@ fn sweep_chassis(map: &mut Map, bodies: &mut RigidBodies, v: &Vehicle, t: &Vehic
 
 /// The four bottom corners of the unit cube a train's bogie probes the rails with.
 const BOGIE_CORNERS: [(f32, f32); 4] = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
-const BOGIE_GAUGE: f32 = 1.435;
-const BOGIE_DROP: f32 = -0.5;
-const BOGIE_TURN: f32 = 1.0 / 16.0;
-const RAIL_DEPTH_SCALE: f32 = 0.125;
-const RAIL_SOFTNESS: f32 = 0.125;
 
 /// vehicle_update_train: each bogie's angular bond turned towards the chassis about the train's up axis only, then
 /// each track piece under the train holds the bogies' corners up on its rails and bed.
@@ -504,7 +473,7 @@ fn update_train(v: &mut Vehicle, bodies: &mut RigidBodies, track: &crate::world:
 
     for &(bogie, turn) in &v.bogies {
         let Some(br) = bodies.get(bogie).map(|b| b.rot[1]) else { continue };
-        let target = br.cross(c) * BOGIE_TURN;
+        let target = br.cross(c) * (1.0 / 16.0);
 
         if let Some(Bond::ItemAngular(a)) = bodies.bond_mut(turn) {
             a.target = target;
@@ -544,14 +513,14 @@ fn update_train(v: &mut Vehicle, bodies: &mut RigidBodies, track: &crate::world:
         for &(bogie, _) in &v.bogies {
             for (cx, cz) in BOGIE_CORNERS {
                 let Some((pos, rot)) = bodies.get(bogie).map(|b| (b.pos, b.rot)) else { continue };
-                let a = (cx - 0.5) * BOGIE_GAUGE;
+                let a = (cx - 0.5) * 1.435;
                 let d = cz - 0.5;
                 let d = d + d;
-                let h = BOGIE_DROP;
+                let h = -0.5;
                 let end = pos + rotate(&rot, Vec3::new(a, h, d));
                 let Some((_, hp, n)) = crate::world::track::segment_intersect_triangles(&tris, pos, end) else { continue };
                 let depth = ((hp.x - end.x) * n.x + (hp.y - end.y) * n.y) + n.z * (hp.z - end.z);
-                bodies.add_world_contact(bogie, end - pos, n, depth, 0.0, RAIL_DEPTH_SCALE, RAIL_SOFTNESS);
+                bodies.add_world_contact(bogie, end - pos, n, depth, 0.0, 0.125, 0.125);
                 v.train_segment = seg;
             }
         }
@@ -807,11 +776,11 @@ pub fn vehicle_simulation(
     }
 
     for (id, v) in vehicles.iter_mut() {
-        if v.controllable_state == DRIVEN {
+        if v.controllable_state == 1 {
             update_car_drivetrain(v, &mut out);
         }
 
-        if v.controllable_state == ROTOR || v.rotor.is_some() {
+        if v.controllable_state == 2 || v.rotor.is_some() {
             update_helicopter(v, bodies, driven.contains(&id));
         }
 
@@ -966,7 +935,7 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
         }
 
         let es = v.engine_speed;
-        let x = ((60.0 * (es * 60.0)) as f64 / FULL_TURN / v.max_rpm) as f32;
+        let x = ((60.0 * (es * 60.0)) as f64 / 360.0_f64.to_radians() / v.max_rpm) as f32;
 
         let torque = if x > 1.0 {
             0.0
@@ -1053,13 +1022,13 @@ pub fn apply_wheel_forces(vehicles: &mut Table<Vehicle>, bodies: &mut Table<Rigi
 
         let es = v.engine_speed.abs();
 
-        if es > 0.0 && TINY > es {
+        if es > 0.0 && 1.0 / 65536.0 > es {
             v.engine_speed = 0.0;
         }
 
         let gs = v.gearbox_speed.abs();
 
-        if gs > 0.0 && TINY > gs {
+        if gs > 0.0 && 1.0 / 65536.0 > gs {
             v.gearbox_speed = 0.0;
         }
     }
@@ -1294,7 +1263,7 @@ pub fn segment_intersect_vehicle(v: &Vehicle, t: &VehicleType, start: Vec3, end:
 /// every other vehicle whose bounds overlap its own, pushing the two apart where it went in.
 pub fn vehicle_vehicle_contacts(vehicles: &Table<Vehicle>, bodies: &mut RigidBodies, types: &[VehicleType]) {
     for (i, vi) in vehicles.iter() {
-        if vi.controllable_state == HIDDEN {
+        if vi.controllable_state == 3 {
             continue;
         }
 
@@ -1302,7 +1271,7 @@ pub fn vehicle_vehicle_contacts(vehicles: &Table<Vehicle>, bodies: &mut RigidBod
         let Some(mesh) = ti.mesh.as_ref() else { continue };
 
         for (j, vj) in vehicles.iter() {
-            if i == j || vj.controllable_state == HIDDEN || vi.occupants[0] == j as i32 || vj.occupants[0] == i as i32 {
+            if i == j || vj.controllable_state == 3 || vi.occupants[0] == j as i32 || vj.occupants[0] == i as i32 {
                 continue;
             }
 
@@ -1323,13 +1292,13 @@ pub fn vehicle_vehicle_contacts(vehicles: &Table<Vehicle>, bodies: &mut RigidBod
                 let Some((_, hit, normal)) = segment_intersect_vehicle(vj, tj, vi.pos, end) else { continue };
                 let mut depth = ((hit.x - end.x) * normal.x + (hit.y - end.y) * normal.y) + (hit.z - end.z) * normal.z;
 
-                depth = depth.min(MAX_CHASSIS_DEPTH);
+                depth = depth.min(0.125);
 
                 let (Some(pa), Some(pb)) = (bodies.get(vi.body).map(|b| b.pos), bodies.get(vj.body).map(|b| b.pos)) else { continue };
                 let off_a = hit - pa;
                 let off_b = hit - pb;
 
-                bodies.add_body_contact(vi.body, vj.body, off_a, off_b, normal, depth, VEHICLE_FRICTION, VEHICLE_DEPTH_SCALE, VEHICLE_SOFTNESS);
+                bodies.add_body_contact(vi.body, vj.body, off_a, off_b, normal, depth, 0.4, 1.0 / 64.0, 1.0 / 32.0);
             }
         }
     }

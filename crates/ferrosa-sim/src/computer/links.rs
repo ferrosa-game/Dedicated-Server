@@ -1,14 +1,6 @@
 use super::{COLUMNS, Computer, LINES, text_len};
 use crate::sim::Sim;
 
-/// The text lines clients are sent: a memo's (kind 0) or a computer's (kind 1) line,
-/// created afresh whenever the line changes and acknowledged per connection.
-pub const LINKS: usize = 16384;
-pub const KIND_MEMO: i32 = 0;
-pub const KIND_COMPUTER: i32 = 1;
-/// The item slots a line link takes.
-pub const ITEM_SLOTS: usize = 64;
-
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Link {
     pub active: bool,
@@ -27,7 +19,7 @@ pub struct LinkPool {
 
 impl Default for LinkPool {
     fn default() -> Self {
-        Self { links: vec![Link::default(); LINKS] }
+        Self { links: vec![Link::default(); 16384] }
     }
 }
 
@@ -55,7 +47,7 @@ impl Sim {
         let l = line as usize & (LINES - 1);
         let text = c.lines[l];
         let colors = c.colors[l];
-        self.register_link(id, KIND_COMPUTER, line, &text, Some(&colors));
+        self.register_link(id, 1, line, &text, Some(&colors));
     }
 
     /// Registers line `line` of item `id` (its text and, for computers, colours). Returns the link, -1 when the pool
@@ -64,7 +56,7 @@ impl Sim {
         let real = text_len(text);
         let len = real.min(COLUMNS - 1);
         let colors = colors.copied().unwrap_or([0; COLUMNS]);
-        let slot = line as usize & (ITEM_SLOTS - 1);
+        let slot = line as usize & 63;
         let Some(item) = self.items.get(id) else { return -1 };
 
         if item.link_mask & (1 << slot) != 0 {
@@ -87,7 +79,7 @@ impl Sim {
 
     /// computer_set_line_link_slot: the item's slot holds the link, and every connection is due to be sent it.
     fn set_link_slot(&mut self, id: usize, link: i32, line: i32) {
-        let slot = line as usize & (ITEM_SLOTS - 1);
+        let slot = line as usize & 63;
 
         if let Some(item) = self.items.get_mut(id) {
             item.links[slot] = link;

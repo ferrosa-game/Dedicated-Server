@@ -30,24 +30,11 @@ fn hash_noise(n: i32) -> f32 {
 
 pub fn calculate_spread_vector(seed: &mut i32, scale: f32, base: f32) -> Vec3 {
     let n = *seed;
-    let v = [hash_noise(n), hash_noise(n.wrapping_add(1)), hash_noise(n.wrapping_add(2))];
-    let n = n.wrapping_add(3);
-    let xy = v[0] * v[0] + v[1] * v[1];
-    let len = (v[2] * v[2] + xy).sqrt();
+    let v = Vec3::new(hash_noise(n), hash_noise(n.wrapping_add(1)), hash_noise(n.wrapping_add(2)));
+    let r = hash_noise(n.wrapping_add(3));
+    *seed = n.wrapping_add(4);
 
-    let (x, y, z) = if len == 0.0 {
-        (len, xy, 0.0)
-    } else {
-        let inv = 1.0 / len;
-        (v[0] * inv, v[1] * inv, inv * v[2])
-    };
-
-    let r = hash_noise(n);
-    *seed = n.wrapping_add(1);
-
-    let k = base + ((r + 1.0) * scale) * 0.5;
-
-    Vec3::new(x * k, y * k, k * z)
+    v.normalize_or_zero() * (base + (r + 1.0) * scale * 0.5)
 }
 
 fn half_turn(angle: f32) -> (f32, f32) {
@@ -147,6 +134,8 @@ fn add_turn(pose: [f32; 4], frame: &mut RotMatrix, row: usize, angle: f32) -> [f
     quaternion_multiply(pose, q)
 }
 
+/// calculate_arm_angles: Given a human, calcuate the angles their arms should be at, resolving with HP,
+/// items held, and finalising it with IK
 pub fn calculate_arm_angles(h: &mut Human, bodies: &mut RigidBodies, map: &Map, touch: &Touchables, seed: &mut i32) {
     if h.action_type != 0 && h.has_input(Input::ThrowItem) {
         h.throw_pitch = 8.0 * h.free_look_pitch;

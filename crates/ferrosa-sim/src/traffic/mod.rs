@@ -9,14 +9,9 @@ pub mod motion;
 pub mod route;
 pub mod spawn;
 
-/// The route steps a car's record holds.
-pub const MAX_ROUTE: usize = 63;
 /// The streets the Round City traffic hack keeps cars off and treats as one loop.
 pub const LOOP_STREET: i32 = 67;
 pub const LOOP_STREET_2: i32 = 68;
-pub const HIDDEN_STREET: i32 = 23;
-/// Each street lists at most this many of the cars on it.
-pub const MAX_STREET_CARS: usize = 256;
 
 /// is_bot: driven by the traffic, parked, or taken over by a player.
 pub const PARKED: i32 = 0;
@@ -58,7 +53,7 @@ pub struct TrafficCar {
     pub is_aggressive: i32,
     pub route_index: i32,
     pub route_len: i32,
-    pub route: [RouteStep; MAX_ROUTE],
+    pub route: [RouteStep; 63],
     /// The street being driven (-1 while crossing an intersection), the end it was entered from and
     /// the intersection being crossed.
     pub street: i32,

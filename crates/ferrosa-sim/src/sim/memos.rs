@@ -2,21 +2,9 @@ use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::{Team, clientbound::game::ItemKind};
 
 use super::Sim;
-use crate::computer::links::{ITEM_SLOTS, KIND_MEMO, Link};
+use crate::computer::links::Link;
 use crate::items::state::ItemState;
 use crate::time::{WORLD_HOUR, WORLD_MINUTE};
-
-/// A memo holds up to 1023 characters, sent in 64 character blocks.
-pub const MEMO_LEN: usize = 1024;
-const BLOCK: usize = 64;
-/// The newspaper is made of readme.txt's lines (124 characters each, up to 1021) and the 10 richest accounts.
-const LINE_LEN: usize = 124;
-const MAX_LINES: usize = 1021;
-const NEWSPAPER_LEN: usize = 1021;
-const TOP: usize = 10;
-const NOON: i32 = 12 * WORLD_HOUR - 1;
-const MEMO_BACK: f32 = -0.5;
-const KEEP: i32 = 65536;
 
 /// sprintf_comma: the amount with thousands separated by commas.
 pub fn with_commas(n: i32) -> String {
@@ -34,7 +22,7 @@ pub fn with_commas(n: i32) -> String {
 /// The time of day the clock shows, as hour (1 to 12), minute and whether it is afternoon.
 pub fn clock_time(t: i32) -> (i32, i32, bool) {
     let h = (t / WORLD_HOUR) % 12;
-    (if h == 0 { 12 } else { h }, (t / WORLD_MINUTE) % 60, t > NOON)
+    (if h == 0 { 12 } else { h }, (t / WORLD_MINUTE) % 60, t > 12 * WORLD_HOUR - 1)
 }
 
 impl Sim {
@@ -49,7 +37,7 @@ impl Sim {
             }
         }
 
-        let n = (text.iter().position(|&c| c == 0).unwrap_or(text.len()) + 1).min(MEMO_LEN - 1);
+        let n = (text.iter().position(|&c| c == 0).unwrap_or(text.len()) + 1).min(1023);
         let Some(item) = self.items.get_mut(id) else { return };
         item.link_mask = 0;
 
@@ -59,7 +47,7 @@ impl Sim {
             *b = text.get(k).copied().unwrap_or(0);
         }
 
-        buf[MEMO_LEN - 1] = 0;
+        buf[1023] = 0;
 
         for block in 0..=(n >> 6) {
             self.memo_block(id, block);
@@ -72,10 +60,10 @@ impl Sim {
         let Some(item) = self.items.get(id) else { return };
 
         let ItemState::Memo(buf) = &item.state else { return };
-        let text = buf[block * BLOCK..(block * BLOCK + BLOCK).min(MEMO_LEN)].to_vec();
-        self.links.links[free] = Link { active: true, kind: KIND_MEMO, tick: self.tick as i32, item: id as i32, line: block as i32, text, colors: Vec::new() };
+        let text = buf[block * 64..(block * 64 + 64).min(1024)].to_vec();
+        self.links.links[free] = Link { active: true, kind: 0, tick: self.tick as i32, item: id as i32, line: block as i32, text, colors: Vec::new() };
 
-        let Some(slot) = (0..ITEM_SLOTS).find(|&k| item.link_mask & (1 << k) == 0) else { return };
+        let Some(slot) = (0..64).find(|&k| item.link_mask & (1 << k) == 0) else { return };
 
         if let Some(item) = self.items.get_mut(id) {
             item.links[slot] = free as i32;
@@ -96,10 +84,10 @@ impl Sim {
         if let Ok(data) = std::fs::read("readme.txt") {
             let mut k = 0;
 
-            while k < data.len() && lines.len() <= MAX_LINES {
+            while k < data.len() && lines.len() <= 1021 {
                 let mut line = Vec::new();
 
-                while k < data.len() && data[k] != b'\n' && data[k] != b'\r' && line.len() < LINE_LEN - 1 {
+                while k < data.len() && data[k] != b'\n' && data[k] != b'\r' && line.len() < 123 {
                     line.push(data[k]);
                     k += 1;
                 }
@@ -119,7 +107,7 @@ impl Sim {
 
         order.sort_by_key(|&i| (0x8fff_ffffu32.wrapping_sub(self.saved_accounts.players[i].money)) as i64);
 
-        for (rank, &i) in order.iter().take(TOP).enumerate() {
+        for (rank, &i) in order.iter().take(10).enumerate() {
             let a = &self.saved_accounts.players[i];
             let name: String = a.player_name.iter().take_while(|&&c| c != 0).map(|&c| c as char).collect();
             lines.push(format!("{}. {name}   ${}", rank + 1, with_commas(a.money as i32)).into_bytes());
@@ -128,11 +116,11 @@ impl Sim {
         let mut paper: Vec<u8> = Vec::new();
 
         for line in &lines {
-            if line.len() + paper.len() <= NEWSPAPER_LEN {
+            if line.len() + paper.len() <= 1021 {
                 paper.extend_from_slice(line);
             }
 
-            if paper.len() <= NEWSPAPER_LEN {
+            if paper.len() <= 1021 {
                 paper.push(b'\n');
             }
         }
@@ -153,12 +141,12 @@ impl Sim {
         let axis = rot[1];
         rotate_orientation(&mut rot, axis, (base.table_orientation as f64 - 90.0_f64.to_radians()) as f32);
 
-        let pos = rot[0] * MEMO_BACK + base.table;
+        let pos = rot[0] * -0.5 + base.table;
         let Some(id) = self.create_item(ItemKind::Paper, pos, None, rot) else { return };
         self.write_memo(id, &memo);
 
         if let Some(i) = self.items.get_mut(id) {
-            i.despawn_time = KEEP;
+            i.despawn_time = 65536;
         }
     }
 
@@ -193,7 +181,7 @@ impl Sim {
             let line = &c.lines[l as usize & 31];
             let n = crate::computer::text_len(line);
 
-            if text.len() + n + 1 < MEMO_LEN {
+            if text.len() + n + 1 < 1024 {
                 text.extend_from_slice(&line[..n]);
                 text.push(b'\n');
             }

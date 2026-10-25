@@ -26,19 +26,11 @@ pub struct CorpState {
     pub manager: Option<PlayerId>,
     pub applicants: Vec<PlayerId>,
     pub money: i32,
-    /// How far the account can go below zero: the manager's corporate rating when they took over (world mode).
     pub credit: i32,
-    /// The garage door.
     pub door_open: bool,
-    /// Whether the door cells are open: they follow the door events (server_main handling event 10), which round mode
-    /// also sends without changing the flag.
-    pub door_cells_open: bool,
-    /// The corporation's round funds.
     pub funds: i32,
     pub missions: [super::missions::Mission; super::missions::MISSION_SLOTS],
-    /// Active players on the team, counted every tick.
     pub player_count: i32,
-    /// Which of the base's car spaces hold a vehicle.
     pub car_space_taken: Vec<bool>,
     /// The accounts the round manager fired (up to 128).
     pub fired: Vec<u32>,
@@ -83,7 +75,7 @@ impl Sim {
         if let Some(id) = self.create_item(ItemKind::Phone, base.table, None, rot) {
             if let Some(phone) = self.items.get_mut(id).and_then(|i| i.state.phone_mut()) {
                 phone.texture = 0;
-                phone.number = (k as i32 + 1) * PHONE_NUMBER_STEP;
+                phone.number = (k as i32 + 1) * 1111;
             }
 
             self.phone_update(id);
@@ -95,7 +87,7 @@ impl Sim {
     }
 
     pub(crate) fn disconnect_phone(&mut self, k: usize) {
-        let number = (k as i32 + 1) * PHONE_NUMBER_STEP;
+        let number = (k as i32 + 1) * 1111;
 
         for id in self.items.ids() {
             let Some(item) = self.items.get(id).filter(|i| i.item_type == ItemKind::Phone) else { continue };
@@ -164,13 +156,8 @@ impl Sim {
     /// the tick (apply_team_doors).
     pub(crate) fn set_team_door(&mut self, k: usize, open: bool) {
         self.corp_state[k].door_open = open;
-        self.push_team_door_event(k, open);
-    }
-
-    /// create_event_toggle_team_door: the event, and the door cells following it at the end of the tick.
-    pub(crate) fn push_team_door_event(&mut self, k: usize, open: bool) {
-        self.corp_state[k].door_cells_open = open;
         let e = EventTeamDoor { team_id: k as i32, door_open: open };
+
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::TeamDoor(e) });
     }
 
@@ -180,7 +167,7 @@ impl Sim {
 
         for (k, base) in level.bases.iter().enumerate() {
             let Some((cells, dir)) = base.door else { continue };
-            let word = if self.corp_state[k].door_cells_open { 0 } else { dir << 10 | GARAGE_DOOR };
+            let word = if self.corp_state[k].door_open { 0 } else { dir << 10 | GARAGE_DOOR };
 
             for c in cells {
                 level.area.set_object(c.x, c.y, c.z, word);

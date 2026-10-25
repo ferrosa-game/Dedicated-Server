@@ -1,14 +1,7 @@
 use glam::Vec3;
 
-use super::{MAX_STREET_CARS, Traffic};
+use super::Traffic;
 use crate::{time::TICKS_PER_SECOND_F32, world::streets::StreetMap};
-
-/// A car covers the lanes whose start line its bounds come within this of.
-const LANE_REACH: f32 = 2.0;
-const NO_CAR: f32 = 65536.0;
-/// lane_clearance keeps this far behind the car ahead and closes the rest of the gap over two seconds.
-const FOLLOW_GAP: f32 = 2.0;
-const CLOSE_RATE: f32 = 0.5;
 
 fn inside(min: Vec3, max: Vec3, p: Vec3) -> bool {
     p.x >= min.x && max.x >= p.x && p.z >= min.z && max.z >= p.z && p.y >= min.y && max.y >= p.y
@@ -32,12 +25,12 @@ pub fn add_cars(traffic: &mut Traffic, map: &StreetMap) {
     traffic.street_cars.iter_mut().for_each(Vec::clear);
 
     for id in 0..traffic.cars.len() {
-        let c = &mut traffic.cars[id];
-        let (s, co) = (c.yaw as f64).sin_cos();
+        let traffic_car = &mut traffic.cars[id];
+        let (s, co) = (traffic_car.yaw as f64).sin_cos();
         let (s, co) = (s as f32, co as f32);
-        let p = c.pos;
-        let (fx, fy, fz) = (co * c.front + p.x, 0.0 * c.front + p.y, c.front * s + p.z);
-        let (bx, by, bz) = (p.x + co * c.rear, p.y + 0.0 * c.rear, p.z + c.rear * s);
+        let p = traffic_car.pos;
+        let (fx, fy, fz) = (co * traffic_car.front + p.x, 0.0 * traffic_car.front + p.y, traffic_car.front * s + p.z);
+        let (bx, by, bz) = (p.x + co * traffic_car.rear, p.y + 0.0 * traffic_car.rear, p.z + traffic_car.rear * s);
         let a = Vec3::new(s + fx, fy, fz - co);
         let (mut min, mut max) = (a, a);
 
@@ -45,38 +38,38 @@ pub fn add_cars(traffic: &mut Traffic, map: &StreetMap) {
         grow(&mut min, &mut max, Vec3::new(bx - s, by + 0.0, bz + co));
         grow(&mut min, &mut max, Vec3::new(bx + s, by, bz - co));
 
-        c.bounds_min = min;
-        c.bounds_max = max;
+        traffic_car.bounds_min = min;
+        traffic_car.bounds_max = max;
 
-        let kept = c.physical_street != -1 && map.streets.get(c.physical_street as usize).is_some_and(|st| inside(st.bounds_min, st.bounds_max, p));
+        let kept = traffic_car.physical_street != -1 && map.streets.get(traffic_car.physical_street as usize).is_some_and(|st| inside(st.bounds_min, st.bounds_max, p));
 
         if !kept {
-            c.physical_street = -1;
+            traffic_car.physical_street = -1;
 
             for &k in map.street_buckets.near(p) {
                 let st = &map.streets[k as usize];
 
                 if inside(st.bounds_min, st.bounds_max, p) {
-                    c.physical_street = k as i32;
+                    traffic_car.physical_street = k as i32;
                 }
             }
         }
 
-        c.physical_intersection = -1;
+        traffic_car.physical_intersection = -1;
 
         for &k in map.intersection_buckets.near(p) {
             let i = &map.intersections[k as usize];
 
             if p.x >= i.bounds_min.x && i.bounds_max.x >= p.x && p.z >= i.bounds_min.z && i.bounds_max.z >= p.z {
-                c.physical_intersection = k as i32;
+                traffic_car.physical_intersection = k as i32;
             }
         }
 
-        if c.physical_street == -1 {
+        if traffic_car.physical_street == -1 {
             continue;
         }
 
-        let ps = c.physical_street as usize;
+        let ps = traffic_car.physical_street as usize;
         let st = &map.streets[ps];
         let d = st.dir;
         let w = map.intersections[st.intersections[0]].world_pos;
@@ -85,45 +78,45 @@ pub fn add_cars(traffic: &mut Traffic, map: &StreetMap) {
         let fwd = s * d.z + (co * d.x + d.y * 0.0);
 
         if fwd > 0.0 {
-            c.front_proj = pmin.max(pmax);
-            c.rear_proj = pmin.min(pmax);
+            traffic_car.front_proj = pmin.max(pmax);
+            traffic_car.rear_proj = pmin.min(pmax);
         } else {
-            c.front_proj = pmin.min(pmax);
-            c.rear_proj = pmin.max(pmax);
+            traffic_car.front_proj = pmin.min(pmax);
+            traffic_car.rear_proj = pmin.max(pmax);
         }
 
         let (ls, le) = (st.lanes[0].start, st.lanes[0].end);
         let a = (d.x * (min.x - ls.x) + (min.y - ls.y) * d.y) + (min.z - ls.z) * d.z;
         let b = (max.z - ls.z) * d.z + (d.x * (max.x - ls.x) + (max.y - ls.y) * d.y);
 
-        c.near[0] = a.min(b);
-        c.far[0] = a.max(b);
+        traffic_car.near[0] = a.min(b);
+        traffic_car.far[0] = a.max(b);
 
         let cmin = ((min.y - le.y) * d.y + (min.x - le.x) * d.x) + (min.z - le.z) * d.z;
         let cmax = ((max.y - le.y) * d.y + d.x * (max.x - le.x)) + d.z * (max.z - le.z);
 
-        c.far[1] = if cmax > cmin { -cmin } else { -cmax };
-        c.near[1] = if cmin > cmax { -cmin } else { -cmax };
-        c.lane_mask = 0;
+        traffic_car.far[1] = if cmax > cmin { -cmin } else { -cmax };
+        traffic_car.near[1] = if cmin > cmax { -cmin } else { -cmax };
+        traffic_car.lane_mask = 0;
 
         let side = st.side;
 
-        for (k, l) in st.lanes.iter().enumerate() {
-            let o = l.start;
+        for (k, lane) in st.lanes.iter().enumerate() {
+            let o = lane.start;
             let t1 = (((min.x - o.x) * side.x + (min.y - o.y) * side.y) + (min.z - o.z) * side.z).abs();
 
-            if LANE_REACH > t1 {
-                c.lane_mask |= 1 << (k & 31);
+            if 2.0 > t1 {
+                traffic_car.lane_mask |= 1 << (k & 31);
             }
 
             let t2 = ((side.x * (max.x - o.x) + side.y * (max.y - o.y)) + side.z * (max.z - o.z)).abs();
 
-            if LANE_REACH > t2 {
-                c.lane_mask |= 1 << (k & 31);
+            if 2.0 > t2 {
+                traffic_car.lane_mask |= 1 << (k & 31);
             }
         }
 
-        if traffic.street_cars[ps].len() < MAX_STREET_CARS {
+        if traffic.street_cars[ps].len() < 256 {
             traffic.street_cars[ps].push(id);
         }
     }
@@ -132,10 +125,10 @@ pub fn add_cars(traffic: &mut Traffic, map: &StreetMap) {
 /// traffic_compute_lane_clearance: the speed that keeps `car` behind the nearest car ahead of `pos` along `street` in
 /// its own lane (when `mask` has that lane), heading the street's way (`reverse` 0) or against it.
 pub fn lane_clearance(traffic: &Traffic, map: &StreetMap, car: usize, street: i32, mask: i32, reverse: bool, pos: f32) -> f32 {
-    let Some(list) = usize::try_from(street).ok().and_then(|s| traffic.street_cars.get(s)) else { return NO_CAR };
+    let Some(list) = usize::try_from(street).ok().and_then(|s| traffic.street_cars.get(s)) else { return 65536.0 };
     let n = super::lane_count(map, street);
     let lane = traffic.cars[car].lane;
-    let mut best = NO_CAR;
+    let mut best = 65536.0;
 
     for &j in list {
         if j == car || n <= 0 {
@@ -163,7 +156,7 @@ pub fn lane_clearance(traffic: &Traffic, map: &StreetMap, car: usize, street: i3
             -(o.rear_proj - pos)
         };
 
-        let v = ((gap - FOLLOW_GAP) * CLOSE_RATE) / TICKS_PER_SECOND_F32 + o.speed();
+        let v = ((gap - 2.0) * 0.5) / TICKS_PER_SECOND_F32 + o.speed();
         best = v.max(0.0).min(best);
     }
     

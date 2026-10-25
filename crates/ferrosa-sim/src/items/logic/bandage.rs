@@ -1,7 +1,4 @@
-use crate::{items::state::ItemState, sim::Sim};
-
-const BANDAGE_RANGE: f32 = 2.0;
-const BANDAGE_TICKS: i32 = 255;
+use crate::{items::state::ItemState, sim::Sim, time::game_seconds};
 
 impl Sim {
     pub(crate) fn bandage_logic(&mut self, id: usize) {
@@ -9,7 +6,7 @@ impl Sim {
 
         let (item_pos, holder) = (self.bodies.get(item.body).map_or(item.pos, |b| b.pos), item.parent_human);
 
-        let mut nearest = (BANDAGE_RANGE, None);
+        let mut nearest = (2.0, None);
 
         for (k, human) in self.humans.iter() {
             if !(human.health.vitality > 0 && (human.bleeding || human.health.vitality <= 9)) {
@@ -35,7 +32,7 @@ impl Sim {
             h.progress_bar = p;
         }
 
-        if p <= BANDAGE_TICKS {
+        if p <= game_seconds(4) {
             return;
         }
 

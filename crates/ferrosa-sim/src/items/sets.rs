@@ -7,9 +7,6 @@ use glam::IVec3;
 use super::Sim;
 use crate::world::item_sets::{SetHit, entry_pose};
 
-/// How near its place in the set an item must be when deleted to go back into the set.
-const RETURN_REACH: f32 = 0.125;
-
 /// The item-set cell an item was taken from: the cell, its word and the item's index in the set.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SetOrigin {
@@ -100,7 +97,7 @@ impl Sim {
         }
     }
 
-    /// item_update_grid_footprint_bit: an item deleted close to where its set placed it goes back into the set.
+    /// return_set_item: an item deleted close to where its set placed it goes back into the set.
     pub(crate) fn return_set_item(&mut self, id: usize) {
         let Some((o, at)) = self.items.get(id).and_then(|i| Some((i.set_origin?, i.pos))) else { return };
         let area = &self.world.map.level.area;
@@ -109,7 +106,7 @@ impl Sim {
         let d = pos - at;
         let dist = d.length();
 
-        if dist >= RETURN_REACH {
+        if dist >= 0.125 {
             return;
         }
 

@@ -74,9 +74,9 @@ impl Sim {
 
         self.bodies = ferrosa_physics::RigidBodies::default();
         self.bodies.gravity_scale = gravity;
-        self.humans = ferrosa_physics::Table::new(crate::human::MAX_HUMANS);
-        self.items = ferrosa_physics::Table::new(items::MAX_ITEMS);
-        self.vehicles = ferrosa_physics::Table::new(crate::vehicle::MAX_VEHICLES);
+        self.humans = ferrosa_physics::Table::new(256);
+        self.items = ferrosa_physics::Table::new(1024);
+        self.vehicles = ferrosa_physics::Table::new(512);
         self.bullets.clear();
         self.npcs.clear();
 
@@ -231,8 +231,10 @@ impl Sim {
 
     pub(crate) fn base_buy_menu(&mut self, pid: PlayerId, outside: Option<glam::Vec3>) {
         let Some(pos) = outside else { return };
+
         let at_base = self.rules.corp_buy_menus
             && self.players.get(pid.idx()).and_then(|p| team_index(p.team)).is_some_and(|k| self.world.map.level.bases.get(k).is_some_and(|b| b.contains(pos)));
+
         let Some(p) = self.players.get_mut(pid.idx()) else { return };
 
         if !at_base {

@@ -16,10 +16,6 @@ use crate::PlayerId;
 
 /// A corporation holds sixteen mission slots.
 pub const MISSION_SLOTS: usize = 16;
-/// A mission text event carries 64 bytes of the text.
-const TEXT_LINE: usize = 64;
-/// Each guard of a car chase has a pistol and four magazines.
-const GUARD_MAGAZINES: i32 = 4;
 
 /// One mission of a corporation (the fields read so far).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -144,7 +140,7 @@ impl Sim {
 
     fn create_guard(&mut self, deadline: i32, mission: Option<i32>, pos: Vec3, rot: RotMatrix, vehicle: usize, seat: usize) {
         if let Some((_, Some(h))) = self.create_mission_bot(deadline, mission, pos, rot, vehicle, seat) {
-            self.give_weapon(h, ItemKind::Pistol, GUARD_MAGAZINES);
+            self.give_weapon(h, ItemKind::Pistol, 4);
         }
     }
 
@@ -243,11 +239,11 @@ impl Sim {
     /// with one line more than the text and its terminator fill.
     pub(crate) fn push_mission_text(&mut self, k: usize, slot: usize) {
         let mut text = self.corp_state[k].missions[slot].result_text(slot).into_bytes();
-        let lines = (text.len() + 1) / TEXT_LINE + 1;
+        let lines = (text.len() + 1) / 65;
 
-        text.resize(lines * TEXT_LINE, 0);
+        text.resize(lines * 64, 0);
 
-        for (line, chunk) in text.chunks(TEXT_LINE).enumerate() {
+        for (line, chunk) in text.chunks(64).enumerate() {
             let e = EventMissionText { corporation: k as i32, mission: slot as i32, line: line as i32, text: chunk.to_vec() };
             self.events.push(Event { tick_created: self.tick, kind: ServerEvent::MissionText(e) });
         }
@@ -281,7 +277,7 @@ impl Sim {
     /// despawn_missions_by_type: every undecided mission of the deal lets go of its disk, which despawns.
     pub(crate) fn despawn_missions_by_id(&mut self, id: i32) {
         for k in 0..self.corp_state.len() {
-            for slot in 0..MISSION_SLOTS {
+            for slot in 0..16 {
                 let m = self.corp_state[k].missions[slot];
 
                 if !m.active || m.done || m.id != id {

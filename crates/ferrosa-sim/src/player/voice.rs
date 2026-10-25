@@ -20,6 +20,7 @@ impl PlayerVoice {
         Self { frames: [const { None }; 64], current: 0, is_silenced: true, volume_level: 0 }
     }
 
+    /// ingest: take a raw voice frame from a client and process it
     pub(crate) fn ingest(&mut self, voice_data: VoiceData) {
         self.is_silenced = voice_data.is_silenced;
 
@@ -28,6 +29,7 @@ impl PlayerVoice {
         }
     }
 
+    /// push: push a voice frame to index (normalized to be within 64)
     pub(crate) fn push(&mut self, index: u8, frame: VoiceFrame) {
         let slot = (index % 64) as usize;
 
@@ -36,6 +38,7 @@ impl PlayerVoice {
         self.current = index.wrapping_add(1) % 64;
     }
 
+    /// recent4: get the latest 4 voice frames
     pub(crate) fn recent4(&self) -> [VoiceFrame; 4] {
         let start = self.current.wrapping_sub(4) % 64;
 

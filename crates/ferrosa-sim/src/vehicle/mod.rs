@@ -9,28 +9,10 @@ use ferrosa_physics::{
     bond::{Bond, ItemAngular, ItemPoint},
 };
 use glam::Vec3;
-
-use ferrosa_protocol::clientbound::game::VehicleKind;
 use types::VehicleType;
 
-pub const MAX_VEHICLES: usize = 512;
-/// Only the first 128 vehicles are ever sent to clients.
-pub const NETWORKED_VEHICLES: usize = 128;
-pub const MAX_SEATS: usize = 8;
-const WHEEL_HALF_WIDTH: f32 = 0.125;
-const WHEEL_HEALTH: i32 = 8;
-const ENGINE_POWER_SCALE: f32 = 213.0;
-const FULL_HEALTH: i32 = 100;
-/// A train's bogies: 80000 each, set 6 along and 1 (the front 1.25) below the chassis.
-const BOGIE_MASS: f32 = 80000.0;
 const BOGIE_INERTIA: Vec3 = Vec3::new(15.0 / 16.0, 1.5, 15.0 / 16.0);
-/// A helicopter's rotor: 160, 1.5 up the chassis' up axis, held by a point bond at (0, 1.5, 0) and an angular bond.
-const ROTOR_MASS: f32 = 160.0;
-const ROTOR_HEIGHT: f32 = 1.5;
 const ROTOR_INERTIA: Vec3 = Vec3::new(769.0 / 192.0, 8.0, 769.0 / 192.0);
-const ROTOR_COEFS: [f32; 3] = [4.0, 0.125, 4.0];
-/// The control flags a vehicle starts with: the handbrake on.
-pub const HANDBRAKE: i32 = 4;
 
 /// A wheel of a vehicle, copied from its type's wheel and given its own body.
 #[derive(Clone, Debug, Default)]
@@ -46,10 +28,7 @@ pub struct Wheel {
     /// The wheel body's spin about its axle and the angle it has turned through.
     pub spin: f32,
     pub angle: f32,
-    /// How far the wheel is steered about the chassis' up axis.
     pub steer: f32,
-    /// The wheel body's position and velocity after the last vehicle step, and the velocity before
-    /// that.
     pub world_pos: Vec3,
     pub prev_vel: Vec3,
     pub vel: Vec3,
@@ -66,9 +45,7 @@ pub struct Wheel {
 #[derive(Clone, Debug)]
 pub struct Vehicle {
     pub kind: ferrosa_protocol::clientbound::game::VehicleKind,
-    /// The type's flag (controllableState); a vehicle in state 3 is not sent to clients.
     pub controllable_state: i32,
-    /// The type's train flag and engine curve.
     pub train: bool,
     pub rev_limit: f32,
     pub max_rpm: f64,
@@ -79,8 +56,6 @@ pub struct Vehicle {
     pub despawn_time: u16,
     pub spawned_state: u16,
     pub locked: bool,
-    /// The player who owns the vehicle (-1 for none): hurting someone in your own vehicle earns no
-    /// criminal rating.
     pub owner: i32,
     pub body: usize,
     pub pos: Vec3,
@@ -96,35 +71,23 @@ pub struct Vehicle {
     pub bounds_max: Vec3,
     pub block_min: [i32; 3],
     pub block_max: [i32; 3],
-    /// The driver's controls: the gear stick, steering and gas.
     pub gear_x: f32,
     pub steer_control: f32,
     pub gear_y: f32,
     pub gas_control: f32,
-    /// The driver's control flags: 2 holds the clutch, 4 the handbrake; -1 is a car nobody controls.
     pub controls: i32,
-    /// The human in each seat.
-    pub occupants: [i32; MAX_SEATS],
+    pub occupants: [i32; 8],
     pub traffic_car: i32,
-    /// Set when a player takes the driver's seat of a traffic car with free hands, for the traffic to hand it over
-    /// (is_bot 2) on its next tick.
     pub traffic_taken: bool,
-    /// The engine: its speed, throttle and power, the gearbox speed and inertia, the engine's
-    /// inertia and losses.
     pub engine_speed: f32,
     pub throttle: f32,
     pub engine_power: f32,
     pub gearbox_speed: f32,
     pub gearbox_inertia: f32,
-    /// How strongly the driven wheels pull back on the gearbox (64 every step).
     pub wheel_feedback: f32,
     pub engine_inertia: f32,
-    /// How strongly the clutch's drag slows the engine (199.99998) and what the engine's drive is divided by
-    /// with its inertia (0.005).
     pub clutch_drag: f32,
     pub drive_divisor: f32,
-    /// The gear (-1 reverse, 0 neutral, 1 to 4), the gear last step, its ratio and inverse, the clutch (1 engaged)
-    /// and the brake.
     pub gear: i32,
     pub prev_gear: i32,
     pub gear_ratio: f32,
@@ -133,15 +96,11 @@ pub struct Vehicle {
     pub brake: f32,
     pub driven: Vec<usize>,
     pub engine_rpm: i32,
-    /// Automatic gear changes and the ticks until the next one.
     pub auto_shift: i32,
     pub shift_delay: i32,
-    /// The steering angle the clients draw.
     pub steer: f32,
     pub wheels: Vec<Wheel>,
-    /// Which of the type's windows are broken (windowStates).
     pub broken_windows: Vec<bool>,
-    /// How hard the last crashes were, played back as crash sounds.
     pub crash: f32,
     pub track: f32,
     pub wheelbase: f32,
@@ -212,10 +171,10 @@ pub fn spawn_vehicle(
 
             Some(Wheel {
                 body: wheel_body,
-                half_width: WHEEL_HALF_WIDTH,
+                half_width: 0.125,
                 popped: w.state,
                 drive: w.drive,
-                health: WHEEL_HEALTH,
+                health: 8,
                 local_pos: l,
                 mass: w.mass,
                 radius: w.radius,
@@ -235,7 +194,7 @@ pub fn spawn_vehicle(
         let ends = [(centre - r1 + r2 * -6.0, Vec3::new(0.0, -1.0, -6.0)), (-1.25 * r1 + centre + r2 * 6.0, Vec3::new(0.0, -1.0, 6.0))];
 
         for (at, anchor) in ends {
-            let bogie = bodies.create(RigidBodyType::Vehicle, at, rot, vel, BOGIE_INERTIA, BOGIE_MASS)?;
+            let bogie = bodies.create(RigidBodyType::Vehicle, at, rot, vel, BOGIE_INERTIA, 80_000.0)?;
             bodies.create_bond(Bond::ItemPoint(ItemPoint::vehicle(body, bogie, anchor, Vec3::ZERO)));
 
             let turn = bodies.create_bond(Bond::ItemAngular(ItemAngular::vehicle(body, bogie)))?;
@@ -245,14 +204,14 @@ pub fn spawn_vehicle(
 
     let rotor = if t.rotor {
         let [_, r1, _] = rot;
-        let at = r1 * ROTOR_HEIGHT + centre;
-        let rotor_body = bodies.create(RigidBodyType::Vehicle, at, rot, vel, ROTOR_INERTIA, ROTOR_MASS)?;
+        let at = r1 * 1.5 + centre;
+        let rotor_body = bodies.create(RigidBodyType::Vehicle, at, rot, vel, ROTOR_INERTIA, 160.0)?;
 
         if let Some(b) = bodies.get_mut(rotor_body) {
-            b.coefs = ROTOR_COEFS;
+            b.coefs = [4.0, 0.125, 4.0];
         }
 
-        let point_bond = bodies.create_bond(Bond::ItemPoint(ItemPoint::vehicle(body, rotor_body, Vec3::new(0.0, ROTOR_HEIGHT, 0.0), Vec3::ZERO)))?;
+        let point_bond = bodies.create_bond(Bond::ItemPoint(ItemPoint::vehicle(body, rotor_body, Vec3::new(0.0, 1.5, 0.0), Vec3::ZERO)))?;
         let angular_bond = bodies.create_bond(Bond::ItemAngular(ItemAngular::vehicle(body, rotor_body)))?;
         Some(Rotor { body: rotor_body, point_bond, angular_bond, angles: [0.0; 2] })
     } else {
@@ -269,7 +228,7 @@ pub fn spawn_vehicle(
         max_rpm: t.max_rpm,
         torque_curve: t.torque_curve,
         controllable_state: t.controllable_state,
-        health: FULL_HEALTH,
+        health: 100,
         last_driver: -1,
         color,
         despawn_time: 65535,
@@ -292,13 +251,13 @@ pub fn spawn_vehicle(
         steer_control: 0.0,
         gear_y: 0.0,
         gas_control: 0.0,
-        controls: HANDBRAKE,
-        occupants: [-1; MAX_SEATS],
+        controls: 4,
+        occupants: [-1; 8],
         traffic_car: -1,
         traffic_taken: false,
         engine_speed: 0.0,
         throttle: 0.0,
-        engine_power: ENGINE_POWER_SCALE * t.engine_power,
+        engine_power: 213.0 * t.engine_power,
         gearbox_speed: 0.0,
         gearbox_inertia: 0.0,
         wheel_feedback: 0.0,
@@ -329,18 +288,4 @@ pub fn spawn_vehicle(
         train_reverse: 0,
         rotor,
     })
-}
-
-/// The type a dealership or round corporation stocks: mostly town cars, hatchbacks, minivans and vans, now and then a
-/// beamer, rarely a turbo and very rarely a Turbo S.
-pub fn random_stock_vehicle() -> VehicleKind {
-    match rand::random_range(0..16) {
-        0..=1 => VehicleKind::Van,
-        2..=5 => VehicleKind::TownCar,
-        6..=9 => VehicleKind::Hatchback,
-        10..=12 => VehicleKind::Minivan,
-        13..=14 => VehicleKind::Beamer,
-        _ if rand::random_ratio(1, 16) => VehicleKind::TurboS,
-        _ => VehicleKind::Turbo,
-    }
 }

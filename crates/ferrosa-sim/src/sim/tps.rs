@@ -7,9 +7,6 @@ use crate::PlayerId;
 
 use super::Sim;
 
-/// The ticks /tps averages over (about two seconds).
-const WINDOW: usize = 128;
-
 /// When the last ticks started and how long their work took.
 #[derive(Default)]
 pub struct TickStats {
@@ -19,7 +16,7 @@ pub struct TickStats {
 
 impl TickStats {
     pub(crate) fn record(&mut self, start: Instant, work: Duration) {
-        if self.starts.len() == WINDOW {
+        if self.starts.len() == 128 {
             self.starts.pop_front();
             self.work.pop_front();
         }
@@ -44,9 +41,6 @@ impl TickStats {
         Some((tps, mean, max))
     }
 }
-
-/// How many ticks the phase timings cover before they are printed (about ten seconds).
-const REPORT_TICKS: u32 = 625;
 
 /// Runs `$body`, adding how long it took to the phase `$name` of `$sim`'s timings.
 macro_rules! timed {
@@ -95,7 +89,7 @@ impl PhaseTimes {
 
         self.ticks += 1;
 
-        if self.ticks < REPORT_TICKS {
+        if self.ticks < 625 {
             return;
         }
 

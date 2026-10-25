@@ -11,33 +11,11 @@ use ferrosa_protocol::{
 };
 
 use super::Sim;
-use crate::time::TICKS_PER_SECOND;
+use crate::time::game_seconds;
 use crate::{ConnId, PlayerId, items::logic::phone::PhoneStatus};
 
-/// handle_player_message keeps the first 63 bytes of a message.
-const MESSAGE_LEN: usize = 63;
-/// Wrong /admin passwords stop working after the fourth try.
-const ADMIN_TRIES: i32 = 4;
-/// /hlist lists humans 0 to 9; /list1 to /list4 list connections ten at a time.
-const HLIST_HUMANS: usize = 10;
-const LIST_PAGE: usize = 10;
-/// The vehicles the spawn commands put 4 units in front of the admin, in colour 1.
-const SPAWN_AHEAD: f32 = -4.0;
-const SPAWN_COLOR: i32 = 1;
-/// /arm's guns by number (1 to 5, anything else the MP5), with four magazines.
 const ARM_GUNS: [ItemKind; 5] = [ItemKind::Ak47, ItemKind::M16, ItemKind::Mp5, ItemKind::Uzi, ItemKind::Pistol];
-const ARM_DEFAULT: usize = 2;
-const ARM_MAGAZINES: i32 = 4;
-const ARM_BANDAGES: usize = 2;
-/// /setmap picks one of 32 versus maps.
-const VERSUS_MAPS: i32 = 32;
-/// A connection is dropped 1800 ticks after its last packet; a kick leaves it 600 of them.
-const TIMEOUT: i32 = 1800;
-const KICK_TIMEOUT: i32 = 20 * TICKS_PER_SECOND;
-const STEAM_BAN_FILE: &str = "serversteamban.txt";
 
-/// The admin side of the server: the password and admin phones (serveradmin.txt), the kicked addresses, a ban
-/// waiting to be confirmed, a game mode change asked for with /resetgame and the versus map picked with /setmap.
 #[derive(Debug, Default)]
 pub struct AdminState {
     pub password: String,
@@ -58,9 +36,11 @@ impl AdminState {
         let phones = std::fs::read_to_string(path)
             .map(|text| text.split("adminphone=").skip(1).filter_map(|rest| leading_int(rest).map(|n| n as u32)).collect())
             .unwrap_or_default();
-        let steam_bans = std::fs::read_to_string(path.with_file_name(STEAM_BAN_FILE))
+
+        let steam_bans = std::fs::read_to_string(path.with_file_name("serversteamban.txt"))
             .map(|text| text.split("steamban=").skip(1).filter_map(leading_u64).collect())
             .unwrap_or_default();
+
         AdminState { phones, steam_bans, ..Default::default() }
     }
 }
@@ -92,6 +72,7 @@ fn leading_int(s: &str) -> Option<i32> {
 /// opened_file_parse_next_int).
 fn numbers(s: &str) -> impl Iterator<Item = i32> + '_ {
     let mut rest = s;
+
     std::iter::from_fn(move || {
         let start = rest.find(|c: char| c.is_ascii_digit() || c == '-')?;
         rest = &rest[start..];
@@ -119,13 +100,13 @@ impl Sim {
     /// handle_player_message for a message starting with '/': /admin <password> makes the player an admin, and an
     /// admin's commands run in the game's order. Every such message is kept from the chat.
     pub(crate) fn admin_message(&mut self, pid: PlayerId, raw: &str) {
-        let msg = &raw[..raw.floor_char_boundary(MESSAGE_LEN)];
+        let msg = &raw[..raw.floor_char_boundary(63)];
         let Some(player) = self.players.get_mut(pid.idx()) else { return };
 
         if let Some(password) = msg.strip_prefix("/admin ") {
             player.admin_tries += 1;
 
-            if player.admin_tries <= ADMIN_TRIES && !self.admin.password.is_empty() && password == self.admin.password {
+            if player.admin_tries <= 4 && !self.admin.password.is_empty() && password == self.admin.password {
                 player.is_admin = true;
                 let name = player.username.clone();
 
@@ -142,12 +123,14 @@ impl Sim {
         }
 
         if msg.starts_with("/hlist") {
-            for i in 0..HLIST_HUMANS {
+            for i in 0..10 {
                 let Some(h) = self.humans.get(i) else { continue };
+
                 let line = match h.player.and_then(|p| self.players.get(p.idx()).map(|pl| (p, pl))) {
                     Some((p, pl)) => format!("{i}:{} {}", p.0, pl.username),
                     None => format!("{i}:-1"),
                 };
+
                 self.admin_say(&line);
             }
         }
@@ -158,9 +141,9 @@ impl Sim {
             }
 
             let conns = self.connection_order();
-            let end = if page == 3 { conns.len() } else { (page + 1) * LIST_PAGE };
+            let end = if page == 3 { conns.len() } else { (page + 1) * 10 };
 
-            for &conn in conns.iter().take(end).skip(page * LIST_PAGE) {
+            for &conn in conns.iter().take(end).skip(page * 10) {
                 let Some(p) = self.clients.get(&conn).and_then(|c| self.players.get(c.player_id.idx())) else { continue };
                 let line = format!("{}  {}", p.username, p.phone_number as i32);
                 self.admin_say(&line);
@@ -212,7 +195,7 @@ impl Sim {
                     n = v.unwrap_or(0);
                 }
 
-                if (0..VERSUS_MAPS).contains(&(n - 1)) {
+                if (0..32).contains(&(n - 1)) {
                     self.admin.versus_map = n - 1;
                 } else {
                     self.admin.versus_map = 0;
@@ -255,13 +238,13 @@ impl Sim {
             let phone = nums.next().unwrap_or(0);
             let amount = nums.next().unwrap_or(0);
 
-            if let Some(i) = self.saved_accounts.players.iter().position(|a| a.phone_number as i32 == phone) {
-                let a = &mut self.saved_accounts.players[i];
-                let (name, phone) = (a.name(), a.phone_number as i32);
+            if let Some(account_idx) = self.saved_accounts.players.iter().position(|a| a.phone_number as i32 == phone) {
+                let account = &mut self.saved_accounts.players[account_idx];
+                let (name, phone) = (account.name(), account.phone_number as i32);
 
-                a.money = (a.money as i32).wrapping_add(amount) as u32;
+                account.money = (account.money as i32).wrapping_add(amount) as u32;
 
-                for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == a.account_id) {
+                for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == account.account_id) {
                     p.money = p.money.wrapping_add(amount);
                 }
 
@@ -276,10 +259,10 @@ impl Sim {
             let phone = nums.next().unwrap_or(0);
             let rating = nums.next().unwrap_or(0);
 
-            if let Some(i) = self.saved_accounts.players.iter().position(|a| a.phone_number as i32 == phone) {
-                let a = &mut self.saved_accounts.players[i];
-                a.crim_rating = rating as u32;
-                let (id, name, phone) = (a.account_id, a.name(), a.phone_number as i32);
+            if let Some(account_idx) = self.saved_accounts.players.iter().position(|a| a.phone_number as i32 == phone) {
+                let account = &mut self.saved_accounts.players[account_idx];
+                account.crim_rating = rating as u32;
+                let (id, name, phone) = (account.account_id, account.name(), account.phone_number as i32);
 
                 for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == id) {
                     p.crim_rating = rating;
@@ -314,7 +297,7 @@ impl Sim {
                 .into_iter()
                 .rfind(|c| self.clients.get(c).and_then(|c| self.players.get(c.player_id.idx())).is_some_and(|p| p.username == name));
             if let Some(c) = target.and_then(|t| self.clients.get_mut(&t)) {
-                c.timeout = KICK_TIMEOUT;
+                c.timeout = game_seconds(20);
                 let ip = c.addr.ip();
                 self.admin.kicked.push(ip);
             }
@@ -329,6 +312,15 @@ impl Sim {
         }
     }
 
+    /// The /godmode chat command: the player's god mode on or off, announced to admins.
+    fn godmode_command(&mut self, pid: PlayerId) {
+        let Some(p) = self.players.get_mut(pid.idx()) else { return };
+        p.god_mode = !p.god_mode;
+
+        let line = if p.god_mode { "godmode on" } else { "godmode off" };
+        self.send_chat(line, ChatType::AdminChat, -1, 0);
+    }
+
     /// The connections in the order they joined, standing in for the game's connection array.
     fn connection_order(&self) -> Vec<ConnId> {
         let mut conns: Vec<ConnId> = self.clients.keys().copied().collect();
@@ -336,12 +328,13 @@ impl Sim {
         conns
     }
 
+    /// Spawn a vehicle in front of player `pid`
     fn admin_spawn_vehicle(&mut self, pid: PlayerId, kind: VehicleKind) {
         let Some(h) = self.players.get(pid.idx()).and_then(|p| p.human).and_then(|h| self.humans.get(h)) else { return };
         let (p, r) = (h.bones[0].pos, h.bones[0].rot[2]);
-        let pos = r * SPAWN_AHEAD + p;
+        let pos = r * -4.0 + p;
 
-        self.spawn_vehicle(kind, SPAWN_COLOR, pos, IDENTITY);
+        self.spawn_vehicle(kind, 1, pos, IDENTITY);
     }
 
     /// /phone: every admin phone hangs up and despawns, then a new one goes in the admin's pocket.
@@ -378,13 +371,13 @@ impl Sim {
     fn admin_arm(&mut self, pid: PlayerId, rest: &str) {
         let Some(h) = self.players.get(pid.idx()).and_then(|p| p.human) else { return };
         let n = if rest.is_empty() { None } else { scan_int(rest).ok().map(|n| n.unwrap_or(0)) };
-        let gun = n.and_then(|n| usize::try_from(n - 1).ok()).filter(|&i| i < ARM_GUNS.len()).map_or(ARM_GUNS[ARM_DEFAULT], |i| ARM_GUNS[i]);
+        let gun = n.and_then(|n| usize::try_from(n - 1).ok()).filter(|&i| i < ARM_GUNS.len()).map_or(ItemKind::Mp5, |i| ARM_GUNS[i]);
 
-        self.give_weapon(h, gun, ARM_MAGAZINES);
+        self.give_weapon(h, gun, 4);
 
         let Some((pos, rot)) = self.humans.get(h).map(|hu| (hu.bones[0].pos, hu.bones[0].rot)) else { return };
 
-        for _ in 0..ARM_BANDAGES {
+        for _ in 0..2 {
             if let Some(id) = self.create_item(ItemKind::Bandage, pos, None, rot) {
                 self.link_to_slot(h, id, 6);
             }
@@ -446,7 +439,7 @@ impl Sim {
                 .and_then(|p| self.saved_accounts.players.iter().find(|a| a.account_id == p.account_id))
                 .is_some_and(|a| a.ban_time > 0);
 
-            if banned || c.timeout >= TIMEOUT || self.players.get(c.player_id.idx()).is_none() {
+            if banned || c.timeout >= game_seconds(30) || self.players.get(c.player_id.idx()).is_none() {
                 if let Some(player) = self.players.get(c.player_id.idx()) {
                     println!("[Sim] {} timed out...", player.username);
                 }

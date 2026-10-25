@@ -6,7 +6,6 @@ use glam::Vec3;
 
 use super::Human;
 
-/// The per-call settings of human_update_three_bone_ik_constraints.
 pub struct IkParams {
     pub length: f32,
     pub twist: f32,
@@ -54,7 +53,7 @@ fn set_joint(h: &Human, bodies: &mut RigidBodies, bone: usize, target: Vec3, spi
     }
 }
 
-/// human_update_three_bone_ik_constraints: drives the joints of a three-bone chain (thigh-shin-foot or
+/// three_bone_ik: drives the joints of a three-bone chain (thigh-shin-foot or
 /// upper arm-forearm-hand, starting at `first` under `root`) towards reaching `target`, given in `frame` space.
 #[allow(clippy::too_many_arguments)]
 pub fn three_bone_ik(

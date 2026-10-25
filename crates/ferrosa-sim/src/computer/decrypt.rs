@@ -1,32 +1,13 @@
-use super::{COLUMNS, Computer, Mode, SCREEN_LINES, WHITE};
-use crate::sim::Sim;
+use super::{Computer, Mode, SCREEN_LINES};
+use crate::{sim::Sim, time::game_seconds};
 
-/// The text is wrapped into rows of 31 to 60 characters, 8 shown in pairs (guessed above, enciphered below).
-const ROWS: usize = 16;
-const SHOWN_ROWS: usize = 8;
-const DRAWN_ROWS: std::ops::Range<usize> = 2..17;
-const WRAP_MIN: i32 = 30;
-const WRAP_MAX: i32 = 59;
-const MAX_TEXT: usize = 512;
-const ROW_COLUMNS: usize = 62;
 const HEADER: &[u8] = b"DECRYPTER     Ctrl-R RESET   Ctrl-P PRINT    Ctrl-X EXIT";
-const HEADER_COLOR: u8 = 0x1f;
-const SELECTED: u8 = 0xc;
-const COUNT_COLOR: u8 = 0x8f;
-/// The letter key table: A to O on lines 17 and 18, P to Z on lines 20 and 21.
-const FIRST_KEYS: std::ops::Range<usize> = 0..15;
-const LAST_KEYS: std::ops::Range<usize> = 15..26;
-const AUTO_TICKS: f32 = 600.0;
-const AUTO_MIN: f32 = 20.0;
-const REVEAL_TRIES: i32 = 1000;
-const CTRL: i32 = 0x100;
-const STATUS_LINE: usize = 1;
 
 /// DECRYPT's state: the wrapped plain text, the file's content, its cipher and the inverse, how
 /// often each enciphered letter appears, the player's guess for each, the letter picked and the auto reveal timer.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Decrypter {
-    pub rows: [[u8; COLUMNS]; ROWS],
+    pub rows: [[u8; 64]; 16],
     pub content: i32,
     pub cipher: [i32; 26],
     pub inverse: [i32; 26],
@@ -38,30 +19,40 @@ pub struct Decrypter {
 
 impl Default for Decrypter {
     fn default() -> Self {
-        Self { rows: [[0; COLUMNS]; ROWS], content: 0, cipher: [0; 26], inverse: [0; 26], counts: [0; 26], guesses: [0; 26], selected: 0, timer: 0 }
+        Self { rows: [[0; 64]; 16], content: 0, cipher: [0; 26], inverse: [0; 26], counts: [0; 26], guesses: [0; 26], selected: 0, timer: 0 }
     }
 }
 
 /// The wrap width for text starting at `from`: up to 60, backed off to a space but not below 30.
 fn wrap(s: &[u8], from: i32, left: i32) -> i32 {
     let at = |k: i32| s.get(k as usize).copied().unwrap_or(0);
-    let mut w = if left > 58 { WRAP_MAX } else { left };
+    let mut w = if left > 58 { 59 } else { left };
 
-    if !(left > 58 || w > WRAP_MIN) || at(from + w) == b' ' {
+    if !(left > 58 || w > 30) || at(from + w) == b' ' {
         return w;
     }
 
     loop {
         w -= 1;
 
-        if w == WRAP_MIN || at(from + w) == b' ' {
+        if w == 30 || at(from + w) == b' ' {
             return w;
         }
     }
 }
 
-fn is_letter(c: u8) -> bool {
-    c.wrapping_sub(b'A') <= 25
+/// A cipher or guess as an index into the 26 letters; the binary's values can run past Z.
+fn index(value: i32) -> usize {
+    value.rem_euclid(26) as usize
+}
+
+fn letter(value: i32) -> u8 {
+    (value + b'A' as i32) as u8
+}
+
+/// A guess as it is shown: blank when there is none.
+fn shown(guess: i32) -> u8 {
+    if guess == -1 { b' ' } else { letter(guess) }
 }
 
 impl Sim {
@@ -69,11 +60,11 @@ impl Sim {
     /// kept (the binary writes further rows on over the content slot and cipher).
     pub(crate) fn decrypt_init(&mut self, id: usize, c: &mut Computer) {
         let (text, cipher) = self.fs.content(c.decrypt.content).map_or((Vec::new(), [0; 26]), |x| (x.text.clone(), x.cipher));
-        let s: Vec<u8> = text.iter().copied().take_while(|&b| b != 0).take(MAX_TEXT).collect();
+        let s: Vec<u8> = text.iter().copied().take_while(|&b| b != 0).take(512).collect();
         let len = s.len() as i32;
         let d = &mut c.decrypt;
 
-        for row in d.rows.iter_mut().take(SHOWN_ROWS) {
+        for row in d.rows.iter_mut().take(8) {
             row[0] = 0;
         }
 
@@ -89,7 +80,7 @@ impl Sim {
                 break;
             }
 
-            if row < ROWS {
+            if row < 16 {
                 d.rows[row][col] = ch.to_ascii_uppercase();
             }
 
@@ -100,8 +91,8 @@ impl Sim {
                 continue;
             }
 
-            if row < ROWS {
-                d.rows[row][col.min(COLUMNS - 1)] = 0;
+            if row < 16 {
+                d.rows[row][col.min(63)] = 0;
             }
 
             row += 1;
@@ -110,21 +101,21 @@ impl Sim {
             col = 0;
         }
 
-        if row < ROWS {
-            d.rows[row][col.min(COLUMNS - 1)] = 0;
+        if row < 16 {
+            d.rows[row][col.min(63)] = 0;
         }
 
         d.cipher = cipher;
         d.selected = -1;
+        d.counts = [0; 26];
+        d.guesses = [-1; 26];
 
         for i in 0..26 {
-            d.inverse[d.cipher[i].rem_euclid(26) as usize] = i as i32;
-            d.counts[i] = 0;
-            d.guesses[i] = -1;
+            d.inverse[index(d.cipher[i])] = i as i32;
         }
 
-        for r in 0..SHOWN_ROWS {
-            for k in 0..ROW_COLUMNS {
+        for r in 0..8 {
+            for k in 0..62 {
                 let ch = d.rows[r][k];
 
                 if ch == 0 {
@@ -134,8 +125,8 @@ impl Sim {
                 let up = ch.to_ascii_uppercase();
                 d.rows[r][k] = up;
 
-                if is_letter(up) {
-                    d.counts[d.cipher[(up - b'A') as usize].rem_euclid(26) as usize] += 1;
+                if up.is_ascii_uppercase() {
+                    d.counts[index(d.cipher[(up - b'A') as usize])] += 1;
                 }
             }
         }
@@ -143,28 +134,26 @@ impl Sim {
         c.current_line = 0;
         c.top_line = 0;
 
-        for l in 0..SCREEN_LINES {
-            if l == 0 {
-                c.banner(0, HEADER, HEADER_COLOR);
-            } else {
-                c.lines[l][0] = 0;
-            }
+        c.banner(0, HEADER, 31);
+
+        for line in c.lines.iter_mut().take(24).skip(1) {
+            line[0] = 0;
         }
 
         self.decrypt_render(id, c);
 
-        for l in 0..SCREEN_LINES as i32 {
+        for l in 0..24_i32 {
             self.register_line(id, c, l);
         }
     }
 
     /// computer_decrypt_render: each shown row enciphered above as guessed so far, then the key table.
     pub(crate) fn decrypt_render(&mut self, id: usize, c: &mut Computer) {
-        for (k, line) in DRAWN_ROWS.step_by(3).enumerate() {
-            let row = c.decrypt.rows[k];
-            self.decrypt_row(c, line, &row, false);
+        for (row, line) in (2..17).step_by(3).enumerate() {
+            let text = c.decrypt.rows[row];
+            self.decrypt_row(c, line, &text, false);
             self.register_line(id, c, line as i32);
-            self.decrypt_row(c, line + 1, &row, true);
+            self.decrypt_row(c, line + 1, &text, true);
             self.register_line(id, c, line as i32 + 1);
         }
 
@@ -173,28 +162,27 @@ impl Sim {
 
     /// computer_decrypt_render_row: a row's letters as the player's guesses (blank when none) or enciphered, the
     /// picked letter in red.
-    fn decrypt_row(&self, c: &mut Computer, line: usize, src: &[u8; COLUMNS], guessed: bool) {
+    fn decrypt_row(&self, c: &mut Computer, line: usize, src: &[u8; 64], guessed: bool) {
         let d = &c.decrypt;
         let mut n = 0;
 
-        while n < ROW_COLUMNS {
+        while n < 62 {
             let ch = src[n];
 
             if ch == 0 {
                 break;
             }
 
-            if !is_letter(ch) {
+            if !ch.is_ascii_uppercase() {
                 c.lines[line][n] = ch;
             } else {
                 let e = d.cipher[(ch - b'A') as usize];
 
                 if guessed {
-                    let g = d.guesses[e.rem_euclid(26) as usize];
-                    c.lines[line][n] = if g == -1 { b' ' } else { (g + b'A' as i32) as u8 };
+                    c.lines[line][n] = shown(d.guesses[index(e)]);
                 } else {
-                    c.lines[line][n] = (e + b'A' as i32) as u8;
-                    c.colors[line][n] = if d.selected == e { SELECTED } else { WHITE };
+                    c.lines[line][n] = letter(e);
+                    c.colors[line][n] = if d.selected == e { 12 } else { 15 };
                 }
             }
 
@@ -206,21 +194,20 @@ impl Sim {
 
     /// computer_decrypt_render_footer: each enciphered letter, how often it appears and the guess for it.
     fn decrypt_footer(&mut self, id: usize, c: &mut Computer) {
-        for (line, guess_line, keys) in [(17, 18, FIRST_KEYS), (20, 21, LAST_KEYS)] {
+        for (line, guess_line, keys) in [(17, 18, 0..15), (20, 21, 15..26)] {
             let end = keys.len() * 4;
 
             for (j, i) in keys.enumerate() {
                 let p = j * 4;
                 let n = c.decrypt.counts[i];
                 c.lines[line][p] = b'A' + i as u8;
-                c.colors[line][p] = if c.decrypt.selected != i as i32 { 0xf } else { SELECTED };
+                c.colors[line][p] = if c.decrypt.selected != i as i32 { 15 } else { 12 };
                 c.lines[line][p + 1] = if n > 9 { b'0' + (n / 10) as u8 } else { b' ' };
                 c.lines[line][p + 2] = b'0' + (n % 10) as u8;
-                c.colors[line][p + 1] = COUNT_COLOR;
-                c.colors[line][p + 2] = COUNT_COLOR;
+                c.colors[line][p + 1] = 143;
+                c.colors[line][p + 2] = 143;
                 c.lines[line][p + 3] = b' ';
-                let g = c.decrypt.guesses[i];
-                c.lines[guess_line][p] = if g == -1 { b' ' } else { (g + b'A' as i32) as u8 };
+                c.lines[guess_line][p] = shown(c.decrypt.guesses[i]);
                 c.lines[guess_line][p + 1..p + 4].fill(b' ');
             }
 
@@ -245,7 +232,7 @@ impl Sim {
                 total += 1;
             }
 
-            let g = d.guesses[d.cipher[i].rem_euclid(26) as usize];
+            let g = d.guesses[index(d.cipher[i])];
 
             if g != i as i32 {
                 total += (g != -1) as i32;
@@ -262,7 +249,7 @@ impl Sim {
     pub(crate) fn decrypt_key(&mut self, id: usize, c: &mut Computer, key: i32) {
         let mut k = (key as u8).to_ascii_uppercase() as i32;
 
-        if key & CTRL != 0 {
+        if key & 0x100 != 0 {
             match k as u8 {
                 b'R' => {
                     c.decrypt.guesses = [-1; 26];
@@ -290,21 +277,19 @@ impl Sim {
 
         if k == 10 {
             if t != 0 {
-                c.lines[STATUS_LINE][0] = 0;
-                self.register_line(id, c, STATUS_LINE as i32);
+                c.lines[1][0] = 0;
+                self.register_line(id, c, 1);
                 c.decrypt.timer = 0;
+                c.decrypt.selected = -1;
+                self.decrypt_render(id, c);
 
-                if c.decrypt.selected != -1 {
-                    c.decrypt.selected = -1;
-                }
-
-                return self.decrypt_render(id, c);
+                return;
             }
 
-            super::put_text(&mut c.lines[STATUS_LINE], b"AUTO DECRYPTING...");
-            self.register_line(id, c, STATUS_LINE as i32);
+            super::put_text(&mut c.lines[1], b"AUTO DECRYPTING...");
+            self.register_line(id, c, 1);
             let p = Self::decrypt_progress(c);
-            c.decrypt.timer = ((1.0 - p) * AUTO_TICKS + AUTO_MIN) as i32;
+            c.decrypt.timer = ((1.0 - p) * game_seconds(10) as f32 + 20.0) as i32;
 
             if c.decrypt.timer > 0 {
                 return;
@@ -313,7 +298,7 @@ impl Sim {
             return;
         }
 
-        let letter = (k - b'A' as i32) as u32 <= 25;
+        let letter = (k as u8).is_ascii_uppercase();
         let sel = c.decrypt.selected;
 
         if sel == -1 {
@@ -346,25 +331,21 @@ impl Sim {
 
     /// decrypt_reveal_random_letter: a random letter that appears and is not guessed gets its true guess.
     fn decrypt_reveal(&mut self, id: usize, c: &mut Computer) {
-        let mut tries = REVEAL_TRIES;
         let mut p = rand::random_range(0..26) as usize;
-        let e = loop {
-            let e = c.decrypt.cipher[p].rem_euclid(26) as usize;
+
+        for _ in 0..10_000 {
+            let e = index(c.decrypt.cipher[p]);
 
             if c.decrypt.counts[e] != 0 && c.decrypt.guesses[e] == -1 {
-                break e;
+                break;
             }
 
             p = rand::random_range(0..26) as usize;
-            tries -= 1;
+        }
 
-            if tries == 0 {
-                break c.decrypt.cipher[p].rem_euclid(26) as usize;
-            }
-        };
-        c.decrypt.guesses[e] = p as i32;
+        c.decrypt.guesses[index(c.decrypt.cipher[p])] = p as i32;
         self.decrypt_render(id, c);
-        c.lines[STATUS_LINE][0] = 0;
-        self.register_line(id, c, STATUS_LINE as i32);
+        c.lines[1][0] = 0;
+        self.register_line(id, c, 1);
     }
 }
