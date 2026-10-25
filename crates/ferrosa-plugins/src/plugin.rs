@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use ferrosa_sim::{Mode, NoPlugins, Plugins};
+use ferrosa_sim::{Mode, NoPlugins, Plugins, Sim};
 use serde::Deserialize;
 use wasmtime::{
     Store,
@@ -36,6 +36,7 @@ pub(crate) struct WasmPlugin {
     pub(crate) mode: Option<&'static str>,
     pub(crate) programs: Vec<&'static str>,
     pub(crate) running: Mutex<Vec<(usize, ResourceAny)>>,
+    dropping: Mutex<Vec<ResourceAny>>,
     store: Mutex<Store<HostState>>,
     hooks: Hooks,
     stopped: AtomicBool,
@@ -174,7 +175,7 @@ impl WasmPlugin {
         };
 
         let mut plugin =
-            Self { name: leak(name), mode: None, programs: Vec::new(), running: Mutex::new(Vec::new()), store: Mutex::new(store), hooks, stopped: AtomicBool::new(false) };
+            Self { name: leak(name), mode: None, programs: Vec::new(), running: Mutex::new(Vec::new()), dropping: Mutex::new(Vec::new()), store: Mutex::new(store), hooks, stopped: AtomicBool::new(false) };
         plugin.call_hook(plugin.name, None, "init", |h, s| {
             let init = h.init.as_ref()?;
             s.data_mut().registering = true;
@@ -196,6 +197,26 @@ impl WasmPlugin {
         Ok(Some((plugin, registered)))
     }
 
+    pub(crate) fn drop_program(&self, sim: &mut Sim, handle: ResourceAny) {
+        if let Ok(mut dropping) = self.dropping.lock() {
+            dropping.push(handle);
+        }
+
+        if self.store.try_lock().is_ok() {
+            self.call_hook(self.name, Some(SimPtr(sim)), "program.drop", |_, _| Some(Ok(())));
+        }
+    }
+
+    fn free_programs(&self, store: &mut Store<HostState>) {
+        let Ok(mut dropping) = self.dropping.lock() else { return };
+
+        for handle in dropping.drain(..) {
+            if let Err(e) = handle.resource_drop(&mut *store) {
+                eprintln!("[Plugins] {}.program.drop: {e:?}", self.name);
+            }
+        }
+    }
+
     pub(crate) fn call_hook<R>(
         &self,
         who: &str,
@@ -214,6 +235,7 @@ impl WasmPlugin {
 
         store.data_mut().sim = sim;
         store.set_epoch_deadline(10);
+        self.free_programs(&mut store);
 
         let result = f(&self.hooks, &mut store);
         store.data_mut().sim = None;

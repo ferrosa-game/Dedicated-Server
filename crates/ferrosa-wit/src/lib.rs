@@ -104,7 +104,8 @@ pub enum Key {
 
 impl Key {
     /// Reads the code the server sends: a character's own byte, 8 backspace, 10 enter, 16 to 19 the arrows, with
-    /// 0x100 set when ctrl is held. Letters always arrive upper case.
+    /// 0x100 set when ctrl is held. A letter comes as the key was typed, and is given upper case here, as the shell
+    /// and the game's own programs read it.
     pub fn new(code: i32) -> (Self, bool) {
         let key = match code & 0xff {
             8 => Self::Backspace,
@@ -113,7 +114,7 @@ impl Key {
             17 => Self::Down,
             18 => Self::Left,
             19 => Self::Right,
-            c => Self::Char(c as u8 as char),
+            c => Self::Char((c as u8).to_ascii_uppercase() as char),
         };
 
         (key, code & 0x100 != 0)

@@ -1,5 +1,5 @@
 use ferrosa_protocol::clientbound::game::MenuType;
-use ferrosa_sim::{BoneId, DamageCause, PlayerId, PluginHooks, Sim};
+use ferrosa_sim::{BoneId, ComputerMode, DamageCause, PlayerId, PluginHooks, Sim};
 use wasmtime::{Store, component::ResourceAny};
 
 use crate::{
@@ -25,6 +25,16 @@ impl WasmPlugins {
 
             Some((*p, handle))
         })
+    }
+
+    fn drop_running(&self, sim: &mut Sim, item: usize) {
+        let Some((plugin, handle)) = self.running(item) else { return };
+
+        if let Ok(mut running) = plugin.running.lock() {
+            running.retain(|(at, _)| *at != item);
+        }
+
+        plugin.drop_program(sim, handle);
     }
 
     fn owner(&self, program: &str) -> Option<&'static WasmPlugin> {
@@ -104,6 +114,9 @@ impl PluginHooks for WasmPlugins {
 
     fn on_computer_run(&self, sim: &mut Sim, item: usize, program: &str, args: &str) -> bool {
         let Some(plugin) = self.owner(program) else { return false };
+
+        self.drop_running(sim, item);
+
         let started = plugin.call_hook(plugin.name, Some(SimPtr(&mut *sim)), "program.start", |h, s| {
             let programs = h.programs.as_ref()?;
 
@@ -112,6 +125,12 @@ impl PluginHooks for WasmPlugins {
 
         match started.flatten() {
             Some(handle) => {
+                if sim.computer_mode(item) != Some(ComputerMode::Plugin) {
+                    plugin.drop_program(sim, handle);
+
+                    return true;
+                }
+
                 if let Ok(mut running) = plugin.running.lock() {
                     running.push((item, handle));
                 }
@@ -145,13 +164,7 @@ impl PluginHooks for WasmPlugins {
     }
 
     fn on_computer_exit(&self, sim: &mut Sim, item: usize) {
-        let Some((plugin, handle)) = self.running(item) else { return };
-
-        if let Ok(mut running) = plugin.running.lock() {
-            running.retain(|(at, _)| *at != item);
-        }
-
-        plugin.call_hook(plugin.name, Some(SimPtr(&mut *sim)), "program.drop", |_, s| Some(handle.resource_drop(s)));
+        self.drop_running(sim, item);
     }
 
     fn on_damage(&self, sim: &mut Sim, human: usize, cause: DamageCause, bone: Option<BoneId>, damage: i32) -> i32 {

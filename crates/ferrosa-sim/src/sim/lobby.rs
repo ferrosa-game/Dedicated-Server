@@ -4,15 +4,8 @@ use ferrosa_protocol::clientbound::game::{ItemKind, MenuType, VehicleKind};
 use super::{Sim, corporations::team_index};
 use crate::{PlayerId, items, items::state::ItemState};
 
-/// reset_game sets the clock to 11:00 outside world mode.
 const CLOCK_START: i32 = 2376000;
-/// The sun's roll: a quarter turn's worth of 256 steps, from a sixteenth of a turn up, and a half turn's tilt.
-const SUN_STEP: f64 = 1.0 / 256.0;
-const SUN_SPAN: f64 = 0.25;
-const SUN_BASE: i32 = 64;
 
-/// One item kept from a player's last round: its type and two values (a gun's
-/// loaded magazine and rounds, an item's uses, a key's vehicle type and colour, cash bills and codes).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SavedItem {
     pub kind: i32,
@@ -21,8 +14,8 @@ pub struct SavedItem {
 }
 
 impl Sim {
-    /// The corporation player counts of logic_simulation: active players on a corporation team with a human (or
-    /// without, where the rules count them).
+    /// count_corp_players: Reset the player count on each corp struct,
+    /// goverened by `rules.count_humanless_members`, works on all coprs
     pub(crate) fn count_corp_players(&mut self) {
         for c in &mut self.corp_state {
             c.player_count = 0;
@@ -39,7 +32,7 @@ impl Sim {
         }
     }
 
-    /// server_main's check before each pass of its loop: when people come to an empty server the game is reset.
+    /// check_occupied: Check if the game has players
     pub(crate) fn check_occupied(&mut self) {
         let occupied = self.players.iter().any(|(_, p)| !p.is_bot);
 
@@ -50,18 +43,15 @@ impl Sim {
         self.occupied = occupied;
     }
 
-    /// reset_game's weather outside world mode, rolled before the reseed: a sun angle (the first roll is thrown away),
-    /// the clock at 11:00 and an axial tilt.
     pub(crate) fn roll_weather(&mut self) {
-        let angle = (((rand::random_range(0..256) as i32 + SUN_BASE) as f64 * std::f64::consts::PI) * SUN_SPAN * SUN_STEP) as f32;
-        let tilt = ((rand::random_range(0..256) as f64 * std::f64::consts::PI) * SUN_STEP) as f32;
+        let angle = (((rand::random_range(0..256) as i32 + 64) as f64 * std::f64::consts::PI) * 0.25 * (1.0 / 256.0)) as f32;
+        let tilt = ((rand::random_range(0..256) as f64 * std::f64::consts::PI) * (1.0 / 256.0)) as f32;
 
         self.world_time = CLOCK_START;
         self.world.set_sun(angle, tilt);
     }
 
-    /// The lobby part of reset_game outside world mode: every player back in the lobby without a human, the world
-    /// emptied and the round counted.
+    /// Reset players humans, items bought, and clear the world
     pub(crate) fn reset_lobby_players_and_world(&mut self) {
         for (_, player) in self.players.iter_mut() {
             player.items_bought = 0;
@@ -76,11 +66,11 @@ impl Sim {
         self.round_number += 1;
     }
 
-    /// The world part of reset_game: every body, human, vehicle, item, bullet and traffic car gone (and with the
-    /// vehicles, the bases' car spaces free), the event list started over and each connection's object and event state
-    /// with it.
+    /// clear_world: Close all programs, reset bodies humans items, just clean up.
     pub(crate) fn clear_world(&mut self) {
         let gravity = self.bodies.gravity_scale;
+
+        self.drop_all_programs();
 
         self.bodies = ferrosa_physics::RigidBodies::default();
         self.bodies.gravity_scale = gravity;
@@ -102,7 +92,7 @@ impl Sim {
         }
     }
 
-    /// save_inventory: what the player's human holds, kept for their next human.
+    /// save_inventory: given a PID, save their inventory for when we will use it next
     pub(crate) fn save_inventory(&mut self, pid: PlayerId) {
         let Some(player) = self.players.get_mut(pid.idx()) else { return };
         player.saved_inventory = Default::default();
@@ -158,8 +148,7 @@ impl Sim {
         }
     }
 
-    /// init_player_inventory: the player's kept items back on their new human (a gun with its magazine in, a key with
-    /// its vehicle respawned in the base).
+    /// init_player_inventory: Initialize a player inventory with their saved items
     pub(crate) fn init_player_inventory(&mut self, pid: PlayerId) {
         let Some(p) = self.players.get(pid.idx()) else { return };
         let Some(human) = p.human else { return };
@@ -228,7 +217,6 @@ impl Sim {
         }
     }
 
-    /// corporation_spawn_vehicle: a vehicle in the first free car space of the corporation's base.
     pub(crate) fn corporation_spawn_vehicle(&mut self, kind: VehicleKind, k: usize, color: i32) -> Option<usize> {
         let spaces = self.world.map.level.bases.get(k)?.car_spaces.clone();
         let taken = &mut self.corp_state[k].car_space_taken;
@@ -241,8 +229,6 @@ impl Sim {
         self.spawn_vehicle(kind, color, pos, rot)
     }
 
-    /// The base menus of every mode but world, for a human in no shop or bank: a corporation member inside their base
-    /// gets the weapons page when no menu is open, where the rules give bases buy menus; anywhere else the menu closes.
     pub(crate) fn base_buy_menu(&mut self, pid: PlayerId, outside: Option<glam::Vec3>) {
         let Some(pos) = outside else { return };
         let at_base = self.rules.corp_buy_menus

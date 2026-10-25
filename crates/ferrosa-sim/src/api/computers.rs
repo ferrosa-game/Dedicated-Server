@@ -192,6 +192,12 @@ impl Sim {
         }
     }
 
+    pub(crate) fn drop_all_programs(&mut self) {
+        for item in self.computer_items() {
+            self.drop_program(item);
+        }
+    }
+
     pub fn new_volume(&mut self, capacity: i32) -> Option<i32> {
         let volume = self.fs.alloc_volume(capacity);
 
