@@ -221,7 +221,8 @@ impl Sim {
             .find(|&k| k != id && self.is_phone(k) && self.items.get(k).and_then(|i| i.state.phone()).is_some_and(|q| q.number == number));
 
         let Some(o) = target else { return };
-        let busy = self.items.get(o).unwrap().state.phone().unwrap().connected.is_some();
+        let q = self.items.get(o).unwrap().state.phone().unwrap();
+        let busy = q.connected.is_some() || q.status == PhoneStatus::Ringing;
         let own_number = self.items.get(id).unwrap().state.phone().unwrap().number;
         let p = self.items.get_mut(id).unwrap().state.phone_mut().unwrap();
 
@@ -247,24 +248,25 @@ impl Sim {
     fn answer(&mut self, id: usize) {
         let own_number = self.items.get(id).unwrap().state.phone().unwrap().number;
 
-        for k in self.items.ids() {
-            if k == id || !self.is_phone(k) || self.items.get(k).unwrap().state.phone().unwrap().connected != Some(id) {
-                continue;
-            }
+        let caller = self
+            .items
+            .ids()
+            .into_iter()
+            .find(|&k| k != id && self.is_phone(k) && self.items.get(k).unwrap().state.phone().unwrap().connected == Some(id));
 
-            let caller_number = self.items.get(k).unwrap().state.phone().unwrap().number;
-            let p = self.items.get_mut(id).unwrap().state.phone_mut().unwrap();
+        let Some(k) = caller else { return };
+        let caller_number = self.items.get(k).unwrap().state.phone().unwrap().number;
+        let p = self.items.get_mut(id).unwrap().state.phone_mut().unwrap();
 
-            p.status = PhoneStatus::Connected;
-            p.connected = Some(k);
-            p.display_number = caller_number;
+        p.status = PhoneStatus::Connected;
+        p.connected = Some(k);
+        p.display_number = caller_number;
 
-            let q = self.items.get_mut(k).unwrap().state.phone_mut().unwrap();
-            q.status = PhoneStatus::Connected;
-            q.display_number = own_number;
+        let q = self.items.get_mut(k).unwrap().state.phone_mut().unwrap();
+        q.status = PhoneStatus::Connected;
+        q.display_number = own_number;
 
-            self.phone_update(id);
-            self.phone_update(k);
-        }
+        self.phone_update(id);
+        self.phone_update(k);
     }
 }
