@@ -38,6 +38,13 @@ impl Sim {
 
             if kind == ItemKind::Computer {
                 self.with_computer(id, |sim, c| sim.logic_computer(id, c));
+                self.start_named_program(id);
+
+                if self.computer_program(id).is_some() {
+                    let plugins = self.plugins;
+
+                    plugins.on_computer_tick(self, id);
+                }
             }
 
             match kind {

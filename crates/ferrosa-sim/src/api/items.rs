@@ -41,6 +41,28 @@ impl Sim {
         usize::try_from(self.items.get(item)?.parent_human).ok().filter(|&h| self.humans.get(h).is_some())
     }
 
+    pub fn item_volume(&self, item: usize) -> Option<i32> {
+        let volume = self.items.get(item)?.volume;
+
+        self.fs.volume(volume).map(|_| volume)
+    }
+
+    pub fn set_item_volume(&mut self, item: usize, volume: i32) -> bool {
+        if self.fs.volume(volume).is_none() {
+            return false;
+        }
+
+        let Some(i) = self.items.get_mut(item) else { return false };
+
+        if i.item_type != ItemKind::Computer && !i.item_type.is_disk() {
+            return false;
+        }
+
+        i.volume = volume;
+
+        true
+    }
+
     pub fn item_children(&self, item: usize) -> Vec<usize> {
         self.items.get(item).map_or_else(Vec::new, |i| i.children.clone())
     }

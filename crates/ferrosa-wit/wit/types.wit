@@ -318,6 +318,13 @@ interface types {
         cash: func() -> option<cash>;
         /// False if it isn't cash.
         set-cash: func(cash: cash) -> bool;
+        /// The computer inside it; none if it isn't a computer.
+        computer: func() -> option<computer>;
+        /// The volume a disk holds; none if it isn't a disk.
+        volume: func() -> option<volume>;
+        /// Gives a disk or a computer the volume it reads, as server.new-volume makes them; false for any other
+        /// item. A computer spawned outside a building has none until it is given one.
+        set-volume: func(volume: borrow<volume>) -> bool;
         /// Takes it out of the world; an item of a set goes back where the set keeps it.
         delete: func();
     }
@@ -452,5 +459,109 @@ interface types {
         coop,
         versus,
         none,
+    }
+
+    /// What a computer is running.
+    enum computer-mode {
+        shell,
+        decrypt,
+        mission,
+        /// A plugin's own program.
+        plugin,
+    }
+
+    /// The sixteen colours a computer screen draws in: the PC text palette, in its own order, which is also the
+    /// number each one has in a line's colours.
+    enum screen-shade {
+        black,
+        blue,
+        green,
+        cyan,
+        red,
+        magenta,
+        brown,
+        light-grey,
+        dark-grey,
+        bright-blue,
+        bright-green,
+        bright-cyan,
+        bright-red,
+        bright-magenta,
+        yellow,
+        white,
+    }
+
+    /// A character's colours on a computer screen.
+    record screen-colour {
+        foreground: screen-shade,
+        background: screen-shade,
+    }
+
+    /// The screen and shell inside a computer item. Every call reads or changes the real computer; once the item is
+    /// gone, or is not a computer, it reads as a blank screen and changes do nothing.
+    resource computer {
+        /// The item it belongs to.
+        item: func() -> item-id;
+        /// False once the item has been removed, or is no longer a computer.
+        exists: func() -> bool;
+        /// The player typing on it: whoever holds it. None for one lying in the world.
+        holder: func() -> option<player>;
+        /// The corporation whose base it is in; none outside a base.
+        team: func() -> option<team>;
+        mode: func() -> computer-mode;
+        /// The plugin program it is running; none in any other mode.
+        program: func() -> option<string>;
+
+        /// A line of output on the current line, which then scrolls as the shell's own does. Past 62 characters is
+        /// cut.
+        print: func(text: string);
+        /// Writes `text` across line `line` in `colour`, the rest of the line spaces: for a program drawing a whole
+        /// screen. The screen keeps 24 lines but only ever draws the first 23, so line 23 is never seen, and
+        /// nothing past it is written at all.
+        write-line: func(line: u32, text: string, colour: screen-colour);
+        /// The same across the first `width` columns only, as the game's own list screens highlight a row. The
+        /// line ends at `width`, so nothing is drawn past it; 62 columns is the whole line.
+        write-field: func(line: u32, text: string, width: u32, colour: screen-colour);
+        /// Writes `text` on line `line` with its own colour for each character, for a program drawing a picture
+        /// rather than a row of text: `colours` covers as many columns as it has, and a column past the end of
+        /// `text` is a space.
+        write-cells: func(line: u32, text: string, colours: list<screen-colour>);
+        /// What line `line` holds.
+        read-line: func(line: u32) -> option<string>;
+        /// The 24 lines a program draws on blanked.
+        clear: func();
+        /// The cursor's line (0 to 22, as far as the screen is drawn) and column (0 to 62); none hides it, as a
+        /// program does.
+        set-cursor: func(at: option<tuple<u32, u32>>);
+        /// Ends the program running on it, giving the shell back. A program can end itself this way from its tick
+        /// as well as by refusing a key.
+        exit: func();
+
+        /// The volume a drive reads: 0 the disk in it, 2 its own. None for a drive that isn't ready.
+        drive-volume: func(drive: u32) -> option<volume>;
+    }
+
+    /// A file system volume: a disk's, or a computer's own.
+    resource volume {
+        id: func() -> u32;
+        /// How much it holds: a disk 360, a computer 10000.
+        capacity: func() -> s32;
+        /// Every file on it. Files are never taken away, so a file keeps its place for as long as the volume lives.
+        files: func() -> list<file>;
+        /// A new file holding `text`; none once the volume holds 256 files, or the 8192 file contents are all
+        /// taken. Directories are only ever read, never made, so it goes in the root.
+        add-file: func(name: string, text: string) -> option<file>;
+    }
+
+    resource file {
+        /// Cut to 15 characters, as the shell stores it.
+        name: func() -> string;
+        /// Its text, enciphered or not: a plugin reads through the cipher.
+        text: func() -> string;
+        set-text: func(text: string);
+        /// Whether DECRYPT must be run on it to read it in game.
+        encrypted: func() -> bool;
+        /// Enciphers it with a fresh cipher, or leaves it plain.
+        set-encrypted: func(encrypted: bool);
     }
 }

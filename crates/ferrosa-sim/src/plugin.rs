@@ -36,6 +36,22 @@ pub trait PluginHooks: Sync {
     fn on_damage(&self, _sim: &mut Sim, _human: usize, _cause: DamageCause, _bone: Option<BoneId>, damage: i32) -> i32 {
         damage
     }
+
+    fn programs(&self) -> &[&'static str] {
+        &[]
+    }
+
+    fn on_computer_run(&self, _sim: &mut Sim, _item: usize, _program: &str, _args: &str) -> bool {
+        false
+    }
+
+    fn on_computer_key(&self, _sim: &mut Sim, _item: usize, _key: i32) -> bool {
+        false
+    }
+
+    fn on_computer_tick(&self, _sim: &mut Sim, _item: usize) {}
+
+    fn on_computer_exit(&self, _sim: &mut Sim, _item: usize) {}
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

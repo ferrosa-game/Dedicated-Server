@@ -27,4 +27,5 @@ world plugin {
     export on-death;
     export on-damage;
     export on-admin-select;
+    export programs;
 }

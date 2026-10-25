@@ -207,6 +207,7 @@ impl Sim {
             self.world_paper_deleted();
         }
 
+        self.drop_program(id);
         self.free_item_links(id);
 
         let parent = self.items.get(id).map_or(-1, |i| i.parent_human);

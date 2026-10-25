@@ -3,19 +3,15 @@ pub mod fs;
 pub mod links;
 pub mod mission;
 pub mod shell;
-pub mod snake;
 
 pub const LINES: usize = 32;
 pub const COLUMNS: usize = 64;
-/// The 24 lines a program draws on.
 pub const SCREEN_LINES: usize = 24;
 pub const WHITE: u8 = 0xf;
-/// The drives: A is the disk in the computer, C the computer's own volume; B is never ready.
 pub const DRIVE_A: i32 = 0;
 pub const DRIVE_C: i32 = 2;
 pub const DRIVES: usize = 3;
 
-/// What the computer is running.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[repr(i32)]
 pub enum Mode {
@@ -23,10 +19,9 @@ pub enum Mode {
     Shell = 0,
     Decrypt = 1,
     Mission = 2,
-    Snake = 3,
+    Plugin = 4,
 }
 
-/// A drive's current directory: the path from the root (entry 0 being the root).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DirStack {
     pub depth: i32,
@@ -39,9 +34,6 @@ impl DirStack {
     }
 }
 
-/// DIR or COPY running in the background: which (1 DIR, 0 COPY), ticks to the next step, the drive and directory,
-/// how far DIR has listed (directories, then files), the file COPY makes (name and content) and the keys typed
-/// meanwhile (64 kept).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DiskOp {
     pub kind: i32,
@@ -58,13 +50,11 @@ pub struct DiskOp {
 pub const DISK_OP_COPY: i32 = 0;
 pub const DISK_OP_DIR: i32 = 1;
 
-/// A computer's screen and shell (the computer fields of an item record). The screen is a ring of 32 lines of 63
-/// characters and colours; `top_line` is the first one shown and `current_line` the one being typed on.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Computer {
     pub current_line: i32,
     pub top_line: i32,
-    /// The cursor's line * 64 + column, -1 hidden.
+    /// line * 64 + column
     pub cursor: i32,
     pub lines: [[u8; COLUMNS]; LINES],
     pub colors: [[u8; COLUMNS]; LINES],
@@ -73,11 +63,11 @@ pub struct Computer {
     pub drive: i32,
     pub dirs: [DirStack; DRIVES],
     pub op: DiskOp,
-    /// The corporation whose base the computer is in, -1 for none.
     pub team: i32,
     pub mode: Mode,
+    pub program: String,
+    pub args: String,
     pub decrypt: decrypt::Decrypter,
-    pub snake: snake::Snake,
     pub mission: mission::MissionScreen,
 }
 
@@ -96,19 +86,18 @@ impl Default for Computer {
             op: DiskOp::default(),
             team: 0,
             mode: Mode::Shell,
+            program: String::new(),
+            args: String::new(),
             decrypt: decrypt::Decrypter::default(),
-            snake: snake::Snake::default(),
             mission: mission::MissionScreen::default(),
         }
     }
 }
 
-/// strlen within a line.
 pub fn text_len(s: &[u8]) -> usize {
     s.iter().position(|&c| c == 0).unwrap_or(s.len())
 }
 
-/// strcpy into a line, cut at its end.
 pub fn put_text(line: &mut [u8; COLUMNS], s: &[u8]) {
     let n = s.len().min(COLUMNS - 1);
     line[..n].copy_from_slice(&s[..n]);
@@ -120,7 +109,6 @@ impl Computer {
         &mut self.lines[self.current_line as usize & (LINES - 1)]
     }
 
-    /// Writes `text` across the first 62 columns of line `l`, the rest spaces, in `color`, ended at column 62.
     pub(crate) fn banner(&mut self, l: usize, text: &[u8], color: u8) {
         let n = text_len(text);
 

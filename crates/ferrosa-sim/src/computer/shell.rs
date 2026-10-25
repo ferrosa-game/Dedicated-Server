@@ -1,18 +1,15 @@
 use super::{COLUMNS, Computer, DISK_OP_COPY, DISK_OP_DIR, DRIVE_A, DRIVE_C, LINES, Mode, WHITE, fs, put_text, text_len};
 use crate::{items::state::ItemState, sim::Sim};
 
-/// The last column the shell reads and types into.
 const LAST: i32 = 61;
 const INPUT_LEN: usize = 62;
 const KEY_ENTER: u8 = 10;
 const KEY_BACKSPACE: i32 = 8;
 const MAX_KEPT_KEYS: usize = 64;
-/// DIR prints an entry every 4 ticks; COPY takes 256.
 const DIR_STEP: i32 = 4;
 const COPY_TICKS: i32 = 256;
 const MAX_NAME: usize = 12;
 const MAX_PATH_DEPTH: usize = 8;
-/// The rows below the two the computer starts with.
 const BOOT_LINES: std::ops::Range<i32> = 2..24;
 
 fn is_alpha(c: u8) -> bool {
@@ -27,8 +24,6 @@ fn at(s: &[u8], k: i32) -> u8 {
     usize::try_from(k).ok().and_then(|k| s.get(k)).copied().unwrap_or(0)
 }
 
-/// computer_parse_token / computer_parse_filename_token: past anything else, a run of letters and digits (and dots
-/// for a file name). Returns the token, empty when there is none.
 pub fn parse_token(s: &[u8], pos: &mut i32, dots: bool) -> Vec<u8> {
     if *pos > LAST {
         return Vec::new();
@@ -78,7 +73,6 @@ pub fn parse_token(s: &[u8], pos: &mut i32, dots: bool) -> Vec<u8> {
     }
 }
 
-/// computer_parse_symbol_token: past spaces, the next one or two characters when they are not a letter or digit.
 pub fn parse_symbol(s: &[u8], pos: &mut i32) -> Option<Vec<u8>> {
     if *pos <= LAST && at(s, *pos) == b' ' {
         loop {
@@ -109,7 +103,6 @@ pub fn parse_symbol(s: &[u8], pos: &mut i32) -> Option<Vec<u8>> {
 }
 
 impl Sim {
-    /// Runs `f` on item `id`'s computer, taken out of the item meanwhile.
     pub(crate) fn with_computer<R>(&mut self, id: usize, f: impl FnOnce(&mut Self, &mut Computer) -> R) -> Option<R> {
         let item = self.items.get_mut(id)?;
         let ItemState::Computer(_) = item.state else { return None };
@@ -125,28 +118,35 @@ impl Sim {
         Some(r)
     }
 
-    /// A key pressed on the computer in a player's hand.
     pub(crate) fn computer_keypress(&mut self, id: usize, key: i32) {
+        let plugins = self.plugins;
+
+        if self.computer_mode(id) == Some(Mode::Plugin) {
+            if !plugins.on_computer_key(self, id, key) {
+                self.exit_program(id);
+            }
+
+            return;
+        }
+
         self.with_computer(id, |sim, c| sim.computer_key(id, c, key));
+        self.start_named_program(id);
     }
 
-    /// The volume a drive reads: C the computer's own, A the disk in it.
     pub(crate) fn drive_volume(&self, id: usize, drive: i32) -> i32 {
         match drive {
-            DRIVE_C => self.items.get(id).map_or(-1, |i| i.volume),
-            DRIVE_A => self.disk_volume(id),
+            2 => self.items.get(id).map_or(-1, |i| i.volume),
+            0 => self.disk_volume(id),
             _ => -1,
         }
     }
 
-    /// computer_get_disk_fs_slot: the volume of the disk in the computer.
     pub(crate) fn disk_volume(&self, id: usize) -> i32 {
         self.items.get(id).and_then(|i| i.children.first()).and_then(|&d| self.items.get(d)).map_or(-1, |d| d.volume)
     }
 
-    /// create_computer: boots into the shell on drive C.
     pub(crate) fn create_computer(&mut self, id: usize) {
-        let mut c = Box::new(Computer { drive: DRIVE_C, team: -1, ..Default::default() });
+        let mut c = Box::new(Computer { drive: 2, team: -1, ..Default::default() });
         put_text(c.line_mut(), b"STARTING CS-DOS...");
         self.commit_line(id, &mut c);
         self.commit_line(id, &mut c);
@@ -165,7 +165,6 @@ impl Sim {
         }
     }
 
-    /// computer_commit_line: the line is done; the screen scrolls when it reaches 10 lines above the top.
     pub(crate) fn commit_line(&mut self, id: usize, c: &mut Computer) {
         let cur = c.current_line as usize & (LINES - 1);
         c.colors[cur][..COLUMNS - 1].fill(WHITE);
@@ -183,16 +182,17 @@ impl Sim {
         }
     }
 
-    /// Writes a message on the current line and commits it.
-    fn say(&mut self, id: usize, c: &mut Computer, text: &[u8]) {
+    pub(crate) fn say(&mut self, id: usize, c: &mut Computer, text: &[u8]) {
         put_text(c.line_mut(), text);
         self.commit_line(id, c);
     }
 
-    /// computer_handle_keypress: a key goes to the running program; the shell keeps it for later while DIR or COPY
-    /// runs, runs the line on enter and redraws the prompt.
     pub(crate) fn computer_key(&mut self, id: usize, c: &mut Computer, key: i32) {
         let mut key = key;
+
+        if c.mode == Mode::Plugin {
+            return;
+        }
 
         if c.mode == Mode::Decrypt {
             c.cursor = -1;
@@ -213,17 +213,6 @@ impl Sim {
             }
 
             if c.mode == Mode::Mission {
-                return;
-            }
-
-            key = KEY_BACKSPACE;
-        }
-
-        if c.mode == Mode::Snake {
-            c.cursor = -1;
-            self.snake_key(id, c, key);
-
-            if c.mode == Mode::Snake {
                 return;
             }
 
@@ -261,8 +250,7 @@ impl Sim {
         self.draw_prompt(id, c);
     }
 
-    /// The prompt (drive and path, then '>') and what has been typed, on the current line.
-    fn draw_prompt(&mut self, id: usize, c: &mut Computer) {
+    pub(crate) fn draw_prompt(&mut self, id: usize, c: &mut Computer) {
         let vol = match c.drive {
             DRIVE_C => self.items.get(id).map_or(-1, |i| i.volume),
             DRIVE_A if self.items.get(id).is_some_and(|i| !i.children.is_empty()) => self.disk_volume(id),
@@ -304,8 +292,6 @@ impl Sim {
         self.register_line(id, c, c.current_line);
     }
 
-    /// computer_resolve_path: walks the path at `pos` (a drive letter, a leading '\', '.' and '..') from the drive's
-    /// current directory. 1 when it ends on a directory, 0 when a name is not one (`pos` left at it), -1 on error.
     fn resolve_path(&self, id: usize, c: &Computer, drive: &mut i32, dir: &mut i32, s: &[u8], pos: &mut i32) -> i32 {
         let (mut r13, mut rbx) = (*pos, *pos);
         let mut ch = at(s, r13);
@@ -425,7 +411,6 @@ impl Sim {
         }
     }
 
-    /// computer_set_current_dir: the drive's path becomes the directory's ancestry (8 deep at most).
     fn set_current_dir(&self, id: usize, c: &mut Computer, drive: i32, dir: i32) {
         let vol = self.drive_volume(id, drive);
 
@@ -459,7 +444,6 @@ impl Sim {
         }
     }
 
-    /// computer_build_path_string: the drive and its current path.
     fn path_string(&self, id: usize, c: &Computer, drive: i32) -> String {
         let vol = match drive {
             DRIVE_C => self.items.get(id).map_or(-1, |i| i.volume),
@@ -485,7 +469,6 @@ impl Sim {
         s
     }
 
-    /// computer_execute_command: the typed line.
     fn execute_command(&mut self, id: usize, c: &mut Computer) {
         let s = c.input;
         let drive = c.drive;
@@ -493,7 +476,7 @@ impl Sim {
         let vol = self.drive_volume(id, drive);
         let token = parse_token(&s, &mut pos, false);
 
-        if drive != DRIVE_A && drive != DRIVE_C && token.len() > 1 {
+        if drive != 0 && drive != 2 && token.len() > 1 {
             return self.say(id, c, b"DRIVE NOT READY");
         }
 
@@ -507,7 +490,7 @@ impl Sim {
             let letter = token.first().copied().unwrap_or(0);
             let d = letter.wrapping_sub(b'A') as i32;
 
-            if !(0..=2).contains(&d) || (d != DRIVE_A && d != DRIVE_C) || self.drive_volume(id, d) == -1 {
+            if !(0..=2).contains(&d) || (d != 0 && d != 2) || self.drive_volume(id, d) == -1 {
                 return self.say(id, c, b"DRIVE NOT READY");
             }
 
@@ -583,12 +566,11 @@ impl Sim {
                 c.decrypt.content = data;
                 self.decrypt_init(id, c);
             }
-            b"SNAKE" | b"SNAKE.EXE" => {
-                c.mode = Mode::Snake;
-                c.cursor = -1;
-                self.snake_init(id, c);
-            }
             _ => {
+                if self.name_program(c, &token, &s, pos) {
+                    return;
+                }
+
                 if s[0] != 0 {
                     self.say(id, c, b"BAD COMMAND OR FILE NAME");
                 }
@@ -596,7 +578,6 @@ impl Sim {
         }
     }
 
-    /// COPY: the named file to the directory given after it, in the background; a small volume takes 3 files.
     fn copy_command(&mut self, id: usize, c: &mut Computer, s: &[u8; COLUMNS], pos: &mut i32, cwd: i32) {
         const NO_PATH: &[u8] = b"THE SYSTEM CANNOT FIND THE PATH SPECIFIED";
         const NO_FILE: &[u8] = b"THE SYSTEM CANNOT FIND THE FILE SPECIFIED";
@@ -654,8 +635,6 @@ impl Sim {
         self.phone_sound(ferrosa_protocol::clientbound::game::events::sound::Sound::Floppy, id, 1.0);
     }
 
-    /// computer_run_disk_operation: the next step of DIR, or the end of COPY; when done the shell takes the keys
-    /// typed meanwhile.
     fn run_disk_operation(&mut self, id: usize, c: &mut Computer) {
         if c.op.kind == DISK_OP_COPY {
             let vol = self.drive_volume(id, c.op.drive);
@@ -710,6 +689,17 @@ impl Sim {
 
                     c.op.next_file += 1;
                 }
+
+                let listed = (c.op.next_file as usize).saturating_sub(v.files.len());
+                let program = (c.op.dir == 0 && c.op.drive == DRIVE_C).then(|| self.plugins.programs().get(listed).copied()).flatten();
+
+                if let Some(name) = program {
+                    self.say(id, c, format!("{name}.EXE").as_bytes());
+                    c.line_mut()[0] = 0;
+                    c.op.next_file += 1;
+                    c.op.timer = DIR_STEP;
+                    return;
+                }
             }
             None => self.say(id, c, b"DISK ERROR"),
         }
@@ -724,7 +714,6 @@ impl Sim {
         self.replay_keys(id, c);
     }
 
-    /// The keys typed while DIR or COPY ran, or a backspace to redraw the prompt.
     fn replay_keys(&mut self, id: usize, c: &mut Computer) {
         let keys = std::mem::take(&mut c.op.keys);
 
@@ -739,7 +728,6 @@ impl Sim {
         c.op.keys.clear();
     }
 
-    /// logic_computer: the background disk work, the decrypter's reveal timer and the running program's tick.
     pub(crate) fn logic_computer(&mut self, id: usize, c: &mut Computer) {
         if c.mode == Mode::Shell && c.op.timer > 0 {
             c.op.timer -= 1;
@@ -755,10 +743,6 @@ impl Sim {
 
         if c.mode == Mode::Mission {
             self.mission_tick(id, c);
-        }
-
-        if c.mode == Mode::Snake {
-            self.snake_tick(id, c);
         }
     }
 }

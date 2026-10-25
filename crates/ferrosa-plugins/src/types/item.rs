@@ -1,6 +1,6 @@
 use wasmtime::component::Resource;
 
-use super::{BodyRef, HumanRef, VehicleRef};
+use super::{BodyRef, ComputerRef, HumanRef, VehicleRef, VolumeRef};
 use crate::{
     bindings::ferrosa::plugin::types::{self, Cash, Vec3},
     host::HostState,
@@ -64,6 +64,30 @@ impl types::HostItem for HostState {
         let id = self.table.get(&item)?.0;
         let Some(h) = self.sim()?.item_holder(id) else { return Ok(None) };
         self.human_handle(h).map(Some)
+    }
+
+    fn set_volume(&mut self, item: Resource<ItemRef>, volume: Resource<VolumeRef>) -> wasmtime::Result<bool> {
+        let id = self.table.get(&item)?.0;
+        let volume = self.table.get(&volume)?.0;
+
+        Ok(self.sim_mut()?.set_item_volume(id, volume))
+    }
+
+    fn computer(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<Option<Resource<ComputerRef>>> {
+        let id = self.table.get(&item)?.0;
+
+        if !self.sim()?.is_computer(id) {
+            return Ok(None);
+        }
+
+        self.computer_handle(id).map(Some)
+    }
+
+    fn volume(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<Option<Resource<VolumeRef>>> {
+        let id = self.table.get(&item)?.0;
+        let Some(volume) = self.sim()?.item_volume(id) else { return Ok(None) };
+
+        self.volume_handle(volume).map(Some)
     }
 
     fn children(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<Vec<Resource<ItemRef>>> {

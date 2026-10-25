@@ -1,12 +1,17 @@
 package ferrosa:plugin@0.1.0;
 
 interface server {
-    use types.{body, body-id, chat-type, client-mode, corporation, game-state, human, human-id, intersection, item, item-id, mat3, player, player-id, team, vec3, vehicle, vehicle-id};
+    use types.{body, body-id, chat-type, client-mode, computer, corporation, game-state, human, human-id, intersection, item, item-id, mat3, player, player-id, team, vec3, vehicle, vehicle-id, volume};
 
     /// Makes this plugin a game mode, named for config.toml's gamemode and /resetgame. Only from init, and only once: a
     /// plugin that registers a mode is that mode, and only its mode hooks are called. `map` is the map it plays; none
     /// keeps config.toml's.
     register-mode: func(name: string, aliases: list<string>, client-mode: client-mode, %map: option<string>);
+
+    /// Makes `name` a program players can run at any computer's shell, as MISSION.EXE is: typing it calls this
+    /// plugin's program.start. Only from init, and matched without case. A name a built-in command already has, or
+    /// one of a single character (which the shell reads as a drive), is refused with a note on the server console.
+    register-program: func(name: string);
 
     /// A message to everyone. Long messages and line breaks become several chat lines of up to 63 characters.
     announce: func(message: string);
@@ -63,6 +68,14 @@ interface server {
     intersections: func() -> list<intersection>;
     /// The height of the ground under `pos`, looking from 8 above it to 256 below.
     ground-below: func(pos: vec3) -> option<f32>;
+
+    /// Every computer in the world.
+    computers: func() -> list<computer>;
+    /// The computer in item `item`; none if it isn't a computer.
+    get-computer: func(item: item-id) -> option<computer>;
+    /// A new empty volume holding `capacity`, as a disk (360) or a computer (10000) has; none once all 1024 are
+    /// taken. Nothing reads it until it is given to a disk.
+    new-volume: func(capacity: s32) -> option<volume>;
 
     /// Every bullet in flight gone.
     clear-bullets: func();

@@ -84,6 +84,8 @@ impl Sim {
         self.mode.reset(self);
 
         let plugins = self.plugins;
+
+        self.exit_all_programs();
         plugins.reset(self);
 
         self.traffic.coop = self.rules.coop_traffic;

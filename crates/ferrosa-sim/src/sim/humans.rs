@@ -138,12 +138,11 @@ impl Sim {
         }
     }
 
-    /// A fall or crash's damage once plugins have had their say: off the vitality, or off the leg's health for a fall
-    /// on a thigh. A run-over that kills thuds and scores the driver.
     fn deal_crush(&mut self, human: usize, cause: DamageCause, bone: BoneId, damage: i32) {
         let plugins = self.plugins;
         let damage = plugins.on_damage(self, human, cause, Some(bone), damage);
         let Some(h) = self.humans.get_mut(human) else { return };
+        let landed = h.pos;
 
         match (cause, bone) {
             (DamageCause::Fall, BoneId::ThighLeft) => h.health.left_leg -= damage,
@@ -165,6 +164,12 @@ impl Sim {
                     }
                 }
             }
+        }
+
+        if cause == DamageCause::Fall && damage > 0 {
+            let e = EventSound { sound_type: Sound::BodyHit, pos: landed, volume: 1.0, pitch: 0.5 };
+
+            self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Sound(e) });
         }
     }
 
@@ -208,8 +213,6 @@ impl Sim {
         }
     }
 
-    /// delete_human: the human's items dropped, its player left without one (an update_player event standing in for the
-    /// binary's per-player update counter), and its bonds and bodies removed.
     pub(crate) fn delete_human(&mut self, id: usize) {
         let Some(mut human) = self.humans.remove(id) else { return };
         let mut touch = touchables!(self, occupied_seats(&self.humans));
@@ -269,8 +272,6 @@ impl Sim {
             .collect()
     }
 
-    /// The own-human block of each player's game packet (written by server_send while the player has a human), with
-    /// its inventory display.
     pub(crate) fn own_human_data(&self) -> std::collections::HashMap<usize, (OwnHumanData, [Vec<i32>; 7])> {
         self.players
             .iter()
@@ -342,17 +343,14 @@ impl Sim {
     }
 }
 
-/// The unseated humans after `id`, which human `id` collides with this tick.
 fn later_humans(humans: &ferrosa_physics::Table<Human>, id: usize) -> Vec<crate::human::physics::OtherHuman> {
     humans.iter().filter(|&(k, h)| k > id && h.vehicle.is_none()).map(|(_, h)| crate::human::physics::OtherHuman::of(h)).collect()
 }
 
-/// The (vehicle, seat) pairs humans sit in.
 pub(crate) fn occupied_seats(humans: &ferrosa_physics::Table<Human>) -> Vec<(usize, usize)> {
     humans.iter().filter_map(|(_, h)| h.vehicle.map(|v| (v, h.seat))).collect()
 }
 
-/// The wanted group of human_simulation: 1 for a criminal rating of 1 to 99, 2 from 100, else 0.
 fn wanted_group(crim_rating: i32) -> i32 {
     match crim_rating {
         1..=99 => 1,

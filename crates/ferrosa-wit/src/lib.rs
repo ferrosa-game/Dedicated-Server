@@ -86,6 +86,51 @@ pub fn command(message: &str) -> Option<(&str, Vec<&str>)> {
     Some((words.next()?, words.collect()))
 }
 
+/// The lines of a computer's screen a program can draw on: it keeps 24, but the game only ever draws the first 23,
+/// so anything written on line 23 is never seen.
+pub const SHOWN_LINES: u32 = 23;
+
+/// A key a computer program is given, and whether ctrl was held with it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Key {
+    Char(char),
+    Enter,
+    Backspace,
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+impl Key {
+    /// Reads the code the server sends: a character's own byte, 8 backspace, 10 enter, 16 to 19 the arrows, with
+    /// 0x100 set when ctrl is held. Letters always arrive upper case.
+    pub fn new(code: i32) -> (Self, bool) {
+        let key = match code & 0xff {
+            8 => Self::Backspace,
+            10 => Self::Enter,
+            16 => Self::Up,
+            17 => Self::Down,
+            18 => Self::Left,
+            19 => Self::Right,
+            c => Self::Char(c as u8 as char),
+        };
+
+        (key, code & 0x100 != 0)
+    }
+}
+
+/// A program running on one computer, made by Plugin::program. The server keeps it for as long as it runs, so its
+/// fields are that computer's own state, and drops it once it ends.
+pub trait Program: 'static {
+    /// A key pressed on it; false ends the program and gives the shell back. Ctrl-X is the key the game's own
+    /// programs quit on.
+    fn key(&mut self, computer: &Computer, key: Key, ctrl: bool) -> bool;
+
+    /// Each tick while it runs. A program can end itself here with computer.exit().
+    fn tick(&mut self, _computer: &Computer) {}
+}
+
 /// A plugin. Every hook does nothing unless written. The server makes it once, with Default, and keeps it for as long
 /// as it runs. A plugin that calls server::register_mode in init is that game mode: it only gets hooks while its mode
 /// is the server's, and before the other plugins.
@@ -143,6 +188,14 @@ pub trait Plugin: Default + 'static {
 
     /// /resetgame has named this plugin's mode. Only asked of the mode.
     fn on_admin_select(&mut self) {}
+
+    /// A program this plugin registered with server::register_program, run at `computer`'s shell with the rest of
+    /// the typed line as `args`. None refuses it, and the computer answers BAD COMMAND OR FILE NAME as it does for
+    /// any other unknown command; a program that refuses should draw nothing. The screen is then the program's to
+    /// draw on, but nothing clears it first, so a program paints every line it wants to own.
+    fn program(&mut self, _name: &str, _computer: &Computer, _args: &str) -> Option<Box<dyn Program>> {
+        None
+    }
 }
 
 /// Makes a type implementing Plugin the component's plugin: `ferrosa_wit::plugin!(MyPlugin);`.
@@ -242,6 +295,38 @@ macro_rules! plugin {
         impl $crate::exports::ferrosa::plugin::on_admin_select::Guest for __FerrosaPlugin {
             fn on_admin_select() {
                 __FERROSA.with_borrow_mut(|p| $crate::Plugin::on_admin_select(p))
+            }
+        }
+
+        struct __FerrosaProgram(::std::cell::RefCell<::std::boxed::Box<dyn $crate::Program>>);
+
+        impl $crate::exports::ferrosa::plugin::programs::Guest for __FerrosaPlugin {
+            type Program = __FerrosaProgram;
+        }
+
+        impl $crate::exports::ferrosa::plugin::programs::GuestProgram for __FerrosaProgram {
+            fn start(
+                name: ::std::string::String,
+                computer: $crate::ItemId,
+                args: ::std::string::String,
+            ) -> ::std::option::Option<$crate::exports::ferrosa::plugin::programs::Program> {
+                let at = $crate::server::get_computer(computer)?;
+                let program = __FERROSA.with_borrow_mut(|p| $crate::Plugin::program(p, &name, &at, &args))?;
+
+                ::std::option::Option::Some($crate::exports::ferrosa::plugin::programs::Program::new(__FerrosaProgram(::std::cell::RefCell::new(program))))
+            }
+
+            fn key(&self, computer: $crate::ItemId, key: i32) -> bool {
+                let ::std::option::Option::Some(at) = $crate::server::get_computer(computer) else { return false };
+                let (key, ctrl) = $crate::Key::new(key);
+
+                self.0.borrow_mut().key(&at, key, ctrl)
+            }
+
+            fn tick(&self, computer: $crate::ItemId) {
+                if let ::std::option::Option::Some(at) = $crate::server::get_computer(computer) {
+                    self.0.borrow_mut().tick(&at);
+                }
             }
         }
 

@@ -1,6 +1,6 @@
 use ferrosa_protocol::clientbound::game::MenuType;
 use ferrosa_sim::{BoneId, DamageCause, PlayerId, PluginHooks, Sim};
-use wasmtime::Store;
+use wasmtime::{Store, component::ResourceAny};
 
 use crate::{
     bindings::ferrosa::plugin::types,
@@ -8,14 +8,34 @@ use crate::{
     plugin::{Hooks, WasmPlugin},
 };
 
-pub(crate) struct WasmPlugins(pub(crate) Vec<&'static WasmPlugin>);
+pub(crate) struct WasmPlugins {
+    pub(crate) plugins: Vec<&'static WasmPlugin>,
+    programs: Vec<&'static str>,
+}
 
 impl WasmPlugins {
+    pub(crate) fn new(plugins: Vec<&'static WasmPlugin>, programs: Vec<&'static str>) -> Self {
+        Self { plugins, programs }
+    }
+
+    fn running(&self, item: usize) -> Option<(&'static WasmPlugin, ResourceAny)> {
+        self.plugins.iter().find_map(|p| {
+            let running = p.running.lock().ok()?;
+            let &(_, handle) = running.iter().find(|(at, _)| *at == item)?;
+
+            Some((*p, handle))
+        })
+    }
+
+    fn owner(&self, program: &str) -> Option<&'static WasmPlugin> {
+        self.plugins.iter().copied().find(|p| p.programs.contains(&program))
+    }
+
     fn targets(&self, sim: &Sim) -> Vec<&'static WasmPlugin> {
         let running = sim.mode_name();
-        let mode = self.0.iter().copied().filter(|p| p.mode == Some(running));
+        let mode = self.plugins.iter().copied().filter(|p| p.mode == Some(running));
 
-        mode.chain(self.0.iter().copied().filter(|p| p.mode.is_none())).collect()
+        mode.chain(self.plugins.iter().copied().filter(|p| p.mode.is_none())).collect()
     }
 
     fn all_hooks(&self, sim: &mut Sim, hook: &str, f: impl Fn(&Hooks, &mut Store<HostState>) -> Option<wasmtime::Result<()>>) {
@@ -76,6 +96,62 @@ impl PluginHooks for WasmPlugins {
 
     fn on_death(&self, sim: &mut Sim, pid: PlayerId) {
         self.all_hooks(sim, "on-death", |h, s| h.on_death.as_ref().map(|g| g.call_on_death(s, pid.0)));
+    }
+
+    fn programs(&self) -> &[&'static str] {
+        &self.programs
+    }
+
+    fn on_computer_run(&self, sim: &mut Sim, item: usize, program: &str, args: &str) -> bool {
+        let Some(plugin) = self.owner(program) else { return false };
+        let started = plugin.call_hook(plugin.name, Some(SimPtr(&mut *sim)), "program.start", |h, s| {
+            let programs = h.programs.as_ref()?;
+
+            Some(programs.program().call_start(s, program, item as u32, args))
+        });
+
+        match started.flatten() {
+            Some(handle) => {
+                if let Ok(mut running) = plugin.running.lock() {
+                    running.push((item, handle));
+                }
+
+                true
+            }
+            None => false,
+        }
+    }
+
+    fn on_computer_key(&self, sim: &mut Sim, item: usize, key: i32) -> bool {
+        let Some((plugin, handle)) = self.running(item) else { return false };
+
+        plugin
+            .call_hook(plugin.name, Some(SimPtr(&mut *sim)), "program.key", |h, s| {
+                let programs = h.programs.as_ref()?;
+
+                Some(programs.program().call_key(s, handle, item as u32, key))
+            })
+            .unwrap_or(false)
+    }
+
+    fn on_computer_tick(&self, sim: &mut Sim, item: usize) {
+        let Some((plugin, handle)) = self.running(item) else { return };
+
+        plugin.call_hook(plugin.name, Some(SimPtr(&mut *sim)), "program.tick", |h, s| {
+            let programs = h.programs.as_ref()?;
+
+            Some(programs.program().call_tick(s, handle, item as u32))
+        });
+    }
+
+    fn on_computer_exit(&self, sim: &mut Sim, item: usize) {
+        let Some((plugin, handle)) = self.running(item) else { return };
+
+        if let Ok(mut running) = plugin.running.lock() {
+            running.retain(|(at, _)| *at != item);
+        }
+
+        plugin.call_hook(plugin.name, Some(SimPtr(&mut *sim)), "program.drop", |_, s| Some(handle.resource_drop(s)));
     }
 
     fn on_damage(&self, sim: &mut Sim, human: usize, cause: DamageCause, bone: Option<BoneId>, damage: i32) -> i32 {

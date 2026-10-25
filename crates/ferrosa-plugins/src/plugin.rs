@@ -10,7 +10,7 @@ use ferrosa_sim::{Mode, NoPlugins, Plugins};
 use serde::Deserialize;
 use wasmtime::{
     Store,
-    component::{Component, HasSelf, Instance, InstancePre, Linker},
+    component::{Component, HasSelf, Instance, InstancePre, Linker, ResourceAny},
 };
 
 use crate::{
@@ -29,9 +29,13 @@ struct PluginManifest {
     entry: Option<String>,
 }
 
+const BUILT_IN: [&str; 5] = ["CD", "DIR", "COPY", "MISSION", "DECRYPT"];
+
 pub(crate) struct WasmPlugin {
     pub(crate) name: &'static str,
     pub(crate) mode: Option<&'static str>,
+    pub(crate) programs: Vec<&'static str>,
+    pub(crate) running: Mutex<Vec<(usize, ResourceAny)>>,
     store: Mutex<Store<HostState>>,
     hooks: Hooks,
     stopped: AtomicBool,
@@ -53,7 +57,7 @@ macro_rules! hooks {
     };
 }
 
-hooks!(init, on_start, reset, tick, tick_after_traffic, before_physics, after_physics, menus_done, on_menu, on_chat, on_join, on_leave, on_death, on_damage, on_admin_select);
+hooks!(init, on_start, reset, tick, tick_after_traffic, before_physics, after_physics, menus_done, on_menu, on_chat, on_join, on_leave, on_death, on_damage, on_admin_select, programs);
 
 pub struct LoadedPlugin {
     pub plugins: Plugins,
@@ -76,9 +80,32 @@ pub fn load(dir: &Path) -> LoadedPlugin {
     std::thread::spawn(move || load_from(&dir)).join().unwrap_or_else(|e| std::panic::resume_unwind(e))
 }
 
+fn keep_programs(who: &str, programs: Vec<&'static str>, taken: &mut Vec<&'static str>) -> Vec<&'static str> {
+    programs
+        .into_iter()
+        .filter(|program| {
+            if program.len() < 2 || BUILT_IN.contains(program) {
+                eprintln!("[Plugins] {who}: a computer already answers to {program}");
+                return false;
+            }
+
+            if taken.contains(program) {
+                eprintln!("[Plugins] {who}: another plugin registered the program {program} first");
+                return false;
+            }
+
+            println!("[Plugins] {who} registered the program {program}");
+            taken.push(program);
+
+            true
+        })
+        .collect()
+}
+
 fn load_from(dir: &Path) -> LoadedPlugin {
     let mut plugins = Vec::new();
     let mut modes = Vec::new();
+    let mut taken: Vec<&'static str> = Vec::new();
 
     for folder in folders(dir) {
         let manifest = match std::fs::read_to_string(folder.join("plugin.toml")).map_err(|e| e.to_string()).and_then(|t| toml::from_str::<PluginManifest>(&t).map_err(|e| e.to_string())) {
@@ -101,6 +128,10 @@ fn load_from(dir: &Path) -> LoadedPlugin {
                 continue;
             }
         };
+        let mut plugin = plugin;
+
+        plugin.programs = keep_programs(plugin.name, std::mem::take(&mut plugin.programs), &mut taken);
+
         let plugin: &'static WasmPlugin = Box::leak(Box::new(plugin));
 
         match &manifest.version {
@@ -115,7 +146,7 @@ fn load_from(dir: &Path) -> LoadedPlugin {
         plugins.push(plugin);
     }
 
-    let plugins: Plugins = if plugins.is_empty() { &NoPlugins } else { Box::leak(Box::new(WasmPlugins(plugins))) };
+    let plugins: Plugins = if plugins.is_empty() { &NoPlugins } else { Box::leak(Box::new(WasmPlugins::new(plugins, taken))) };
 
     LoadedPlugin { plugins, modes }
 }
@@ -142,7 +173,8 @@ impl WasmPlugin {
             None => folder.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
         };
 
-        let mut plugin = Self { name: leak(name), mode: None, store: Mutex::new(store), hooks, stopped: AtomicBool::new(false) };
+        let mut plugin =
+            Self { name: leak(name), mode: None, programs: Vec::new(), running: Mutex::new(Vec::new()), store: Mutex::new(store), hooks, stopped: AtomicBool::new(false) };
         plugin.call_hook(plugin.name, None, "init", |h, s| {
             let init = h.init.as_ref()?;
             s.data_mut().registering = true;
@@ -159,6 +191,7 @@ impl WasmPlugin {
 
         let registered = plugin.store.get_mut().unwrap().data_mut().registered.take();
         plugin.mode = registered.as_ref().map(|m| leak(m.name.clone()));
+        plugin.programs = std::mem::take(&mut plugin.store.get_mut().unwrap().data_mut().programs).into_iter().map(|p| leak(p.to_uppercase())).collect();
 
         Ok(Some((plugin, registered)))
     }

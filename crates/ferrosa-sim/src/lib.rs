@@ -19,6 +19,7 @@ pub(crate) mod traffic;
 pub(crate) mod vehicle;
 pub(crate) use ferrosa_world as world;
 
+pub use computer::Mode as ComputerMode;
 pub use gamemode::{MODES, Mode, ModeHooks, ModeSync, find, rules::ModeRules};
 pub use human::{Human, HumanHealth};
 pub use items::Item;

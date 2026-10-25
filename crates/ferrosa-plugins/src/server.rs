@@ -7,7 +7,7 @@ use crate::{
         types::{self, ChatType, ClientMode, Intersection, Mat3, Vec3},
     },
     host::{HostState, RegisteredMode},
-    types::{BodyRef, CorporationRef, HumanRef, ItemRef, PlayerRef, VehicleRef},
+    types::{BodyRef, ComputerRef, CorporationRef, HumanRef, ItemRef, PlayerRef, VehicleRef, VolumeRef},
 };
 use wasmtime::component::Resource;
 
@@ -24,6 +24,37 @@ impl server::Host for HostState {
         println!("[Plugins] Registered new game mode {name}");
         self.registered = Some(RegisteredMode { name, aliases, client_mode: client_mode.into(), map });
         Ok(())
+    }
+
+    fn register_program(&mut self, name: String) -> wasmtime::Result<()> {
+        if !self.registering {
+            bail!("register-program can only be called from init");
+        }
+
+        self.programs.push(name);
+        Ok(())
+    }
+
+    fn computers(&mut self) -> wasmtime::Result<Vec<Resource<ComputerRef>>> {
+        let items = self.sim()?.computer_items();
+
+        items.into_iter().map(|i| self.computer_handle(i)).collect()
+    }
+
+    fn get_computer(&mut self, item: u32) -> wasmtime::Result<Option<Resource<ComputerRef>>> {
+        let item = item as usize;
+
+        if !self.sim()?.is_computer(item) {
+            return Ok(None);
+        }
+
+        self.computer_handle(item).map(Some)
+    }
+
+    fn new_volume(&mut self, capacity: i32) -> wasmtime::Result<Option<Resource<VolumeRef>>> {
+        let Some(volume) = self.sim_mut()?.new_volume(capacity) else { return Ok(None) };
+
+        self.volume_handle(volume).map(Some)
     }
 
     fn announce(&mut self, message: String) -> wasmtime::Result<()> {

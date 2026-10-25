@@ -1,4 +1,5 @@
 mod body;
+mod computer;
 mod convert;
 mod corporation;
 mod human;
@@ -7,6 +8,7 @@ mod player;
 mod vehicle;
 
 pub use body::BodyRef;
+pub use computer::{ComputerRef, FileRef, VolumeRef};
 pub use corporation::CorporationRef;
 pub use human::HumanRef;
 pub use item::ItemRef;

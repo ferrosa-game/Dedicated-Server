@@ -1,4 +1,4 @@
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 use bitflags::bitflags;
 use glam::Vec3;
@@ -72,7 +72,7 @@ pub struct ClientGamePacket {
 impl WireRead for ClientGamePacket {
     fn read(r: &mut Reader) -> Result<Self, crate::codec::CodecError> {
         let round_num = r.u32()?;
-        let gear_x = r.fixed_float()?.clamp(-1.0, 1.0);
+        let gear_x = r.fixed_float()?.clamp(-TAU, TAU);
         let left_right = r.fixed_float()?.clamp(-1.0, 1.0);
         let gear_y = r.fixed_float()?.clamp(-1.0, 1.0);
         let forward_back = r.fixed_float()?.clamp(-1.0, 1.0);

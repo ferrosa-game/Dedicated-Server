@@ -9,6 +9,7 @@ use crate::{
 };
 
 mod chat;
+mod computers;
 mod corporations;
 mod humans;
 mod items;
