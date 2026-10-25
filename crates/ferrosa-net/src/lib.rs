@@ -20,8 +20,6 @@ use crate::{fragment::Reassembler, masterserver::MasterServer};
 pub mod fragment;
 pub mod masterserver;
 
-const RECV_BUFFER: usize = 0x10000;
-
 pub struct ServerListing {
     pub build: u8,
     pub gamemode: GameMode,
@@ -60,7 +58,7 @@ impl Edge {
     }
 
     pub async fn run(mut self) {
-        let mut buf = vec![0u8; RECV_BUFFER];
+        let mut buf = vec![0u8; 65536];
         let mut keepalive = tokio::time::interval(Duration::from_secs(16));
         let mut evict = tokio::time::interval(Duration::from_secs(10));
 
