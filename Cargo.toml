@@ -3,7 +3,7 @@ resolver="3"
 members = ["crates/ferrosa-bin", "crates/ferrosa-map", "crates/ferrosa-net", "crates/ferrosa-physics", "crates/ferrosa-plugins", "crates/ferrosa-protocol", "crates/ferrosa-sim", "crates/ferrosa-wit", "crates/ferrosa-world"]
 
 [workspace.package]
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 authors = ["Infinity Dev"]
 
@@ -12,7 +12,7 @@ inherits = "release"
 debug = true
 
 [workspace.dependencies]
-tokio = { version = "1.54.0", features = ["full"] }
+tokio = { version = "1.54.1", features = ["full"] }
 serde = { version = "1.0.229", features = [ "derive" ] }
 rayon = "1.12.0"
 # THIS IS KEPT OUT OF DATE FOR A REASON

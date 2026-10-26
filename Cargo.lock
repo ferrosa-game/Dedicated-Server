@@ -602,7 +602,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "ferrosa-bin"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "ferrosa-map",
  "ferrosa-net",
@@ -618,7 +618,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-map"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "binrw",
  "glam",
@@ -630,7 +630,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-net"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "ferrosa-protocol",
  "ferrosa-sim",
@@ -639,7 +639,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-physics"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "glam",
  "rayon",
@@ -647,7 +647,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-plugins"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "ferrosa-physics",
  "ferrosa-protocol",
@@ -662,7 +662,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-protocol"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "bitflags",
  "glam",
@@ -672,7 +672,7 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-sim"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "ferrosa-map",
  "ferrosa-physics",
@@ -686,14 +686,14 @@ dependencies = [
 
 [[package]]
 name = "ferrosa-wit"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "wit-bindgen",
 ]
 
 [[package]]
 name = "ferrosa-world"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "ferrosa-map",
  "ferrosa-physics",
@@ -2276,9 +2276,9 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "tokio"
-version = "1.54.0"
+version = "1.54.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0c168a474b95bfecfe908a65d4bdffc523144b649a74c09c286afb35d53e0bc"
+checksum = "b52fd3255258d26fac7264ab5a76b53c13367136dc011d3d6ad4f8ed070396a3"
 dependencies = [
  "bytes",
  "libc",
