@@ -14,6 +14,7 @@ use crate::{
     world::trace::line_intersect_level,
 };
 
+mod buildings;
 mod chat;
 mod computers;
 mod corporations;

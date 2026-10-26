@@ -3,7 +3,7 @@ package ferrosa:plugin@0.1.0;
 /// A plugin's own computer programs. The server makes one when a player runs a program the plugin registered with
 /// server.register-program, and drops it when the program ends, so each running program keeps its own state.
 interface programs {
-    use types.{item-id};
+    use types.{item-id, key};
 
     resource program {
         /// The program `name` starting on the computer in item `computer`, with the rest of the typed line as
@@ -12,9 +12,8 @@ interface programs {
         /// nothing clears it first, so a program paints every line it wants to own.
         start: static func(name: string, computer: item-id, args: string) -> option<program>;
 
-        /// A key pressed on it: a character's own byte, 8 backspace, 10 enter, 16 to 19 the arrows, with 0x100 set
-        /// when ctrl is held. False ends the program and gives the shell back.
-        key: func(computer: item-id, key: s32) -> bool;
+        /// A key pressed on it, and whether ctrl was held with it. False ends the program and gives the shell back.
+        key: func(computer: item-id, key: key, ctrl: bool) -> bool;
 
         /// Each tick while it runs.
         tick: func(computer: item-id);

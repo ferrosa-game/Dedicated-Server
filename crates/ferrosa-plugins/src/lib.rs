@@ -12,6 +12,7 @@ mod bindings {
         imports: { default: trappable },
         with: {
             "ferrosa:plugin/types.body": crate::types::BodyRef,
+            "ferrosa:plugin/types.building": crate::types::BuildingRef,
             "ferrosa:plugin/types.computer": crate::types::ComputerRef,
             "ferrosa:plugin/types.file": crate::types::FileRef,
             "ferrosa:plugin/types.volume": crate::types::VolumeRef,

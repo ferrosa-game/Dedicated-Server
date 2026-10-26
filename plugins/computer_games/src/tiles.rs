@@ -186,10 +186,10 @@ impl Tiles {
 impl Program<ComputerGames> for Tiles {
     fn key(&mut self, _plugin: &mut ComputerGames, computer: &Computer, key: Key, ctrl: bool) -> bool {
         if ctrl {
-            return key != Key::Char('X');
+            return key != Key::Character('X');
         }
 
-        if key == Key::Char('R') {
+        if key == Key::Character('R') {
             *self = Self::new(computer);
             return true;
         }

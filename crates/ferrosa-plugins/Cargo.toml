@@ -8,6 +8,7 @@ authors.workspace = true
 ferrosa-physics.workspace = true
 ferrosa-protocol.workspace = true
 ferrosa-sim.workspace = true
+ferrosa-world.workspace = true
 
 glam.workspace = true
 serde.workspace = true

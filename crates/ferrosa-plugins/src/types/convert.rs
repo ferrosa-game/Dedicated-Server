@@ -2,7 +2,7 @@ use ferrosa_physics::RotMatrix;
 use ferrosa_protocol::{
     GameMode, SuitColor, Team,
     clientbound::game::{
-        GameState, MenuType,
+        GameState, ItemKind, MenuType, VehicleKind,
         events::{chat::ChatType, sound::Sound},
     },
 };
@@ -147,18 +147,27 @@ impl From<ferrosa_sim::Mission> for Mission {
             done: m.done,
             id: m.id,
             kind: m.kind,
-            item: m.item,
-            item2: m.item2,
+            item: id_of(m.item),
+            item2: id_of(m.item2),
             team1: m.team1,
             team2: m.team2,
             disk_type: m.disk_type,
             value: m.value,
             deadline: m.deadline,
-            location: m.location,
+            location: id_of(m.location),
             provided_cash: m.provided_cash,
             rate: m.rate,
         }
     }
+}
+
+/// A mission's item or spot: the binary's -1 for none.
+fn id_of(value: i32) -> Option<u32> {
+    u32::try_from(value).ok()
+}
+
+fn index_of(id: Option<u32>) -> i32 {
+    id.and_then(|v| i32::try_from(v).ok()).unwrap_or(-1)
 }
 
 impl From<Mission> for ferrosa_sim::Mission {
@@ -168,14 +177,14 @@ impl From<Mission> for ferrosa_sim::Mission {
             done: m.done,
             id: m.id,
             kind: m.kind,
-            item: m.item,
-            item2: m.item2,
+            item: index_of(m.item),
+            item2: index_of(m.item2),
             team1: m.team1,
             team2: m.team2,
             disk_type: m.disk_type,
             value: m.value,
             deadline: m.deadline,
-            location: m.location,
+            location: index_of(m.location),
             provided_cash: m.provided_cash,
             rate: m.rate,
             result: None,
@@ -405,3 +414,95 @@ impl From<types::Menu> for MenuType {
         }
     }
 }
+
+/// A kind's number on the wire is its place in the WIT enum, so the two lists must stay in the same order: plugins
+/// pass a kind as that number. These check it at compile time, and the COUNT checks catch a kind added to the
+/// protocol without a name in the WIT.
+const _: () = {
+    const ITEMS: [(types::ItemKind, ItemKind); 46] = [
+        (types::ItemKind::Auto5, ItemKind::Auto5),
+        (types::ItemKind::Ak47, ItemKind::Ak47),
+        (types::ItemKind::Ak47Mag, ItemKind::Ak47Mag),
+        (types::ItemKind::M16, ItemKind::M16),
+        (types::ItemKind::M16Mag, ItemKind::M16Mag),
+        (types::ItemKind::Magnum, ItemKind::Magnum),
+        (types::ItemKind::MagnumMag, ItemKind::MagnumMag),
+        (types::ItemKind::Mp5, ItemKind::Mp5),
+        (types::ItemKind::Mp5Mag, ItemKind::Mp5Mag),
+        (types::ItemKind::Uzi, ItemKind::Uzi),
+        (types::ItemKind::UziMag, ItemKind::UziMag),
+        (types::ItemKind::Pistol, ItemKind::Pistol),
+        (types::ItemKind::PistolMag, ItemKind::PistolMag),
+        (types::ItemKind::Grenade, ItemKind::Grenade),
+        (types::ItemKind::Bandage, ItemKind::Bandage),
+        (types::ItemKind::Briefcase, ItemKind::Briefcase),
+        (types::ItemKind::BriefcaseOpen, ItemKind::BriefcaseOpen),
+        (types::ItemKind::CashRound, ItemKind::CashRound),
+        (types::ItemKind::CashWorld, ItemKind::CashWorld),
+        (types::ItemKind::DiskBlack, ItemKind::DiskBlack),
+        (types::ItemKind::DiskGreen, ItemKind::DiskGreen),
+        (types::ItemKind::DiskBlue, ItemKind::DiskBlue),
+        (types::ItemKind::DiskWhite, ItemKind::DiskWhite),
+        (types::ItemKind::DiskGold, ItemKind::DiskGold),
+        (types::ItemKind::DiskRed, ItemKind::DiskRed),
+        (types::ItemKind::Phone, ItemKind::Phone),
+        (types::ItemKind::Radio, ItemKind::Radio),
+        (types::ItemKind::Key, ItemKind::Key),
+        (types::ItemKind::Door, ItemKind::Door),
+        (types::ItemKind::PaperWorld, ItemKind::PaperWorld),
+        (types::ItemKind::Burger, ItemKind::Burger),
+        (types::ItemKind::Desk, ItemKind::Desk),
+        (types::ItemKind::Lamp, ItemKind::Lamp),
+        (types::ItemKind::PhonePay, ItemKind::PhonePay),
+        (types::ItemKind::Paper, ItemKind::Paper),
+        (types::ItemKind::SoccerBall, ItemKind::SoccerBall),
+        (types::ItemKind::Rope, ItemKind::Rope),
+        (types::ItemKind::Box, ItemKind::Box),
+        (types::ItemKind::BigBox, ItemKind::BigBox),
+        (types::ItemKind::Computer, ItemKind::Computer),
+        (types::ItemKind::Arcade, ItemKind::Arcade),
+        (types::ItemKind::Table, ItemKind::Table),
+        (types::ItemKind::TableTest, ItemKind::TableTest),
+        (types::ItemKind::Wall, ItemKind::Wall),
+        (types::ItemKind::Bottle, ItemKind::Bottle),
+        (types::ItemKind::Watermelon, ItemKind::Watermelon),
+    ];
+
+    const VEHICLES: [(types::VehicleKind, VehicleKind); 18] = [
+        (types::VehicleKind::TownCar, VehicleKind::TownCar),
+        (types::VehicleKind::TownCar2, VehicleKind::TownCar2),
+        (types::VehicleKind::Metro, VehicleKind::Metro),
+        (types::VehicleKind::Limo, VehicleKind::Limo),
+        (types::VehicleKind::Turbo, VehicleKind::Turbo),
+        (types::VehicleKind::TurboS, VehicleKind::TurboS),
+        (types::VehicleKind::Beamer, VehicleKind::Beamer),
+        (types::VehicleKind::Van, VehicleKind::Van),
+        (types::VehicleKind::Van2, VehicleKind::Van2),
+        (types::VehicleKind::Minivan, VehicleKind::Minivan),
+        (types::VehicleKind::Truck, VehicleKind::Truck),
+        (types::VehicleKind::Trailer, VehicleKind::Trailer),
+        (types::VehicleKind::Helicopter, VehicleKind::Helicopter),
+        (types::VehicleKind::Train, VehicleKind::Train),
+        (types::VehicleKind::NoClip, VehicleKind::NoClip),
+        (types::VehicleKind::Hatchback, VehicleKind::Hatchback),
+        (types::VehicleKind::Test, VehicleKind::Test),
+        (types::VehicleKind::Pickup, VehicleKind::Pickup),
+    ];
+
+    assert!(ItemKind::COUNT == ITEMS.len());
+    assert!(VehicleKind::COUNT == VEHICLES.len());
+
+    let mut k = 0;
+
+    while k < ITEMS.len() {
+        assert!(ITEMS[k].0 as u32 == ITEMS[k].1 as u32);
+        k += 1;
+    }
+
+    let mut k = 0;
+
+    while k < VEHICLES.len() {
+        assert!(VEHICLES[k].0 as u32 == VEHICLES[k].1 as u32);
+        k += 1;
+    }
+};

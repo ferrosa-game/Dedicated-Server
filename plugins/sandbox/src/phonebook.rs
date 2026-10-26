@@ -53,7 +53,7 @@ impl PhoneBook {
 
 impl Program<Sandbox> for PhoneBook {
     fn key(&mut self, _plugin: &mut Sandbox, computer: &Computer, key: Key, ctrl: bool) -> bool {
-        if ctrl && key == Key::Char('X') {
+        if ctrl && key == Key::Character('X') {
             return false;
         }
 

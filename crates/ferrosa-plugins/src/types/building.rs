@@ -1,0 +1,124 @@
+use ferrosa_protocol::Team;
+use ferrosa_world::building::{self, ShopEntry};
+use wasmtime::component::Resource;
+
+use crate::{
+    bindings::ferrosa::plugin::types::{self, BuildingKind, Mat3, Vec3},
+    host::HostState,
+};
+
+pub struct BuildingRef(pub(crate) usize);
+
+impl HostState {
+    pub(crate) fn building_handle(&mut self, id: usize) -> wasmtime::Result<Resource<BuildingRef>> {
+        Ok(self.table.push(BuildingRef(id))?)
+    }
+}
+
+fn kind(record: i32) -> BuildingKind {
+    match record {
+        building::CORPORATION_BASE => BuildingKind::CorporationBase,
+        building::CAR_DEALER => BuildingKind::CarDealer,
+        building::LAB => BuildingKind::Lab,
+        building::CLOTHING_STORE => BuildingKind::ClothingStore,
+        building::BANK => BuildingKind::Bank,
+        building::GUN_STORE => BuildingKind::GunStore,
+        building::BURGER_SHOP => BuildingKind::BurgerShop,
+        _ => BuildingKind::Other,
+    }
+}
+
+impl types::HostBuilding for HostState {
+    fn id(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<u32> {
+        Ok(self.table.get(&building)?.0 as u32)
+    }
+
+    fn kind(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<BuildingKind> {
+        let id = self.table.get(&building)?.0;
+        Ok(kind(self.sim()?.building(id).map_or(0, |b| b.kind)))
+    }
+
+    fn interior_min(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Vec3> {
+        let id = self.table.get(&building)?.0;
+        Ok(self.sim()?.building(id).map_or(glam::Vec3::ZERO, |b| b.interior_min).into())
+    }
+
+    fn interior_max(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Vec3> {
+        let id = self.table.get(&building)?.0;
+        Ok(self.sim()?.building(id).map_or(glam::Vec3::ZERO, |b| b.interior_max).into())
+    }
+
+    fn pos(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Vec3> {
+        let id = self.table.get(&building)?.0;
+        Ok(self.sim()?.building(id).map_or(glam::Vec3::ZERO, |b| b.pos).into())
+    }
+
+    fn rot(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Mat3> {
+        let id = self.table.get(&building)?.0;
+        Ok(self.sim()?.building(id).map_or_else(Default::default, |b| b.rot).into())
+    }
+
+    fn team(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Option<types::Team>> {
+        let id = self.table.get(&building)?.0;
+        let team = self.sim()?.building(id).map(|b| b.team).filter(|&t| t >= 0);
+
+        Ok(team.and_then(|t| Team::try_from(t).ok()).map(Into::into))
+    }
+
+    fn lobby(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Vec3> {
+        let id = self.table.get(&building)?.0;
+        Ok(self.sim()?.building(id).map_or(glam::Vec3::ZERO, |b| b.lobby).into())
+    }
+
+    fn spot(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Option<u32>> {
+        let id = self.table.get(&building)?.0;
+        Ok(self.sim()?.building(id).and_then(|b| u32::try_from(b.spot).ok()))
+    }
+
+    fn streets(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<(i32, i32)> {
+        let id = self.table.get(&building)?.0;
+        Ok(self.sim()?.building(id).map_or((-1, -1), |b| b.streets))
+    }
+
+    fn contains(&mut self, building: Resource<BuildingRef>, pos: Vec3, margin: f32) -> wasmtime::Result<bool> {
+        let id = self.table.get(&building)?.0;
+        Ok(self.sim()?.building_contains(id, pos.into(), margin))
+    }
+
+    fn shop(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Vec<types::ShopEntry>> {
+        let id = self.table.get(&building)?.0;
+        let entries = self.sim()?.building_shop(id).iter().map(|e| types::ShopEntry { kind: e.kind, price: e.price, extra: e.extra });
+
+        Ok(entries.collect())
+    }
+
+    fn set_shop(&mut self, building: Resource<BuildingRef>, entries: Vec<types::ShopEntry>) -> wasmtime::Result<()> {
+        let id = self.table.get(&building)?.0;
+        let entries = entries.into_iter().map(|e| ShopEntry { kind: e.kind, price: e.price, extra: e.extra }).collect();
+        self.sim_mut()?.set_building_shop(id, entries);
+
+        Ok(())
+    }
+
+    fn car_spawn(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Vec3> {
+        let id = self.table.get(&building)?.0;
+        Ok(self.sim()?.building(id).map_or(glam::Vec3::ZERO, |b| b.car_spawn).into())
+    }
+
+    fn car_counter(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<i32> {
+        let id = self.table.get(&building)?.0;
+        Ok(self.sim()?.building_car_counter(id))
+    }
+
+    fn set_car_counter(&mut self, building: Resource<BuildingRef>, next: i32) -> wasmtime::Result<()> {
+        let id = self.table.get(&building)?.0;
+        self.sim_mut()?.set_building_car_counter(id, next);
+
+        Ok(())
+    }
+
+    fn drop(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<()> {
+        self.table.delete(building)?;
+        Ok(())
+    }
+}

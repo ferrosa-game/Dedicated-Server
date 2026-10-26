@@ -136,6 +136,11 @@ fn item_kind(id: i32) -> i32 {
     u32::try_from(id).ok().and_then(server::get_item).map_or(0, |i| i.kind() as i32)
 }
 
+/// An item or mission spot the binary leaves at -1 for none.
+fn index(value: i32) -> Option<u32> {
+    u32::try_from(value).ok()
+}
+
 fn spawn(name: &str, pos: Vec3, rot: Mat3) -> Option<ferrosa_wit::Item> {
     server::spawn_item(name, pos, rot)
 }
@@ -235,14 +240,14 @@ impl Round {
             done: false,
             id: self.missions.counter,
             kind: 0,
-            item: -1,
-            item2: -1,
+            item: None,
+            item2: None,
             team1: 0,
             team2: 0,
             disk_type: 0,
             value: 0,
             deadline: 0,
-            location: -1,
+            location: None,
             provided_cash: 0,
             rate: 0.0,
         };
@@ -302,16 +307,16 @@ impl Round {
             let Some((slot, mut m)) = self.open_mission(team) else { continue };
             let spent = self.missions.spent[team];
 
-            m.item = item;
+            m.item = index(item);
             m.disk_type = disk_type;
             m.value = values[i];
             m.deadline = deadline(clock_time(1, 55));
             m.team1 = list[0] as i32;
 
             (m.kind, m.location, m.provided_cash) = match i {
-                0 => (MissionTypes::Sell as i32, location, 0),
-                _ if i <= funded => (MissionTypes::BuyFunded as i32, -1, -spent),
-                _ => (MissionTypes::Buy as i32, -1, 0),
+                0 => (MissionTypes::Sell as i32, index(location), 0),
+                _ if i <= funded => (MissionTypes::BuyFunded as i32, None, -spent),
+                _ => (MissionTypes::Buy as i32, None, 0),
             };
 
             set_mission(team, slot, m);
@@ -369,8 +374,8 @@ impl Round {
             let Some((slot, mut mission)) = self.open_mission(team) else { continue };
             let spent = self.missions.spent[team];
 
-            mission.item = item;
-            mission.item2 = item2;
+            mission.item = index(item);
+            mission.item2 = index(item2);
             mission.disk_type = disk_type;
             mission.value = values[i];
             mission.deadline = deadline(clock_time(1, 55));
@@ -412,11 +417,11 @@ impl Round {
             }
 
             m.kind = MissionTypes::Acquisition as i32;
-            m.item = item;
+            m.item = index(item);
             m.disk_type = disk_type;
             m.value = value;
             m.deadline = deadline;
-            m.location = location;
+            m.location = index(location);
             m.rate = value as f32 * (1.0 / 40000.0);
 
             set_mission(team, slot, m);
@@ -438,17 +443,17 @@ impl Round {
 
         for team in TEAMS {
             let (Some(base), Some(corp)) = (base(team), server::get_corporation(team)) else { continue };
-            let pos = |id: i32| u32::try_from(id).ok().and_then(server::get_item).map(|i| i.pos());
+            let pos = |id: Option<u32>| id.and_then(server::get_item).map(|i| i.pos());
             let mut earnings = self.missions.spent[team];
 
             earnings += items.iter().filter(|i| Some(i.kind()) == cash && base.contains(i.pos())).count() as i32 * 250;
 
-            for m in corp.missions().iter().filter(|m| m.active && m.item != -1) {
+            for m in corp.missions().iter().filter(|m| m.active && m.item.is_some()) {
                 if !pos(m.item).is_some_and(|p| base.contains(p)) {
                     continue;
                 }
 
-                if (MissionTypes::TwoTeamSell as i32..=9).contains(&m.kind) && m.item2 != -1 && !pos(m.item2).is_some_and(|p| base.contains(p)) {
+                if (MissionTypes::TwoTeamSell as i32..=9).contains(&m.kind) && m.item2.is_some() && !pos(m.item2).is_some_and(|p| base.contains(p)) {
                     continue;
                 }
 

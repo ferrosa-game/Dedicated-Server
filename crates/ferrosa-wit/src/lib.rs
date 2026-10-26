@@ -4,6 +4,7 @@ wit_bindgen::generate!({
     pub_export_macro: true,
     export_macro_name: "export_bindings",
     default_bindings_module: "ferrosa_wit",
+    additional_derives: [PartialEq],
 });
 
 use std::ops::{Add, Mul, Neg, Sub};
@@ -90,41 +91,6 @@ pub fn command(message: &str) -> Option<(&str, Vec<&str>)> {
 /// so anything written on line 23 is never seen.
 pub const SHOWN_LINES: u32 = 23;
 
-/// A key a computer program is given, and whether ctrl was held with it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Key {
-    Char(char),
-    Enter,
-    Backspace,
-    Up,
-    Down,
-    Left,
-    Right,
-}
-
-impl Key {
-    /// Reads the code the server sends: a character's own byte, 8 backspace, 10 enter, 16 to 19 the arrows, with
-    /// 0x100 set when ctrl is held. A letter comes as the key was typed, and is given upper case here, as the shell
-    /// and the game's own programs read it.
-    pub fn new(code: i32) -> (Self, bool) {
-        let key = match code & 0xff {
-            8 => Self::Backspace,
-            10 => Self::Enter,
-            16 => Self::Up,
-            17 => Self::Down,
-            18 => Self::Left,
-            19 => Self::Right,
-            c => Self::Char((c as u8).to_ascii_uppercase() as char),
-        };
-
-        (key, code & 0x100 != 0)
-    }
-}
-
-/// A program running on one computer, made by Plugin::program. The server keeps it for as long as it runs, so its
-/// fields are that computer's own state, and drops it once it ends. Its hooks are given the plugin as every other
-/// hook is, so what is shared between a plugin's programs, like a high score or a game two computers play, lives in
-/// the plugin's own fields.
 pub trait Program<P: Plugin>: 'static {
     /// A key pressed on it; false ends the program and gives the shell back. Ctrl-X is the key the game's own
     /// programs quit on.
@@ -319,9 +285,8 @@ macro_rules! plugin {
                 ::std::option::Option::Some($crate::exports::ferrosa::plugin::programs::Program::new(__FerrosaProgram(::std::cell::RefCell::new(program))))
             }
 
-            fn key(&self, computer: $crate::ItemId, key: i32) -> bool {
+            fn key(&self, computer: $crate::ItemId, key: $crate::Key, ctrl: bool) -> bool {
                 let ::std::option::Option::Some(at) = $crate::server::get_computer(computer) else { return false };
-                let (key, ctrl) = $crate::Key::new(key);
 
                 __FERROSA.with_borrow_mut(|p| self.0.borrow_mut().key(p, &at, key, ctrl))
             }

@@ -185,7 +185,7 @@ impl Snake {
 impl Program<ComputerGames> for Snake {
     fn key(&mut self, _plugin: &mut ComputerGames, _computer: &Computer, key: Key, ctrl: bool) -> bool {
         if ctrl {
-            return key != Key::Char('X');
+            return key != Key::Character('X');
         }
 
         self.heading = match key {

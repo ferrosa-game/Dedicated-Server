@@ -55,6 +55,23 @@ impl WasmPlugins {
     }
 }
 
+/// The key code the shell sends a program: a character's own byte, 8 backspace, 10 enter, 16 to 19 the arrows, with
+/// 0x100 set when ctrl is held. A letter comes as it was typed, and is given upper case here, as the shell and the
+/// game's own programs read it.
+fn computer_key(code: i32) -> (types::Key, bool) {
+    let key = match code & 0xff {
+        8 => types::Key::Backspace,
+        10 => types::Key::Enter,
+        16 => types::Key::Up,
+        17 => types::Key::Down,
+        18 => types::Key::Left,
+        19 => types::Key::Right,
+        c => types::Key::Character((c as u8).to_ascii_uppercase() as char),
+    };
+
+    (key, code & 0x100 != 0)
+}
+
 impl PluginHooks for WasmPlugins {
     fn on_start(&self, sim: &mut Sim) {
         self.all_hooks(sim, "on-start", |h, s| h.on_start.as_ref().map(|g| g.call_on_start(s)));
@@ -143,12 +160,13 @@ impl PluginHooks for WasmPlugins {
 
     fn on_computer_key(&self, sim: &mut Sim, item: usize, key: i32) -> bool {
         let Some((plugin, handle)) = self.running(item) else { return false };
+        let (key, ctrl) = computer_key(key);
 
         plugin
             .call_hook(plugin.name, Some(SimPtr(&mut *sim)), "program.key", |h, s| {
                 let programs = h.programs.as_ref()?;
 
-                Some(programs.program().call_key(s, handle, item as u32, key))
+                Some(programs.program().call_key(s, handle, item as u32, key, ctrl))
             })
             .unwrap_or(false)
     }

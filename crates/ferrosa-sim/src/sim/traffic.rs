@@ -46,8 +46,8 @@ pub(crate) fn vehicle_pos(c: &TrafficCar, types: &[VehicleType]) -> Vec3 {
 }
 
 impl Sim {
-    /// The shop and traffic part of reset_game: srand(time), the dealerships and gun stores restocked, and 128 cars when
-    /// the map has streets (none for races).
+    /// The traffic part of reset_game: srand(time), and 128 cars when the map has streets (none for races). The shops
+    /// are the shops plugin's: it stocks them from its own reset hook.
     ///
     /// This is called immediately after `Sim` is created.
     pub(crate) fn reset_game(&mut self) {
@@ -96,9 +96,6 @@ impl Sim {
         }
 
         self.roll_weather();
-
-        self.restock_dealerships();
-        self.stock_gun_stores();
 
         if let Some(cars) = self.rules.reset_traffic {
             self.do_traffic = Some(cars);

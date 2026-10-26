@@ -91,6 +91,26 @@ impl types::HostPlayer for HostState {
         Ok(())
     }
 
+    fn menu_tab(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<i32> {
+        Ok(self.player_of(&player)?.map_or(-1, |p| p.menu_tab))
+    }
+
+    fn set_menu_tab(&mut self, player: Resource<PlayerRef>, tab: i32) -> wasmtime::Result<()> {
+        let id = self.player_id_of(&player)?;
+        self.sim_mut()?.set_menu_tab(id, tab);
+        Ok(())
+    }
+
+    fn items_bought(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<i32> {
+        Ok(self.player_of(&player)?.map_or(0, |p| p.items_bought))
+    }
+
+    fn set_items_bought(&mut self, player: Resource<PlayerRef>, count: i32) -> wasmtime::Result<()> {
+        let id = self.player_id_of(&player)?;
+        self.sim_mut()?.set_items_bought(id, count);
+        Ok(())
+    }
+
     fn account_id(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<Option<u32>> {
         Ok(self.player_of(&player)?.filter(|p| !p.is_bot).map(|p| p.account_id))
     }
@@ -111,12 +131,16 @@ impl types::HostPlayer for HostState {
         self.change_look(&player, |l| l.suit_color = colour.into())
     }
 
-    fn tie_colour(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<u8> {
-        Ok(self.player_of(&player)?.map_or(0, |p| p.customization.tie_color))
+    fn tie_colour(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<Option<types::SuitColour>> {
+        let tie = self.player_of(&player)?.map_or(0, |p| p.customization.tie_color);
+
+        Ok(tie.checked_sub(1).and_then(|c| SuitColor::try_from(c).ok()).map(Into::into))
     }
 
-    fn set_tie_colour(&mut self, player: Resource<PlayerRef>, colour: u8) -> wasmtime::Result<()> {
-        self.change_look(&player, |l| l.tie_color = colour)
+    fn set_tie_colour(&mut self, player: Resource<PlayerRef>, colour: Option<types::SuitColour>) -> wasmtime::Result<()> {
+        let tie = colour.map_or(0, |c| SuitColor::from(c) as u8 + 1);
+
+        self.change_look(&player, |l| l.tie_color = tie)
     }
 
     fn necklace(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<u8> {

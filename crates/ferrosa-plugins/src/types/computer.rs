@@ -127,8 +127,13 @@ impl types::HostComputer for HostState {
         Ok(())
     }
 
-    fn drive_volume(&mut self, computer: Resource<ComputerRef>, drive: u32) -> wasmtime::Result<Option<Resource<VolumeRef>>> {
+    fn drive_volume(&mut self, computer: Resource<ComputerRef>, drive: types::Drive) -> wasmtime::Result<Option<Resource<VolumeRef>>> {
         let item = self.item_of(&computer)?;
+        let drive = match drive {
+            types::Drive::Disk => 0,
+            types::Drive::Internal => 2,
+        };
+
         let Some(volume) = self.sim()?.computer_drive_volume(item, drive) else { return Ok(None) };
 
         self.volume_handle(volume).map(Some)

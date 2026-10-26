@@ -64,7 +64,6 @@ impl Sim {
         mark(&mut self.updates.players, player);
     }
 
-    /// The client's mission event (eliminator's HUD) to one player.
     pub fn send_mission_event(&mut self, player: PlayerId, kind: i32, role: i32, value: i32, pos: Option<Vec3>) {
         let e = EventMission { player: player.0 as i32, kind, role, value, pos: pos.map_or([0.0; 3], |p| p.to_array()) };
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Mission(e) });
@@ -89,6 +88,18 @@ impl Sim {
         p.manager_tab = on;
 
         mark(&mut self.updates.players, player);
+    }
+
+    pub fn set_menu_tab(&mut self, player: PlayerId, tab: i32) {
+        if let Some(p) = self.players.get_mut(player.idx()) {
+            p.menu_tab = tab;
+        }
+    }
+
+    pub fn set_items_bought(&mut self, player: PlayerId, count: i32) {
+        if let Some(p) = self.players.get_mut(player.idx()) {
+            p.items_bought = count;
+        }
     }
 
     pub fn set_customization(&mut self, player: PlayerId, look: CharacterCustomization) {

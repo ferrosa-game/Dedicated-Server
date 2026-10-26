@@ -140,6 +140,13 @@ interface types {
         /// Whether they see the manager page (menu 19) of their corporation's base.
         manager-tab: func() -> bool;
         set-manager-tab: func(on: bool);
+        /// The building whose shop or bank menu they have open; -1 for none.
+        menu-tab: func() -> s32;
+        set-menu-tab: func(tab: s32);
+        /// How many things they have bought from gun stores and burger shops, which the server clears when they get
+        /// a new human.
+        items-bought: func() -> s32;
+        set-items-bought: func(count: s32);
         /// The account they joined with; none for a bot.
         account-id: func() -> option<u32>;
         /// Their next human has it.
@@ -151,8 +158,9 @@ interface types {
         set-model: func(model: model);
         suit-colour: func() -> suit-colour;
         set-suit-colour: func(colour: suit-colour);
-        tie-colour: func() -> u8;
-        set-tie-colour: func(colour: u8);
+        /// The tie's colour, from the same twelve the suit comes in; none for no tie.
+        tie-colour: func() -> option<suit-colour>;
+        set-tie-colour: func(colour: option<suit-colour>);
         necklace: func() -> u8;
         set-necklace: func(necklace: u8);
         /// Ticks until they may switch team again; 0 lets them.
@@ -378,6 +386,151 @@ interface types {
         codes: u32,
     }
 
+    /// The item kinds the game itself has. A kind's number, which item.kind and server.spawn-item-by-id use, is
+    /// its place in this list. A server whose data adds kinds past these has no name for them here, so
+    /// server.find-item-kind takes a name instead.
+    enum item-kind {
+        auto5,
+        ak47,
+        ak47-mag,
+        m16,
+        m16-mag,
+        magnum,
+        magnum-mag,
+        mp5,
+        mp5-mag,
+        uzi,
+        uzi-mag,
+        pistol,
+        pistol-mag,
+        grenade,
+        bandage,
+        briefcase,
+        briefcase-open,
+        cash-round,
+        cash-world,
+        disk-black,
+        disk-green,
+        disk-blue,
+        disk-white,
+        disk-gold,
+        disk-red,
+        phone,
+        radio,
+        key,
+        door,
+        paper-world,
+        burger,
+        desk,
+        lamp,
+        phone-pay,
+        paper,
+        soccer-ball,
+        rope,
+        box,
+        big-box,
+        computer,
+        arcade,
+        table,
+        table-test,
+        wall,
+        bottle,
+        watermelon,
+    }
+
+    /// The vehicle kinds the game itself has, numbered as item-kind is. Not every one has a model, and one
+    /// without cannot be spawned.
+    enum vehicle-kind {
+        town-car,
+        town-car2,
+        metro,
+        limo,
+        turbo,
+        turbo-s,
+        beamer,
+        van,
+        van2,
+        minivan,
+        truck,
+        trailer,
+        helicopter,
+        train,
+        no-clip,
+        hatchback,
+        test,
+        pickup,
+    }
+
+    /// A key pressed on a computer running a plugin's program.
+    variant key {
+        /// A letter, digit or punctuation, given in upper case as the shell and the game's own programs read it.
+        character(char),
+        enter,
+        backspace,
+        up,
+        down,
+        left,
+        right,
+    }
+
+    /// A drive a computer reads: the disk in it, or its own storage.
+    enum drive {
+        disk,
+        internal,
+    }
+
+    /// What a building is. Buildings the game keeps no record of, and kinds a plugin has no name for, read as
+    /// `other`.
+    enum building-kind {
+        other,
+        corporation-base,
+        car-dealer,
+        lab,
+        clothing-store,
+        bank,
+        gun-store,
+        burger-shop,
+    }
+
+    /// One thing a shop sells: the item or vehicle kind, its price, and the kind's own extra (a gun's magazine).
+    record shop-entry {
+        kind: s32,
+        price: s32,
+        extra: s32,
+    }
+
+    /// A building on the map, in placement order. Every call reads or changes the real building; the map's own
+    /// records live as long as the map, so a handle never goes stale.
+    resource building {
+        /// Its number: its place in server.buildings.
+        id: func() -> u32;
+        kind: func() -> building-kind;
+        interior-min: func() -> vec3;
+        interior-max: func() -> vec3;
+        /// Where its local frame sits in the world: its origin and turned axes.
+        pos: func() -> vec3;
+        rot: func() -> mat3;
+        /// The corporation a base belongs to; none for any other building.
+        team: func() -> option<team>;
+        /// Its lobby, where a lab's intel disk is left.
+        lobby: func() -> vec3;
+        /// A lab's mission spot; none for a building without one.
+        spot: func() -> option<u32>;
+        /// The two streets of the intersection nearest the point 32 along its facing.
+        streets: func() -> tuple<s32, s32>;
+        /// Whether `pos` is inside it, `margin` past its walls.
+        contains: func(pos: vec3, margin: f32) -> bool;
+        /// What it sells; empty for a building that sells nothing.
+        shop: func() -> list<shop-entry>;
+        /// Sets what it sells. Clients are sent the list as they open its menu, so this takes effect at once.
+        set-shop: func(entries: list<shop-entry>);
+        /// Where a dealership puts the cars it sells.
+        car-spawn: func() -> vec3;
+        /// Which of the 8 spaces back from car-spawn is next.
+        car-counter: func() -> s32;
+        set-car-counter: func(next: s32);
+    }
+
     /// A street intersection.
     record intersection {
         /// Its position on the road.
@@ -402,20 +555,23 @@ interface types {
         done: bool,
         /// The deal it belongs to, shared by the corporations of one deal.
         id: s32,
-        /// 1 acquisition by car chase, 2 sell a disk, 3 buy it, 4 buy it unfunded, 7 two-team sellers, 8 their buyer.
+        /// Which shape the mission is: 1 acquisition by car chase, 2 sell a disk, 3 buy it funded, 4 buy it
+        /// unfunded, 7 two-team sellers, 8 their buyer. Left a number because the binary uses values past these
+        /// (round tests for 7 to 9) and a name for each is not known.
         kind: s32,
-        /// The disks of the deal; -1 for none.
-        item: s32,
-        item2: s32,
-        /// The other corporations of the deal.
+        /// The disks of the deal.
+        item: option<item-id>,
+        item2: option<item-id>,
+        /// The other corporations of the deal. These are raw team numbers: the binary gives them no "none" value,
+        /// and round leaves them 0 rather than -1, so a team here cannot be told apart from Goldmen.
         team1: s32,
         team2: s32,
         disk-type: s32,
         value: s32,
         /// The world clock the mission runs until.
         deadline: s32,
-        /// The mission spot the disk waits at, or -1 for the table.
-        location: s32,
+        /// The mission spot the disk waits at; none for the table.
+        location: option<u32>,
         provided-cash: s32,
         rate: f32,
     }
@@ -568,8 +724,8 @@ interface types {
         /// as well as by refusing a key.
         exit: func();
 
-        /// The volume a drive reads: 0 the disk in it, 2 its own. None for a drive that isn't ready.
-        drive-volume: func(drive: u32) -> option<volume>;
+        /// The volume a drive reads. None for a drive that isn't ready.
+        drive-volume: func(drive: drive) -> option<volume>;
     }
 
     /// A file system volume: a disk's, or a computer's own.

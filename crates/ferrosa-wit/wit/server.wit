@@ -1,7 +1,7 @@
 package ferrosa:plugin@0.1.0;
 
 interface server {
-    use types.{body, body-id, chat-type, client-mode, computer, corporation, game-state, human, human-id, intersection, item, item-id, mat3, player, player-id, sound, team, vec3, vehicle, vehicle-id, volume};
+    use types.{body, body-id, building, chat-type, client-mode, computer, corporation, game-state, human, human-id, intersection, item, item-id, mat3, player, player-id, sound, team, vec3, vehicle, vehicle-id, volume};
 
     /// Makes this plugin a game mode, named for config.toml's gamemode and /resetgame. Only from init, and only once: a
     /// plugin that registers a mode is that mode, and only its mode hooks are called. `map` is the map it plays; none
@@ -60,12 +60,17 @@ interface server {
     spawn-vehicle: func(name: string, colour: s32, pos: vec3, rot: mat3) -> option<vehicle>;
     /// A vehicle of the kind numbered `kind` (its place in vehicle-kinds); none for a kind without a model.
     spawn-vehicle-by-id: func(kind: u32, colour: s32, pos: vec3, rot: mat3) -> option<vehicle>;
+    /// A list of all vehicles inside of the game
     vehicles: func() -> list<vehicle>;
+    /// Get a reference to a vehicle by id
     get-vehicle: func(id: vehicle-id) -> option<vehicle>;
     /// What a vehicle kind costs.
     vehicle-price: func(kind: u32) -> option<s32>;
     /// The map's street intersections; a corner's number is its place in the list.
     intersections: func() -> list<intersection>;
+    /// Every building the map keeps a record of, in placement order; a building's number is its place in the list.
+    buildings: func() -> list<building>;
+    get-building: func(id: u32) -> option<building>;
     /// The height of the ground under `pos`, looking from 8 above it to 256 below.
     ground-below: func(pos: vec3) -> option<f32>;
 

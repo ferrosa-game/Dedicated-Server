@@ -7,7 +7,7 @@ use crate::{
         types::{self, ChatType, ClientMode, Intersection, Mat3, Vec3},
     },
     host::{HostState, RegisteredMode},
-    types::{BodyRef, ComputerRef, CorporationRef, HumanRef, ItemRef, PlayerRef, VehicleRef, VolumeRef},
+    types::{BodyRef, BuildingRef, ComputerRef, CorporationRef, HumanRef, ItemRef, PlayerRef, VehicleRef, VolumeRef},
 };
 use wasmtime::component::Resource;
 
@@ -191,6 +191,20 @@ impl server::Host for HostState {
         });
 
         Ok(corners.collect())
+    }
+
+    fn buildings(&mut self) -> wasmtime::Result<Vec<Resource<BuildingRef>>> {
+        let count = self.sim()?.buildings().len();
+
+        (0..count).map(|id| self.building_handle(id)).collect()
+    }
+
+    fn get_building(&mut self, id: u32) -> wasmtime::Result<Option<Resource<BuildingRef>>> {
+        if self.sim()?.building(id as usize).is_none() {
+            return Ok(None);
+        }
+
+        self.building_handle(id as usize).map(Some)
     }
 
     fn ground_below(&mut self, pos: Vec3) -> wasmtime::Result<Option<f32>> {

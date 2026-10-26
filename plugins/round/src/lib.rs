@@ -327,8 +327,8 @@ impl Round {
             p.set_suit_colour(suits[team]);
         }
 
-        let ties = Corps([2, 9, 8]);
-        p.set_tie_colour(ties[team]);
+        let ties = Corps([SuitColour::Black, SuitColour::Red, SuitColour::White]);
+        p.set_tie_colour(Some(ties[team]));
 
         let Some(human) = server::spawn_human(pos, yaw(angle), Some(p.id())) else { return };
 
