@@ -482,7 +482,7 @@ impl ServerGamePacket {
             return Ok(None);
         }
 
-        let gamestate = GameState::try_from(r.bits(4)?)?;
+        let gamestate = GameState::try_from(r.bits(4)?).unwrap_or(GameState::InGame);
         let ready_states = if gamestate == GameState::Intermission {
             let mut v = [false; 32];
 

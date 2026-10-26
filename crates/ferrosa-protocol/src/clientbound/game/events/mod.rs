@@ -198,11 +198,7 @@ impl WireRead for Event {
                 let c = r.i32()? as u32;
                 let d = r.bits(24)?;
                 let active = (a >> 9) & 1 != 0;
-                let team = match Team::try_from((a >> 10) - 1) {
-                    Ok(t) => t,
-                    Err(_) if !active => Team::Spectator,
-                    Err(e) => return Err(e),
-                };
+                let team = Team::try_from((a >> 10) - 1).unwrap_or(Team::Spectator);
 
                 let customization = CharacterCustomization {
                     gender: Gender::from_bit(c),
