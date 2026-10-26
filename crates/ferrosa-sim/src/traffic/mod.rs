@@ -110,9 +110,6 @@ pub struct Traffic {
     pub signals: Vec<Signals>,
     /// hack_roundcity_traffic: on Round City, cars keep off two streets and treat the loop as one.
     pub roundcity: bool,
-    /// The co-op wave, which speeds up aggressive cars.
-    pub coop_level: i32,
-    pub coop: bool,
 }
 
 impl Traffic {

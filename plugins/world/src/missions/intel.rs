@@ -1,29 +1,15 @@
-//! The intel memo a corporation is faxed: which mission it is told about, and which way the file reaches the city.
-
 use ferrosa_wit::server;
 
-use super::{DAILY_MISSIONS, clock_time, intel_car::INTEL_TIME, text::{project_part, streets_part, worth_part}};
+use super::{clock_time, text::{project_part, streets_part, worth_part}};
 use crate::{World, state::CORPORATIONS};
 
-/// A corporation's intel once its memo is faxed.
-const INTEL_FAXED: i32 = 11;
-
-/// Corporations give up looking for a mission worth something to one of them after 100 tries.
-const MEMO_TRIES: i32 = 100;
-
-/// A memo's three INTEL parts come in a shuffled order (64 swaps).
-const PART_SHUFFLES: i32 = 64;
-
 impl World {
-    /// generate_team_mission_memo: the corporation is told about one of the day's missions it has asked least about
-    /// (among those not yet traded) that some corporation with players wants. An encrypted INTEL file describes it,
-    /// and the file is either left on a disk in a lab's lobby or carried by a town car, which the memo tells of.
     pub fn generate_team_mission_memo(&mut self, t: usize) {
-        if self.state.missions.missions.len() < DAILY_MISSIONS {
+        if self.state.missions.missions.len() < 7 {
             return;
         }
 
-        let daily = &self.state.missions.missions[..DAILY_MISSIONS];
+        let daily = &self.state.missions.missions[..7];
         let least_asked = daily.iter().map(|m| m.teams[t].status).fold(256, i32::min);
         let least_state = daily.iter().map(|m| m.state).fold(256, i32::min);
 
@@ -31,7 +17,7 @@ impl World {
             return;
         }
 
-        let list: Vec<usize> = (0..DAILY_MISSIONS).filter(|&i| daily[i].teams[t].status == least_asked && daily[i].state == least_state).collect();
+        let list: Vec<usize> = (0..7).filter(|&i| daily[i].teams[t].status == least_asked && daily[i].state == least_state).collect();
 
         if list.is_empty() {
             return;
@@ -43,14 +29,14 @@ impl World {
             m = list[rand::random_range(0..list.len())];
             let wanted = (0..6).any(|j| self.corp_player_count(j) > 0 && self.state.missions.missions[m].teams[j].value > 0);
 
-            if wanted || tries >= MEMO_TRIES {
+            if wanted || tries >= 100 {
                 break;
             }
         }
 
         let mut order = [0, 1, 2];
 
-        for _ in 0..PART_SHUFFLES {
+        for _ in 0..64 {
             let a = rand::random_range(0..3);
             let b = rand::random_range(0..3);
             order.swap(a, b);
@@ -59,7 +45,7 @@ impl World {
         self.state.missions.missions[m].teams[t].status += 1;
 
         if let Some(corp) = server::get_corporation(CORPORATIONS[t]) {
-            corp.set_intel(INTEL_FAXED);
+            corp.set_intel(11);
         }
 
         let boosted = self.state.missions.boosted == m as i32;
@@ -85,7 +71,7 @@ impl World {
             return self.intel_disk_memo(t, &file, content);
         }
 
-        let expiry = server::world_time() + INTEL_TIME;
+        let expiry = server::world_time() + 216_000;
         let Some(car) = self.spawn_mission_intel_car(&file, content, expiry) else { return };
         let (hour, minute, pm) = clock_time(expiry);
         let route = server::traffic_car_route(car);

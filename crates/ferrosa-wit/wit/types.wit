@@ -165,15 +165,18 @@ interface types {
         set-necklace: func(necklace: u8);
         /// The corporation money and credit their client is shown; a mode that runs corporations sets these.
         set-corp-money: func(money: s32, credit: s32);
+        /// Their corporate rating, which mission settlement raises. A mode that saves accounts keeps it.
+        corp-rating: func() -> s32;
+        set-corp-rating: func(rating: s32);
+        /// How long they wait before spawning again.
+        spawn-timer: func() -> s32;
+        set-spawn-timer: func(ticks: s32);
+        /// How many vehicles they have bought, which the dealerships cap.
+        vehicles-bought: func() -> s32;
+        set-vehicles-bought: func(count: s32);
         /// Their criminal rating, which the server's own scoring raises when they hurt people.
         crim-rating: func() -> s32;
         set-crim-rating: func(rating: s32);
-        /// Their saved account; none for a bot, or a player the server has no account for.
-        account: func() -> option<account>;
-        set-account: func(account: account);
-        /// How long they must wait before spawning again, which the server keeps with their account.
-        account-spawn-timer: func() -> s32;
-        set-account-spawn-timer: func(ticks: s32);
         /// The world clock a bot leaves at; 0 for one that stays.
         bot-deadline: func() -> s32;
         set-bot-deadline: func(clock: s32);
@@ -232,6 +235,8 @@ interface types {
     /// A corporation: its share market, base and missions. Every call reads or changes the real one.
     resource corporation {
         team: func() -> team;
+        /// Its name, as the game writes it: "Goldmen Inc", "OXS International".
+        name: func() -> string;
         /// Its base on the map; none if the map has none for it.
         base: func() -> option<base>;
         /// A vehicle in the first free car space of its base; none when they're all taken.
@@ -302,6 +307,8 @@ interface types {
         player: func() -> option<player-id>;
         /// The vehicle it's in.
         vehicle: func() -> option<vehicle>;
+        /// The last vehicle it was in, which it still counts as being in for the scoring of a hit.
+        last-vehicle: func() -> option<vehicle>;
         /// Puts it in one of `vehicle`'s seats, 0 the driver's; false if the vehicle is gone.
         enter-vehicle: func(vehicle: borrow<vehicle>, seat: u32) -> bool;
         /// Its bones' bodies.
@@ -404,6 +411,8 @@ interface types {
         pos: func() -> vec3;
         /// The traffic car it is, if it is one: the number server.traffic-car-route takes.
         traffic-car: func() -> option<u32>;
+        /// The player who bought it; none for one nobody owns.
+        owner: func() -> option<player-id>;
         /// Makes it a parked traffic car, which bots can drive.
         park-in-traffic: func();
         /// Which of the track's stations a train runs from.
@@ -561,33 +570,6 @@ interface types {
         kind: s32,
         price: s32,
         extra: s32,
-    }
-
-    /// What hurting someone adds to the attacker's criminal rating, by their teams. A victim who is already
-    /// criminal adds less.
-    record crime-rates {
-        /// A civilian hurting a civilian.
-        civ-civ: s32,
-        /// A civilian hurting a corporation's member.
-        civ-team: s32,
-        /// A member hurting a civilian.
-        team-civ: s32,
-        /// A member hurting another corporation's member.
-        team-team: s32,
-        /// The same, inside the victim's own base.
-        team-team-in-base: s32,
-        /// The rating at which a player's human is killed.
-        kick: s32,
-    }
-
-    /// What a player's saved account holds, which the server keeps across days and restores when they rejoin. A
-    /// mode that keeps money and ratings writes them here.
-    record account {
-        money: u32,
-        corp-rating: u32,
-        crim-rating: u32,
-        /// 5 is added at every world mode save; stats.txt counts it in tens.
-        play-time: u32,
     }
 
     /// A guard post inside a building: where it stands, the way it faces, and the route it walks.

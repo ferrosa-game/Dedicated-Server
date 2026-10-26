@@ -41,11 +41,6 @@ fn steer_toward(yaw: f32, target: f32, limit: f64, max: f32) -> f32 {
     }
 }
 
-/// The co-op speed for aggressive cars: (wave * `per` + 16) / 60.
-fn coop_speed(traffic: &Traffic, per: i32) -> f32 {
-    (traffic.coop_level * per + 16) as f32 / TICKS_PER_SECOND_F32
-}
-
 /// The stuck count: it climbs while the car is stopped but means to go forwards, and runs on to 319 once past 179.
 fn update_stuck(traffic: &mut Traffic, id: usize) {
     let c = &mut traffic.cars[id];
@@ -319,14 +314,13 @@ fn approach_junction(traffic: &mut Traffic, map: &StreetMap, id: usize, st: &Map
     (remaining, junction, way)
 }
 
-/// The cruising speed (faster for an aggressive car far from a turn), cut to the stopping speed at a red or amber
-/// light. Returns the stopping speed.
+/// The cruising speed, cut to the stopping speed at a red or amber light. Returns the stopping speed. Vanilla speeds
+/// an aggressive car up far from a turn, but only by the co-op wave, which comes to this same 4/15 without co-op.
 fn slow_for_signal(traffic: &mut Traffic, id: usize, remaining: f32, junction: usize, way: i32) -> f32 {
     let c = &traffic.cars[id];
     let next_turn = c.step(c.route_index + 1).turn;
     let aggressive = c.is_aggressive != 0;
-    let fast = aggressive && (remaining > 40.0 || next_turn == 0);
-    let base = if fast { coop_speed(traffic, 8) } else { 4.0 / 15.0 };
+    let base = 4.0 / 15.0;
     let c = &mut traffic.cars[id];
     let mut approach = (((remaining - 4.0) * 0.5) / TICKS_PER_SECOND_F32).max(0.0);
 
@@ -550,10 +544,6 @@ fn cross_intersection(traffic: &mut Traffic, map: &StreetMap, id: usize) {
 
         if aggressive {
             base = 0.4_f32 as f64;
-
-            if traffic.coop {
-                base = coop_speed(traffic, 4) as f64;
-            }
         }
     }
 

@@ -20,12 +20,11 @@ pub(crate) mod vehicle;
 pub(crate) use ferrosa_world as world;
 
 pub use computer::Mode as ComputerMode;
-pub use gamemode::{MODES, Mode, ModeHooks, ModeSync, find, rules::ModeRules};
+pub use gamemode::{Mode, ModeHooks, ModeSync, find, rules::ModeRules};
 pub use human::{Human, HumanHealth};
 pub use items::Item;
 pub use player::Player;
 pub use plugin::{DamageCause, NoPlugins, PluginHooks, Plugins};
-pub use api::world::CrimeRates;
 pub use sim::{Sim, economy::Corporation, missions::Mission};
 pub use vehicle::Vehicle;
 pub use world::skeleton::BoneId;
@@ -85,10 +84,7 @@ pub struct Client {
     pack_ack: u16,
     /// What each slot holds as far as the queued entries go.
     packed: std::collections::HashMap<u16, game::ObjectPack>,
-    /// How overdue each traffic car is for this client, and which intersection's lights it gets
-    /// next.
     traffic_priority: Vec<i32>,
-    /// How overdue each vehicle is for this client, by vehicle id.
     vehicle_priority: Vec<i32>,
     /// The game packets sent to this connection, and the client's own packet count, echoed back.
     packet_sequence: u32,

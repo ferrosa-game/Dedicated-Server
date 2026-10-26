@@ -284,10 +284,8 @@ fn despawn_timer(h: &mut Human, out: &mut Vec<HumanOutput>, keep_bodies: bool) -
         out.push(HumanOutput::ReleasePlayer(player));
         h.player = None;
         h.account = None;
-    } else if h.despawn_ticks < DEAD_PLAYER_TICKS
-        && let Some(account) = h.account.take()
-    {
-        out.push(HumanOutput::TaxAccount(account));
+    } else if h.despawn_ticks < DEAD_PLAYER_TICKS {
+        h.account = None;
     }
 
     if keep_bodies && !alive && h.despawn_ticks - 1 < KEPT_BODY_TICKS {

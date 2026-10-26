@@ -1,4 +1,4 @@
-use ferrosa_sim::{CrimeRates, PlayerId};
+use ferrosa_sim::PlayerId;
 use wasmtime::bail;
 
 use crate::{
@@ -239,21 +239,6 @@ impl server::Host for HostState {
         Ok(())
     }
 
-    fn set_crime(&mut self, rates: Option<types::CrimeRates>) -> wasmtime::Result<()> {
-        let rates = rates.map(|r| CrimeRates {
-            civ_civ: r.civ_civ,
-            civ_team: r.civ_team,
-            team_civ: r.team_civ,
-            team_team: r.team_team,
-            team_team_in_base: r.team_team_in_base,
-            kick: r.kick,
-        });
-
-        self.sim_mut()?.set_crime(rates);
-
-        Ok(())
-    }
-
     fn ground_below(&mut self, pos: Vec3) -> wasmtime::Result<Option<f32>> {
         Ok(self.sim()?.ground_below(pos.into()))
     }
@@ -295,14 +280,16 @@ impl server::Host for HostState {
         Ok(self.sim()?.tick_count())
     }
 
-    fn save_accounts(&mut self) -> wasmtime::Result<()> {
-        self.sim_mut()?.save_account_file();
-        Ok(())
+    fn account_name(&mut self, account: u32) -> wasmtime::Result<Option<String>> {
+        Ok(self.sim()?.account_name(account))
     }
 
-    fn save_stats(&mut self) -> wasmtime::Result<()> {
-        self.sim_mut()?.save_stats_file();
-        Ok(())
+    fn bullets_fired(&mut self) -> wasmtime::Result<u32> {
+        Ok(self.sim()?.bullets_fired())
+    }
+
+    fn missions_settled(&mut self) -> wasmtime::Result<u32> {
+        Ok(self.sim()?.missions_settled())
     }
 
     fn send_stock_prices(&mut self) -> wasmtime::Result<()> {
@@ -424,6 +411,10 @@ impl server::Host for HostState {
         Ok(ferrosa_sim::Sim::bill_value(bill as u32))
     }
 
+    fn item_magazine_ammo(&mut self, kind: u32) -> wasmtime::Result<Option<i32>> {
+        Ok(self.sim()?.item_magazine_ammo(kind))
+    }
+
     fn item_price(&mut self, kind: u32) -> wasmtime::Result<Option<i32>> {
         Ok(self.sim()?.item_price(kind))
     }
@@ -463,6 +454,16 @@ impl server::Host for HostState {
 
     fn set_door_knocks(&mut self, on: bool) -> wasmtime::Result<()> {
         self.sim_mut()?.set_door_knocks(on);
+        Ok(())
+    }
+
+    fn set_punish_team_kills(&mut self, on: bool) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_punish_team_kills(on);
+        Ok(())
+    }
+
+    fn set_shares_follow_human(&mut self, on: bool) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_shares_follow_human(on);
         Ok(())
     }
 

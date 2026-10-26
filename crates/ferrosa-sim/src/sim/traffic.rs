@@ -85,7 +85,6 @@ impl Sim {
         self.exit_all_programs();
         plugins.reset(self);
 
-        self.traffic.coop = self.rules.coop_traffic;
         self.world.map.level.area.reset_dynamic();
 
         if self.world.map.map_name == "test2" {

@@ -73,6 +73,12 @@ impl types::HostVehicle for HostState {
         Ok(())
     }
 
+    fn owner(&mut self, vehicle: Resource<VehicleRef>) -> wasmtime::Result<Option<u32>> {
+        let id = self.table.get(&vehicle)?.0;
+
+        Ok(self.sim()?.vehicle_owner(id).map(|p| p.0))
+    }
+
     fn traffic_car(&mut self, vehicle: Resource<VehicleRef>) -> wasmtime::Result<Option<u32>> {
         let id = self.table.get(&vehicle)?.0;
 

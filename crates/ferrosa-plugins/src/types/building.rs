@@ -16,16 +16,16 @@ impl HostState {
     }
 }
 
-fn kind(record: i32) -> BuildingKind {
+fn kind(record: building::BuildingKind) -> BuildingKind {
     match record {
-        building::CORPORATION_BASE => BuildingKind::CorporationBase,
-        building::CAR_DEALER => BuildingKind::CarDealer,
-        building::LAB => BuildingKind::Lab,
-        building::CLOTHING_STORE => BuildingKind::ClothingStore,
-        building::BANK => BuildingKind::Bank,
-        building::GUN_STORE => BuildingKind::GunStore,
-        building::BURGER_SHOP => BuildingKind::BurgerShop,
-        _ => BuildingKind::Other,
+        building::BuildingKind::Other => BuildingKind::Other,
+        building::BuildingKind::CorporationBase => BuildingKind::CorporationBase,
+        building::BuildingKind::CarDealer => BuildingKind::CarDealer,
+        building::BuildingKind::Lab => BuildingKind::Lab,
+        building::BuildingKind::ClothingStore => BuildingKind::ClothingStore,
+        building::BuildingKind::Bank => BuildingKind::Bank,
+        building::BuildingKind::GunStore => BuildingKind::GunStore,
+        building::BuildingKind::BurgerShop => BuildingKind::BurgerShop,
     }
 }
 
@@ -36,7 +36,7 @@ impl types::HostBuilding for HostState {
 
     fn kind(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<BuildingKind> {
         let id = self.table.get(&building)?.0;
-        Ok(kind(self.sim()?.building(id).map_or(0, |b| b.kind)))
+        Ok(kind(self.sim()?.building(id).map_or(building::BuildingKind::Other, |b| b.kind)))
     }
 
     fn interior_min(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Vec3> {
@@ -73,7 +73,7 @@ impl types::HostBuilding for HostState {
 
     fn spot(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Option<u32>> {
         let id = self.table.get(&building)?.0;
-        Ok(self.sim()?.building(id).and_then(|b| u32::try_from(b.spot).ok()))
+        Ok(self.sim()?.building(id).and_then(|b| u32::try_from(b.mission_spot).ok()))
     }
 
     fn streets(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<(i32, i32)> {

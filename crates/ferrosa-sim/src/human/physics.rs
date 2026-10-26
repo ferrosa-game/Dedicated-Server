@@ -487,7 +487,6 @@ pub enum HumanOutput {
     /// event.
     ReleasePlayer(crate::PlayerId),
     /// The dead human of a player who has left taxes their account.
-    TaxAccount(u32),
     /// A sound at a place (event 9), e.g. a magazine going in.
     Sound { sound: Sound, pos: Vec3, volume: f32, pitch: f32 },
     /// A fall or a crash hurts the human: `damage` off its vitality, or off a leg's health for a thigh. Dealt after the

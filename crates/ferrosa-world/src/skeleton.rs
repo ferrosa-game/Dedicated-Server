@@ -1,6 +1,3 @@
-//! A human's sixteen bones (load_hardcoded_bone_data's hardcoded_bones): each one's parent (linkedBoneId), where it
-//! sits from its parent (pos), its joint (musclePos), its shape and its joint limits.
-
 use glam::Vec3;
 
 pub const BONE_COUNT: usize = 16;

@@ -5,7 +5,7 @@ use ferrosa_protocol::{
         events::{Event, ServerEvent, team_door::EventTeamDoor},
     },
 };
-use glam::Vec3;
+use glam::{Vec3, Vec3Swizzles};
 
 use super::Sim;
 use crate::{
@@ -15,18 +15,15 @@ use crate::{
 };
 
 /// The team phones: the manager's at the table is numbered (team + 1) * 1111, and the one after it goes with it.
-/// A member can work the garage door from up to 4 outside the base.
-const DOOR_REACH: f32 = 4.0;
-
+///
 /// A corporation's people and account: its manager and applicants, and its money.
 #[derive(Clone, Debug, Default)]
 pub struct CorpState {
     pub manager: Option<PlayerId>,
     pub applicants: Vec<PlayerId>,
-    pub money: i32,
     pub door_open: bool,
     pub funds: i32,
-    pub missions: [super::missions::Mission; super::missions::MISSION_SLOTS],
+    pub missions: [super::missions::Mission; 16],
     pub player_count: i32,
     pub car_space_taken: Vec<bool>,
     /// The accounts the round manager fired (up to 128).
@@ -80,30 +77,6 @@ impl Sim {
         }
     }
 
-    /// update_corp_player_ratings: a tenth of the corporation's money (doubled when in debt) goes to its members'
-    /// corporate ratings, half to the manager and half split among the rest (all of it when one member), and the
-    /// account is emptied.
-    pub(crate) fn update_corp_player_ratings(&mut self, k: usize) {
-        let team = Team::CORPORATIONS[k];
-        let members = self.players.iter().filter(|(_, p)| p.team == team).count() as i32;
-
-        if members == 0 {
-            return;
-        }
-
-        let tenth = self.corp_state[k].money / 10;
-        let share = if tenth < 0 { tenth * 2 } else { tenth };
-        let (manager_share, member_share) = if members == 1 { (share, share) } else { (share / 2, share / 2 / (members - 1)) };
-        let manager = self.corp_state[k].manager;
-
-        for (i, p) in self.players.iter_mut().filter(|(_, p)| p.team == team) {
-            p.corp_rating += if manager.is_some_and(|m| m.idx() == i) { manager_share } else { member_share };
-        }
-
-        self.corp_state[k].money = 0;
-    }
-
-
     /// Opens or closes a corporation's garage door (create_event_toggle_team_door); the door cells follow at the end of
     /// the tick (apply_team_doors).
     pub(crate) fn set_team_door(&mut self, k: usize, open: bool) {
@@ -145,9 +118,9 @@ impl Sim {
 
         let Some(k) = self.players.get(player.unwrap_or(PlayerId(0)).idx()).and_then(|p| team_index(p.team)) else { return };
         let base = &map.level.bases[k];
-        let (a, b) = (base.interior_min, base.interior_max);
+        let (near, far) = (base.interior_min.xz() - 4.0, base.interior_max.xz() + 4.0);
 
-        if pos.x < a.x - DOOR_REACH || b.x + DOOR_REACH <= pos.x || pos.z < a.z - DOOR_REACH || DOOR_REACH + b.z <= pos.z {
+        if pos.xz().cmplt(near).any() || pos.xz().cmpge(far).any() {
             return;
         }
 

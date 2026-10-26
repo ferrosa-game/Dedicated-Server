@@ -1,15 +1,9 @@
-//! The corporations' own mission slots, which the server keeps and round uses too: world only lets them expire and
-//! holds their disks in the world while they run.
-
 use ferrosa_wit::server;
 
 use crate::{World, state::CORPORATIONS};
 
-/// A mission disk's despawn time while its mission is active.
-const KEEP_DESPAWN: i32 = 65535;
 
 impl World {
-    /// The undecided missions whose deadline is now let go of their disks and, unless that decided them, fail.
     pub fn expire_corp_missions(&mut self, clock: i32) {
         for team in CORPORATIONS {
             let Some(corp) = server::get_corporation(team) else { continue };
@@ -28,7 +22,6 @@ impl World {
         }
     }
 
-    /// Each active mission's disk, while it has a despawn time, is kept from despawning.
     pub fn keep_mission_items(&mut self) {
         for team in CORPORATIONS {
             let Some(corp) = server::get_corporation(team) else { continue };
@@ -41,7 +34,7 @@ impl World {
                 if let Some(item) = m.item.and_then(server::get_item)
                     && item.despawn_time() > 0
                 {
-                    item.set_despawn_time(KEEP_DESPAWN);
+                    item.set_despawn_time(65535);
                 }
             }
         }

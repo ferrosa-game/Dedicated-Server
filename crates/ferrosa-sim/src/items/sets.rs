@@ -2,9 +2,11 @@ use ferrosa_protocol::clientbound::game::{
     ItemKind,
     events::{Event, ServerEvent, item_set_cell::EventItemSetCell},
 };
+use ferrosa_world::building::BuildingKind;
 use glam::IVec3;
 
 use super::Sim;
+use crate::items::state::ItemState;
 use crate::world::item_sets::{SetHit, entry_pose};
 
 /// The item-set cell an item was taken from: the cell, its word and the item's index in the set.
@@ -46,7 +48,33 @@ impl Sim {
             item.set_origin = Some(SetOrigin { cell, word: (word & (3 << 24)) + (word & 1023), index });
         }
 
+        if kind == ItemKind::Computer {
+            self.place_set_computer(id, pos, cell);
+        }
+
         Some(id)
+    }
+
+    fn place_set_computer(&mut self, id: usize, pos: glam::Vec3, cell: glam::IVec3) {
+        let placed: Option<(i32, BuildingKind, i32)> = self.world.map.level.buildings.iter().find_map(|b| {
+            if !b.contains(pos, 0.0) {
+                return None;
+            }
+
+            b.computers.iter().find(|&&(p, _)| p == cell).map(|&(_, v)| (v, b.kind, b.team))
+        });
+
+        let Some((volume, kind, team)) = placed else { return };
+
+        if let Some(i) = self.items.get_mut(id) {
+            i.volume = volume;
+        }
+
+        if kind == BuildingKind::CorporationBase
+            && let Some(ItemState::Computer(c)) = self.items.get_mut(id).map(|i| &mut i.state)
+        {
+            c.team = team;
+        }
     }
 
     /// Every item of the set a trace hit in `cell` made real (bullet_simulation, item_simulation); the ids by index.

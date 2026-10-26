@@ -1,6 +1,3 @@
-//! The client's side of the game packet (client_recv_game_packet?, client_recv_object_packet): what a client
-//! must remember between packets to read the next one, and the reading itself.
-
 use glam::Vec3;
 
 use crate::{

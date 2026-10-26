@@ -8,7 +8,7 @@ use super::{Sim, items::touchables};
 use crate::items::state::ItemState;
 use crate::{
     PlayerId,
-    world::building::{BURGER_SHOP, CAR_DEALER, CLOTHING_STORE, GUN_STORE, ShopEntry},
+    world::building::{BuildingKind, ShopEntry},
 };
 
 fn menu(id: u8) -> MenuType {
@@ -22,12 +22,6 @@ fn menu(id: u8) -> MenuType {
 }
 
 impl Sim {
-
-
-
-    /// The menu part of logic_player: standing in a dealership opens its front page (menu 9), in a store, clothing
-    /// store or burger shop its list (menu 10), in a bank the bank (menu 13); leaving the building closes menus 9 to 11.
-    /// The mode then builds each player's base menus.
     pub(crate) fn update_shop_menus(&mut self) {
         let mode = self.mode;
 
@@ -42,9 +36,6 @@ impl Sim {
         plugins.menus_done(self);
     }
 
-    /// One player's shop menu. Returns None for a player without a human, and the human's position when it is in no
-    /// shop or bank (where world mode then closes every menu outside a corporation base), except with the /stocks test
-    /// menu open, which is kept.
     fn shop_menu(&mut self, pid: PlayerId) -> Option<Option<glam::Vec3>> {
         let buildings = &self.world.map.level.buildings;
         let restarting = self.gamestate == ferrosa_protocol::clientbound::game::GameState::Restarting;
@@ -78,11 +69,11 @@ impl Sim {
         }
 
         let shop = buildings.iter().enumerate().find_map(|(k, b)| match b.kind {
-            CAR_DEALER if b.contains(pos, 0.0) => Some((k, 9)),
-            GUN_STORE | BURGER_SHOP | CLOTHING_STORE if b.contains(pos, 0.0) => Some((k, 10)),
+            BuildingKind::CarDealer if b.contains(pos, 0.0) => Some((k, 9)),
+            BuildingKind::GunStore | BuildingKind::BurgerShop | BuildingKind::ClothingStore if b.contains(pos, 0.0) => Some((k, 10)),
             _ => None,
         });
-        let found = shop.or_else(|| buildings.iter().position(|b| b.kind == crate::world::building::BANK && b.contains(pos, 0.0)).map(|k| (k, 13)));
+        let found = shop.or_else(|| buildings.iter().position(|b| b.kind == BuildingKind::Bank && b.contains(pos, 0.0)).map(|k| (k, 13)));
         let Some((k, m)) = found else {
             return Some((p.menu != MenuType::RoundCorpStock).then_some(pos));
         };
@@ -95,8 +86,6 @@ impl Sim {
         Some(None)
     }
 
-    /// The shop menus of logic_playerinteractions: the front page picks buying (1) or selling (2); a list buys its entry
-    /// `button`, and the back button returns to the front page.
     pub(crate) fn shop_menu_action(&mut self, pid: PlayerId, button: u32) {
         let Some(p) = self.players.get(pid.idx()) else { return };
 
@@ -120,10 +109,10 @@ impl Sim {
 
                 if button > 0 && button <= count {
                     match kind {
-                        5 => self.clothing_store_purchase(pid, button),
-                        3 => self.dealership_buy_vehicle(pid, button),
-                        8 if p.items_bought <= 19 => self.buy_shop_item(pid, button),
-                        9 => self.burger_shop_menu(pid, button),
+                        BuildingKind::ClothingStore => self.clothing_store_purchase(pid, button),
+                        BuildingKind::CarDealer => self.dealership_buy_vehicle(pid, button),
+                        BuildingKind::GunStore if p.items_bought <= 19 => self.buy_shop_item(pid, button),
+                        BuildingKind::BurgerShop => self.burger_shop_menu(pid, button),
                         _ => {}
                     }
                 }

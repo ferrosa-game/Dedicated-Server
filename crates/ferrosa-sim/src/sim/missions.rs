@@ -14,29 +14,23 @@ use glam::Vec3;
 use super::Sim;
 use crate::PlayerId;
 
-/// A corporation holds sixteen mission slots.
-pub const MISSION_SLOTS: usize = 16;
-
 /// One mission of a corporation (the fields read so far).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Mission {
     pub active: bool,
     /// set once the mission is decided.
     pub done: bool,
-    /// the mission counter when it was made, shared by the corporations of one deal.
     pub id: i32,
     /// 1 acquisition by car chase, 2 sell a disk, 3 buy it, 4 buy it unfunded, 7 two-team sellers, 8 their buyer.
     pub kind: i32,
-    /// The disks of the deal.
     pub item: i32,
     pub item2: i32,
     pub team1: i32,
     pub team2: i32,
     pub disk_type: i32,
     pub value: i32,
-    /// The world clock the mission runs until.
     pub deadline: i32,
-    /// The mission spot the disk waits at, or -1 for the table.
+    // -1 if table, otherwise location idx
     pub location: i32,
     pub provided_cash: i32,
     pub rate: f32,
@@ -329,6 +323,7 @@ impl Sim {
         }
 
         let expired = self.world_time >= m.deadline;
+        self.stats.missions = self.stats.missions.wrapping_add(1);
         let m = &mut self.corp_state[k].missions[slot];
 
         m.result = Some((expired, rating));

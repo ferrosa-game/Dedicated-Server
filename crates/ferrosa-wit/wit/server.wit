@@ -1,7 +1,7 @@
 package ferrosa:plugin@0.1.0;
 
 interface server {
-    use types.{bill, body, body-id, building, crime-rates, chat-type, client-mode, computer, corporation, game-state, human, human-id, intersection, item, item-id, mat3, player, player-id, sound, team, vec3, vehicle, vehicle-id, volume};
+    use types.{bill, body, body-id, building, chat-type, client-mode, computer, corporation, game-state, human, human-id, intersection, item, item-id, mat3, player, player-id, sound, team, vec3, vehicle, vehicle-id, volume};
 
     /// Makes this plugin a game mode, named for config.toml's gamemode and /resetgame. Only from init, and only once: a
     /// plugin that registers a mode is that mode, and only its mode hooks are called. `map` is the map it plays; none
@@ -44,6 +44,8 @@ interface server {
     get-item: func(id: item-id) -> option<item>;
     /// What a note is worth.
     bill-value: func(bill: bill) -> s32;
+    /// How many rounds a magazine kind holds; none for a kind that isn't one.
+    item-magazine-ammo: func(kind: u32) -> option<s32>;
     /// What an item kind costs in the shops.
     item-price: func(kind: u32) -> option<s32>;
 
@@ -91,10 +93,6 @@ interface server {
     /// The route an NPC walks, from the first point, round and round.
     set-npc-waypoints: func(npc: u32, waypoints: list<vec3>);
 
-    /// Hurting people raises criminal ratings by these rates, and the kick applies; none turns it off, as it is
-    /// after every reset. A mode sets it from its reset hook.
-    set-crime: func(rates: option<crime-rates>);
-
     /// The height of the ground under `pos`, looking from 8 above it to 256 below.
     ground-below: func(pos: vec3) -> option<f32>;
 
@@ -122,10 +120,12 @@ interface server {
 
     /// The server's tick count, which counts on from the reset (60 a second).
     get-tick: func() -> u32;
-    /// Writes the accounts out, as world mode does at every save.
-    save-accounts: func();
-    /// Writes the server's stats out.
-    save-stats: func();
+    /// The name an account is known by, for a mode writing its own saved file.
+    account-name: func(account: u32) -> option<string>;
+    /// How many bullets have been fired since the server started, for a mode that keeps statistics.
+    bullets-fired: func() -> u32;
+    /// How many missions have been settled since the server started.
+    missions-settled: func() -> u32;
     /// Sends every client the corporations' share prices.
     send-stock-prices: func();
 
@@ -194,6 +194,10 @@ interface server {
     set-count-humanless-members: func(on: bool);
     /// Garage doors open and close when a teammate knocks on them.
     set-door-knocks: func(on: bool);
+    /// Hurting a teammate hurts the attacker too.
+    set-punish-team-kills: func(on: bool);
+    /// Shares are sold when the human dies and bought back when a returning player takes it over.
+    set-shares-follow-human: func(on: bool);
 
     get-gravity: func() -> f32;
     set-gravity: func(scale: f32);

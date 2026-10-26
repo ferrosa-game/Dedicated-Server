@@ -13,7 +13,7 @@ use ferrosa_protocol::clientbound::game::{
 };
 use glam::Vec3;
 
-use super::{Sim, economy, items::touchables};
+use super::{Sim, items::touchables};
 use crate::{
     PlayerId,
     human::{
@@ -195,13 +195,6 @@ impl Sim {
                 }
                 HumanOutput::DoorProbe { player, start, end, pos } => {
                     self.team_door_probe(player, start, end, pos);
-                    continue;
-                }
-                HumanOutput::TaxAccount(account) => {
-                    if let Some(a) = self.saved_accounts.get_player_data(account) {
-                        economy::account_wealth_tax(a);
-                    }
-
                     continue;
                 }
             };

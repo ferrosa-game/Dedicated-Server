@@ -1,5 +1,3 @@
-//! The client's keys (ClientGamePacket input_flags), which humans and bots keep as a raw u32, and the use flags a
-//! human sets on the item in its hand.
 use ferrosa_protocol::serverbound::game::InputFlags;
 
 use crate::{human::Human, items::Item};

@@ -43,7 +43,7 @@ impl Map {
         }
 
         println!("[Map] Attempting to build grid...");
-        let level = build_level(&city, &city_data, &mut ground, &roads, dir, Path::new("data"), &map_name, 0);
+        let level = build_level(&city, &city_data, &mut ground, &roads, dir, Path::new("data"), &map_name);
 
         roads.compute_world_bounds();
         ground.build_city_blocks(&roads);

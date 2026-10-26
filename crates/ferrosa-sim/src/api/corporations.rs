@@ -5,7 +5,7 @@ use crate::{
         Sim,
         corporations::team_index,
         economy::Corporation,
-        missions::{MISSION_SLOTS, Mission},
+        missions::Mission,
     },
     world::building::CorporationBase,
 };
@@ -53,21 +53,19 @@ impl Sim {
         team_index(team).and_then(|k| self.world.map.level.bases.get(k))
     }
 
-    /// A vehicle in the first free car space of the corporation's base.
     pub fn spawn_corporation_vehicle(&mut self, team: Team, kind: u32, colour: i32) -> Option<usize> {
         let kind = VehicleKind::try_from(u8::try_from(kind).ok()?).ok()?;
         self.corporation_spawn_vehicle(kind, team_index(team)?, colour)
     }
 
-    pub fn missions(&self, team: Team) -> Option<&[Mission; MISSION_SLOTS]> {
+    pub fn missions(&self, team: Team) -> Option<&[Mission; 16]> {
         team_index(team).map(|k| &self.corp_state[k].missions)
     }
 
-    /// Sets a mission slot and tells the corporation's clients.
     pub fn set_mission(&mut self, team: Team, slot: usize, mission: Mission) {
         let Some(k) = team_index(team) else { return };
 
-        if slot >= MISSION_SLOTS {
+        if slot >= 16 {
             return;
         }
 

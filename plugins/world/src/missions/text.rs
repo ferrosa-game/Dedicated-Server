@@ -1,6 +1,3 @@
-//! What an INTEL file says: one sentence per part, each picked at random, as the game writes them.
-
-/// create_world_mode_mission_string: what the INTEL file says about a mission.
 pub(super) fn mission_string(file: &str, a: &str, b: &str, project: &str, high_value: bool) -> String {
     let mut text = String::new();
 
@@ -28,7 +25,6 @@ pub(super) fn mission_string(file: &str, a: &str, b: &str, project: &str, high_v
     text
 }
 
-/// The INTEL part naming the lab's streets.
 pub(super) fn streets_part(a: &str, b: &str) -> String {
     match rand::random_range(0..3) {
         0 => format!("the laboratory at {a} and {b} has the data. "),
@@ -37,7 +33,6 @@ pub(super) fn streets_part(a: &str, b: &str) -> String {
     }
 }
 
-/// The INTEL part naming the project.
 pub(super) fn project_part(project: &str) -> String {
     match rand::random_range(0..3) {
         0 => format!("project {project} has made progress in many areas. "),
@@ -46,7 +41,6 @@ pub(super) fn project_part(project: &str) -> String {
     }
 }
 
-/// The INTEL part about the project's worth: office chatter, or for the boosted mission a hint.
 pub(super) fn worth_part(boosted: bool) -> &'static str {
     if boosted {
         return if rand::random_range(0..2) == 1 { "this is a high priority project. " } else { "this project is extremely high value. " };

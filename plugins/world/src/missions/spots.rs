@@ -1,16 +1,9 @@
-//! The lab computers a mission's document can sit on, and the base computers that read them.
-
 use ferrosa_wit::{BuildingKind, server};
 
 use super::MissionSpot;
 use crate::World;
 
-/// A computer's volume holds 10000, a disk 360.
-const COMPUTER_CAPACITY: i32 = 10000;
-
 impl World {
-    /// init_mission_spots: each base computer gets a volume with MISSION.EXE and DECRYPT.EXE for its corporation,
-    /// and each lab becomes a mission spot with a volume per computer.
     pub fn init_mission_spots(&mut self) {
         self.state.missions.spots.clear();
 
@@ -24,7 +17,7 @@ impl World {
                     let team = b.team();
 
                     for (m, _) in b.computers().iter().enumerate() {
-                        let Some(volume) = server::new_volume(COMPUTER_CAPACITY) else { continue };
+                        let Some(volume) = server::new_volume(10_000) else { continue };
 
                         b.set_computer_volume(m as u32, &volume);
                         volume.add_file_of_content("MISSION.EXE", 0);
@@ -40,7 +33,7 @@ impl World {
                     let mut volumes = Vec::new();
 
                     for (m, _) in b.computers().iter().enumerate() {
-                        let Some(volume) = server::new_volume(COMPUTER_CAPACITY) else { continue };
+                        let Some(volume) = server::new_volume(10_000) else { continue };
 
                         b.set_computer_volume(m as u32, &volume);
                         volumes.push(volume.id() as i32);

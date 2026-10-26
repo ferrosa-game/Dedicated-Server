@@ -2,43 +2,24 @@ use ferrosa_wit::{BuildingKind, ItemKind, Mat3, ShopEntry, Vec3, server};
 
 use crate::{World, state::CORPORATIONS};
 
-/// The city itself: where players enter it, and the shops and ratings that tick over through the day.
-///
-/// On test2 reset_game puts the spawn by the fifth train spawn, 16 east and 1 up.
-const TEST2_SPAWN_TRAIN: usize = 4;
-const TEST2_SPAWN_EAST: f32 = 16.0;
-const TEST2_SPAWN_UP: f32 = 1.0;
-
-/// load_map's spawn: one end of the first street, moved 1480 east, 1 up and 24 north.
-const SPAWN_STREET: i32 = 0;
-const SPAWN_EAST_A: f32 = 96.0;
-const SPAWN_EAST_B: f32 = 1384.0;
-const SPAWN_UP: f32 = 1.0;
-const SPAWN_NORTH: f32 = 24.0;
-
-const BURGER_PRICE: i32 = 20;
-
 impl World {
-    /// Where civilians enter the city: on test2 beside the fifth train spawn, otherwise off the end of the first
-    /// street.
     pub fn map_spawn(&self) -> Vec3 {
         if server::map_name() == "test2" {
-            let t = server::track_spawns().get(TEST2_SPAWN_TRAIN).map_or(Vec3::ZERO, |s| s.0);
+            let t = server::track_spawns().get(4).map_or(Vec3::ZERO, |s| s.0);
 
-            return Vec3::new(TEST2_SPAWN_EAST + t.x, TEST2_SPAWN_UP + t.y, t.z);
+            return Vec3::new(t.x + 16.0, t.y + 1.0, t.z);
         }
 
-        let Some((end, _)) = server::street_intersections(SPAWN_STREET) else { return Vec3::ZERO };
+        let Some((end, _)) = server::street_intersections(0) else { return Vec3::ZERO };
         let corners = server::intersections();
         let Some(i) = corners.get(end as usize) else { return Vec3::ZERO };
         let p = i.pos;
 
-        Vec3::new((SPAWN_EAST_A + p.x) + SPAWN_EAST_B, SPAWN_UP + p.y, p.z - SPAWN_NORTH)
+        Vec3::new((p.x + 96.0) + 1384.0, p.y + 1.0, p.z - 24.0)
     }
 
-    /// The burger shops' one line, topped back up every tick until they close for the day.
     pub fn stock_burger_shops(&mut self) {
-        let stock = [ShopEntry { kind: 0, price: BURGER_PRICE, extra: 0 }];
+        let stock = [ShopEntry { kind: 0, price: 20, extra: 0 }];
 
         for b in server::buildings().iter().filter(|b| b.kind() == BuildingKind::BurgerShop) {
             if b.shop().len() != 1 {
@@ -47,8 +28,6 @@ impl World {
         }
     }
 
-    /// Every quarter hour: each corporation's prints and every player's purchases are forgotten, and criminal
-    /// ratings decay.
     pub fn world_crime_tick(&mut self) {
         for team in CORPORATIONS {
             if let Some(corp) = server::get_corporation(team) {
@@ -60,20 +39,21 @@ impl World {
 
         for p in server::players() {
             p.set_items_bought(0);
+
+            if p.vehicles_bought() > 0 {
+                p.set_vehicles_bought(p.vehicles_bought() - 1);
+            }
+
+            // If they are above the buy limit, just increase the bought to make it so they cant
+            if p.crim_rating() >= self.state.cfg.crimenobuy {
+                p.set_items_bought(i32::MAX);
+                p.set_vehicles_bought(i32::MAX);
+            }
         }
 
         self.account_crime_tick();
     }
-}
-/// The world keeps 8 memos at the spawn, 4 to the west and 1 to the south of it.
-const MEMOS: i32 = 8;
 
-const MEMO_WEST: f32 = 4.0;
-
-const MEMO_SOUTH: f32 = 1.0;
-
-impl World {
-    /// Bots go when they lose their human, and when their deadline passes they leave with what they hold.
     pub fn expire_world_bots(&mut self) {
         let clock = server::world_time();
 
@@ -96,13 +76,12 @@ impl World {
         }
     }
 
-    /// The memos at the spawn, topped back up to 8.
     pub fn place_world_memos(&mut self) {
         let s = self.map_spawn();
         let paper = String::from_utf8_lossy(&self.state.newspaper).into_owned();
 
-        while self.state.memos < MEMOS {
-            let pos = Vec3::new(s.x - MEMO_WEST, s.y, MEMO_SOUTH + s.z);
+        while self.state.memos < 8 {
+            let pos = Vec3::new(s.x - 4.0, s.y, s.z + 1.0);
             let Some(item) = server::spawn_item_by_id(ItemKind::PaperWorld as u32, pos, Mat3::IDENTITY) else { break };
 
             item.write_memo(&paper);

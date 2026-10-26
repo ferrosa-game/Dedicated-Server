@@ -157,7 +157,7 @@ impl Round {
     /// The menus logic_player leaves to the mode: in the lobby a player without a human has the lobby menu (and no
     /// menu otherwise), a corporation member inside their base gets the weapons page when no menu is open, and the buy
     /// pages close once they leave it.
-    pub(crate) fn base_menus(&self) {
+    pub(crate) fn corp_buy_menus(&self) {
         let lobby = server::get_game_state() == GameState::Intermission;
 
         for p in server::players() {

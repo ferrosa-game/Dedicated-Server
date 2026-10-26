@@ -1,9 +1,11 @@
 target/
 map.ppm
-server.srk
+players.json
 stats.txt
 config.toml
 config_world.txt
 config_round.txt
 config.toml
 serveradmin.txt
+bans.txt
+accounts.txt

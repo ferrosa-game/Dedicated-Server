@@ -1,90 +1,9 @@
-use ferrosa_protocol::Team;
 use ferrosa_world::skeleton::BoneId;
-use glam::Vec3;
 
 use super::Sim;
 use crate::{PlayerId, human::damage::damage_human};
 
 impl Sim {
-    /// handle_criminal_rating: in world mode, a player who hurts another gains criminal rating by their teams
-    /// (civilian or corporation, and whether the victim was in their own base), less the more criminal the victim
-    /// already is. A player who reaches crimekick has their human killed.
-    pub(crate) fn handle_criminal_rating(&mut self, attacker: PlayerId, victim: PlayerId, damage: i32) {
-        let cfg = self.rules;
-        let (Some(attacker_player), Some(attacker_victim)) = (self.players.get(attacker.idx()), self.players.get(victim.idx())) else { return };
-        let (Some(attacker_human), Some(victim_human)) = (attacker_player.human, attacker_victim.human) else { return };
-
-        if attacker_player.is_bot || attacker_victim.is_bot {
-            return;
-        }
-
-        if !self.rules.crime {
-            return;
-        }
-
-        let Some(vh) = self.humans.get(victim_human) else { return };
-        let (victim_pos, last_vehicle) = (vh.bones[0].pos, vh.last_vehicle);
-        let owner = (last_vehicle != -1).then(|| self.vehicles.get(last_vehicle as usize)).flatten().map_or(-1, |v| v.owner);
-        let (a_team, v_team) = (attacker_player.team as i32, attacker_victim.team as i32);
-
-        let rate = if attacker_player.team == Team::Spectator {
-            if last_vehicle != -1 && attacker.idx() as i32 == owner && owner != -1 {
-                return;
-            }
-
-            if attacker_victim.team == Team::Spectator { cfg.crimecivciv } else { cfg.crimecivteam }
-        } else if !(0..=5).contains(&a_team) {
-            cfg.crimecivciv
-        } else {
-            if self.in_base(a_team, victim_pos) {
-                return;
-            }
-
-            if owner != -1 && self.players.get(owner as usize).is_some_and(|o| o.team as i32 == a_team) {
-                return;
-            }
-
-            if attacker_victim.team == Team::Spectator {
-                cfg.crimeteamciv
-            } else if (0..=5).contains(&v_team) && self.in_base(v_team, victim_pos) {
-                cfg.crimeteamteaminbase
-            } else {
-                cfg.crimeteamteam
-            }
-        };
-
-        let mut k = rate as f32 / 100.0;
-
-        if attacker_victim.crim_rating > 0 {
-            let f = attacker_victim.crim_rating as f32 / 100.0;
-
-            if f > 1.0 {
-                k *= 0.0;
-            } else if f >= 0.0 {
-                k *= 1.0 - f;
-            }
-        }
-
-        let gain = (damage as f32 * k) as i32;
-        let Some(a) = self.players.get_mut(attacker.idx()) else { return };
-
-        if gain > 0 {
-            a.crim_rating += gain;
-        }
-
-        a.crim_rating = a.crim_rating.min(1023);
-
-        if cfg.crimekick <= a.crim_rating
-            && let Some(h) = self.humans.get_mut(attacker_human)
-        {
-            h.health.vitality = 0;
-        }
-    }
-
-    fn in_base(&self, team: i32, pos: Vec3) -> bool {
-        usize::try_from(team).ok().and_then(|t| self.world.map.level.bases.get(t)).is_some_and(|b| b.contains(pos))
-    }
-
     /// handle_team_kill: the team damage is logged and dealt to the player's head, and the player's details resent.
     pub fn handle_team_kill(&mut self, player: PlayerId, damage: i32) {
         let Some(player) = self.players.get(player.idx()) else { return };
@@ -106,8 +25,8 @@ impl Sim {
         self.events.push(round);
     }
 
-    /// The scoring of one player hurting another: a teammate is punished (not in eliminator) and the attacker's
-    /// criminal rating goes up, as bullet_simulation does it.
+    /// The scoring of one player hurting another: a teammate is punished (not in eliminator), and the mode scores
+    /// the hit, as bullet_simulation does it.
     pub(crate) fn score_hurt(&mut self, attacker: Option<PlayerId>, victim: Option<PlayerId>, damage: i32) {
         let (Some(attacker), Some(victim)) = (attacker, victim) else { return };
 
@@ -115,7 +34,7 @@ impl Sim {
             return;
         }
 
-        self.handle_criminal_rating(attacker, victim, damage);
+        self.plugins.on_hurt(self, attacker, victim, damage);
 
         if self.same_team(attacker, victim) {
             self.handle_team_kill(attacker, damage);
@@ -133,7 +52,7 @@ impl Sim {
         let Some(victim) = victim else { return };
 
         if driver != victim {
-            self.handle_criminal_rating(driver, victim, 100);
+            self.plugins.on_hurt(self, driver, victim, 100);
         }
 
         if self.same_team(driver, victim) {

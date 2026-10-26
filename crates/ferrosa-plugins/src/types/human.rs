@@ -89,6 +89,11 @@ impl types::HostHuman for HostState {
         self.vehicle_handle(v).map(Some)
     }
 
+    fn last_vehicle(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<Option<Resource<VehicleRef>>> {
+        let Some(v) = self.human_of(&human)?.and_then(|h| usize::try_from(h.last_vehicle).ok()) else { return Ok(None) };
+        self.vehicle_handle(v).map(Some)
+    }
+
     fn bones(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<Vec<Resource<BodyRef>>> {
         let bodies: Vec<usize> = self.human_of(&human)?.map_or_else(Vec::new, |h| h.bones.iter().map(|b| b.body).collect());
         bodies.into_iter().map(|b| self.body_handle(b)).collect()

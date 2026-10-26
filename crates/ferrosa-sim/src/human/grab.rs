@@ -1,9 +1,3 @@
-//! Hands holding on to other humans: the grab part of human_update_hand_grab_and_inventory.
-//!
-//! The binary keeps a grab record per hand and, while the grab key is held, bonds the hand to the spot it records,
-//! but nothing in it ever fills the record in, so no hand ever takes hold. Here an empty hand takes hold of the
-//! nearest other human's bone it touches while the key is held.
-
 use ferrosa_physics::rotation::{rotate, unrotate};
 use ferrosa_physics::{Bond, ItemPoint, RigidBodies, RotMatrix, Table};
 use glam::Vec3;

@@ -5,7 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use ferrosa_map::file_types::srk::SrkData;
+use ferrosa_map::file_types::roster::Roster;
 use ferrosa_protocol::{
     clientbound::{
         game::{
@@ -37,6 +37,7 @@ use crate::{
 use rayon::prelude::*;
 
 pub mod admin;
+pub mod bans;
 pub mod bots;
 pub mod bullets;
 pub mod corporations;
@@ -146,7 +147,8 @@ pub struct Sim {
     out_tx: Outbound,
     drop_tx: Dropped,
     pub(crate) world: World,
-    pub(crate) saved_accounts: SrkData,
+    pub(crate) roster: Roster,
+    pub(crate) bans: bans::Bans,
     pub(crate) players: crate::player::PlayerTable,
     pub(crate) clients: HashMap<ConnId, Client>,
     pub(crate) max_players: u8,
@@ -163,8 +165,6 @@ pub struct Sim {
     pub(crate) vehicle_types: Vec<crate::vehicle::types::VehicleType>,
     /// The world mode clock.
     pub(crate) world_time: i32,
-    /// Per account, the spawn timer kept while its player is away (not saved to disk).
-    pub(crate) account_spawn_timers: HashMap<u32, i32>,
     /// The walkie-talkies on each channel (rebuilt by logic_item, read by calculate_voice).
     pub(crate) radio_channels: Vec<Vec<usize>>,
     pub(crate) traffic: crate::traffic::Traffic,
@@ -176,7 +176,6 @@ pub struct Sim {
     pub(crate) game_timer: i32,
     pub(crate) round_elapsed: i32,
     /// Each game mode's own state and config.
-    pub(crate) modes: crate::gamemode::Modes,
     pub(crate) npcs: Vec<Option<npcs::Npc>>,
     pub(crate) admin: admin::AdminState,
     pub(crate) missions: missions::MissionGlobals,
@@ -195,7 +194,7 @@ pub struct Sim {
     pub(crate) week: Option<(bool, u8)>,
 }
 
-/// What stats.txt counts since the server started: mission deals and bullets.
+/// What the server counts since it started, for a mode that keeps statistics.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ServerStats {
     pub missions: u32,
@@ -214,7 +213,8 @@ impl Sim {
         plugins: crate::plugin::Plugins,
         max_players: u8,
     ) -> Self {
-        let srk_data = SrkData::load(Path::new("server.srk")).unwrap();
+        let roster = Roster::load(Path::new("players.json"));
+        let bans = bans::Bans::load(Path::new("bans.txt"));
         let corporations = [economy::Corporation::default(); economy::CORPORATIONS];
         let mut events = EventRing::default();
         events.push(economy::stock_event(&corporations, 0));
@@ -231,7 +231,7 @@ impl Sim {
             plugins,
             gamestate: GameState::Intermission,
             round_number: 0,
-            saved_accounts: srk_data,
+            roster,
             players: crate::player::PlayerTable::default(),
             clients: HashMap::new(),
             max_players,
@@ -247,7 +247,6 @@ impl Sim {
             vehicles: ferrosa_physics::Table::new(512),
             vehicle_types: crate::vehicle::types::vehicle_types(Path::new("data")),
             world_time: economy::WORLD_TIME_START,
-            account_spawn_timers: HashMap::new(),
             radio_channels: vec![Vec::new(); 128],
             traffic: crate::traffic::Traffic::default(),
             tick_stats: tps::TickStats::default(),
@@ -255,9 +254,9 @@ impl Sim {
             corp_state: Default::default(),
             game_timer: game_minutes(2),
             round_elapsed: 0,
-            modes: crate::gamemode::Modes::load(),
             npcs: Vec::new(),
             admin: admin::AdminState::load(Path::new("serveradmin.txt")),
+            bans,
             missions: Default::default(),
             occupied: false,
             stats: ServerStats::default(),
@@ -321,9 +320,10 @@ impl Sim {
             weekday,
             sun_angle: self.world.sun_angle(),
             sun_axial_tilt: self.world.sun_axial_tilt(),
-            versus_movedelay: mode.versus_movedelay,
             gamemode: self.mode.client_mode(),
             map_name: self.world.map.map_name.clone(),
+            // No mode this server runs is versus, which is the only one the client reads it for.
+            versus_movedelay: None,
         }
     }
 
@@ -433,12 +433,6 @@ impl Sim {
 
         timed!(self, "broadcast", self.broadcast_tick());
         self.send_admin_lists();
-
-        for player in self.saved_accounts.players.iter_mut() {
-            if player.ban_time > 0 {
-                player.ban_time -= 1;
-            }
-        }
 
         self.tick += 1;
         self.ticks_since_reset = self.ticks_since_reset.wrapping_add(1);

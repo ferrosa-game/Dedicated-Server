@@ -20,6 +20,12 @@ impl types::HostCorporation for HostState {
         Ok(self.table.get(&corporation)?.0.into())
     }
 
+    fn name(&mut self, corporation: Resource<CorporationRef>) -> wasmtime::Result<String> {
+        let team = self.table.get(&corporation)?.0;
+
+        Ok(Team::CORPORATIONS.iter().position(|&t| t == team).and_then(|k| Team::CORPORATION_NAMES.get(k)).unwrap_or(&"").to_string())
+    }
+
     fn shares(&mut self, corporation: Resource<CorporationRef>) -> wasmtime::Result<i32> {
         let team = self.table.get(&corporation)?.0;
         Ok(self.sim()?.corporation(team).map_or(0, |c| c.shares))

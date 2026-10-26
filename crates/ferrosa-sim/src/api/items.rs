@@ -20,6 +20,10 @@ impl Sim {
         self.item_types.get(kind as usize).map(|t| t.price)
     }
 
+    pub fn item_magazine_ammo(&self, kind: u32) -> Option<i32> {
+        self.item_types.get(kind as usize).map(|t| t.magazine_ammo)
+    }
+
     pub fn spawn_item(&mut self, kind: u32, pos: Vec3, rot: RotMatrix) -> Option<usize> {
         let kind = ItemKind::try_from(u8::try_from(kind).ok()?).ok()?;
         self.create_item(kind, pos, None, rot)
@@ -135,20 +139,16 @@ impl Sim {
         true
     }
 
-    /// What a bundle of cash is worth; none if the item isn't cash.
     pub fn item_cash_value(&self, item: usize) -> Option<i32> {
         self.items.get(item)?.state.cash().map(|c| c.value())
     }
 
-    /// cash_separate: puts a bill of `code` into the bundle at `at` (on top past the end), moving the bills above it
-    /// up. False if the item isn't cash or already holds ten bills.
     pub fn insert_item_bill(&mut self, item: usize, at: i32, code: u32) -> bool {
         let Some(c) = self.items.get_mut(item).and_then(|i| i.state.cash_mut()) else { return false };
 
         c.insert(at, code)
     }
 
-    /// What a bill of each code is worth.
     pub fn bill_value(code: u32) -> i32 {
         crate::items::state::BILL_VALUES.get(code as usize).copied().unwrap_or(0)
     }

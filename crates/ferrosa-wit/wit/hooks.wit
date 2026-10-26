@@ -43,6 +43,20 @@ interface menus-done {
     menus-done: func();
 }
 
+/// Each player's menus for the tick, once the shops and banks have had theirs. `outside` is where their human
+/// stands when it is in no shop or bank, and none when it is in one, so a mode leaves those menus alone. Only asked
+/// of the mode.
+interface base-menus {
+    use types.{player-id, vec3};
+
+    base-menus: func(player: player-id, outside: option<vec3>);
+}
+
+/// What a joining player's money is, given what their account holds. Only asked of the mode.
+interface joining-money {
+    joining-money: func(money: s32) -> s32;
+}
+
 /// A menu button pressed; true takes it. The mode is asked first, then each plugin, then the shared menus.
 interface on-menu {
     use types.{menu, player-id};
@@ -63,6 +77,14 @@ interface on-join {
     use types.{player-id};
 
     on-join: func(player: player-id);
+}
+
+/// One player has hurt another: where a mode scores it. The damage is what landed, except for a grenade or a
+/// run-over, which both come as 100.
+interface on-hurt {
+    use types.{player-id};
+
+    on-hurt: func(attacker: player-id, victim: player-id, damage: s32);
 }
 
 /// A player has left

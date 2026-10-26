@@ -1,4 +1,4 @@
-use ferrosa_map::file_types::srk::SrkPlayerData;
+use ferrosa_map::file_types::roster::RosterPlayer;
 use ferrosa_protocol::{
     Model, SuitColor, Team,
     clientbound::game::events::{Event, ServerEvent, update_stock::EventUpdateStock},
@@ -107,16 +107,6 @@ pub fn wealth_tax(player: &mut Player, corps: &mut [Corporation; 6]) {
     }
 }
 
-/// some_cash_penalty: the wealth tax on the money of an account whose player has left.
-pub fn account_wealth_tax(account: &mut SrkPlayerData) {
-    let money = account.money as i32;
-    let excess = money - 10_000;
-
-    if excess > 0 {
-        account.money = (money - (excess as f32 * 0.05) as i32) as u32;
-    }
-}
-
 /// create_event_update_stock: the first five share prices in tenths.
 pub fn stock_event(corps: &[Corporation; 6], tick: u32) -> Event {
     let tenths: Vec<i32> = corps.iter().map(|c| (c.price * 10.0) as i32).collect();
@@ -124,14 +114,6 @@ pub fn stock_event(corps: &[Corporation; 6], tick: u32) -> Event {
         tick_created: tick,
         kind: ServerEvent::UpdateStock(EventUpdateStock { prices: [(tenths[1] << 16) + tenths[0], (tenths[3] << 16) + tenths[2], tenths[4]] }),
     }
-}
-
-fn account_name_bytes(name: &str) -> [u8; 32] {
-    let mut buf = [0u8; 32];
-    let src = name.as_bytes();
-    let n = src.len().min(31);
-    buf[..n].copy_from_slice(&src[..n]);
-    buf
 }
 
 /// sanitize_name: slashes become spaces, the spaces at either end go, and an empty name is "Noname".
@@ -149,44 +131,6 @@ pub fn sanitize_name(raw: &[u8]) -> String {
 pub const WORLD_TIME_START: i32 = 1728010;
 
 impl Sim {
-
-    /// save_accounts: writes server.srk.
-    pub(crate) fn save_accounts(&self) {
-        if let Err(e) = self.saved_accounts.save(std::path::Path::new("server.srk")) {
-            println!("[Sim] Could not save accounts: {e:?}");
-        }
-    }
-
-    /// save_stats: writes stats.txt, the deals made and bullets fired since the server started, the accounts and their
-    /// play time (in tens), and a line per account.
-    pub(crate) fn save_stats(&self) {
-        let accounts = &self.saved_accounts.players;
-        let total = accounts.iter().fold(0u32, |t, a| t.wrapping_add(a.play_time / 10));
-        let average = if accounts.is_empty() { 0 } else { total / accounts.len() as u32 };
-        let mut out = format!(
-            "numofmissions={}\r\nnumofbullets={}\r\nusers={}\r\ntotaltime={}\r\naveragetime={}\r\n\r\n",
-            self.stats.missions as i32,
-            self.stats.bullets as i32,
-            accounts.len(),
-            total as i32,
-            average as i32
-        );
-
-        for (i, a) in accounts.iter().enumerate() {
-            let line = format!("{i}:{}:{} ({})", a.name(), (a.play_time / 10) as i32, a.account_id as i32);
-            out += &line;
-
-            if a.ban_time != 0 {
-                out += &format!(" BANNED {}", a.ban_time as i32);
-            }
-
-            out += "\r\n";
-        }
-
-        if let Err(e) = std::fs::write("stats.txt", out) {
-            println!("[Sim] Could not save stats: {e:?}");
-        }
-    }
 
     /// The death bookkeeping of human_simulation for a dead human's player: world mode sells their shares and sets
     /// the respawn wait, every mode taxes their wealth, then the player loses the human.
@@ -221,49 +165,18 @@ impl Sim {
     /// create_account_from_join_ticket: the joining player's account, made new (1000 money, startcash in world mode,
     /// 1000 corporate rating and a random look) if this server has not seen them, and brought up to date with what the
     /// master server says about them.
-    pub(crate) fn join_account(&mut self, auth: &ferrosa_protocol::masterserver::AuthPacket) -> SrkPlayerData {
-        let accounts = &mut self.saved_accounts;
+    pub(crate) fn join_account(&mut self, auth: &ferrosa_protocol::masterserver::AuthPacket) -> RosterPlayer {
+        let name = sanitize_name(auth.player_name.as_bytes());
+        let player = self.roster.cache_player(auth.account_id, &name, auth.phone_number, auth.steam_id);
 
-        if !accounts.players.iter().any(|a| a.account_id == auth.account_id) {
-            let mut a = SrkPlayerData::new(auth.account_id, &auth.player_name, auth.phone_number, auth.steam_id);
-            a.money = 10000;
-            a.corp_rating = 1000;
-            a.eye_color = rand::random_range(0..3) as u32;
-            a.hair_color = rand::random_range(0..8) as u32;
-            a.skin_color = rand::random_range(0..4) as u32;
-            accounts.players.push(a);
-            accounts.player_count = accounts.players.len() as u32;
-        }
+        self.roster.save(std::path::Path::new("players.json"));
 
-        let a = accounts.players.iter_mut().find(|a| a.account_id == auth.account_id).unwrap();
-        a.phone_number = auth.phone_number;
-        a.steam_id = auth.steam_id;
-
-        if self.admin.steam_bans.contains(&a.steam_id) {
-            a.ban_time = 100_000_000;
-        }
-
-        a.player_name = account_name_bytes(&auth.player_name);
-        a.clone()
+        player
     }
 
     /// The account part of server_recv_and_dispatch's join and restore_account_data: round and world mode players
     /// get their saved money and ratings back, then the mode's starting money applies.
     pub(crate) fn restore_account(&mut self, pid: PlayerId) {
-        let Some(player) = self.players.get_mut(pid.idx()) else { return };
-        if self.rules.saved_accounts
-            && let Some(a) = self.saved_accounts.get_player_data(player.account_id)
-        {
-            player.money = a.money as i32;
-
-            if (a.corp_rating as i32) < 0 {
-                a.corp_rating = 0;
-            }
-
-            player.corp_rating = a.corp_rating as i32;
-            player.crim_rating = a.crim_rating as i32;
-            player.spawn_timer = self.account_spawn_timers.get(&player.account_id).copied().unwrap_or(0);
-        }
         self.reclaim_humans(pid);
         let Some(money) = self.players.get(pid.idx()).map(|p| p.money) else { return };
         let money = self.mode.joining_money(self, money);
@@ -323,23 +236,11 @@ impl Sim {
                 continue;
             }
 
-            if self.rules.world_corporations {
-                self.update_corp_player_ratings(k);
-            }
-
             self.corp_state[k].manager = None;
             self.corp_state[k].fired.clear();
         }
 
         let Some(player) = self.players.get_mut(pid.idx()) else { return };
-
-        if let Some(a) = self.saved_accounts.get_player_data(player.account_id) {
-            a.money = player.money as u32;
-            a.corp_rating = player.corp_rating as u32;
-            a.crim_rating = player.crim_rating as u32;
-        }
-
-        self.account_spawn_timers.insert(player.account_id, player.spawn_timer);
         let account = player.account_id;
         if let Some(h) = player.human.and_then(|id| self.humans.get_mut(id))
             && h.player == Some(pid)

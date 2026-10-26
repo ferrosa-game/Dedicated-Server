@@ -4,12 +4,12 @@ pub mod csx;
 pub mod glb;
 pub mod it3;
 pub mod itm;
+pub mod roster;
 pub mod sbb;
 pub mod sbc;
 pub mod sbl;
 pub mod sbv;
 pub mod sis;
-pub mod srk;
 pub mod tst;
 
 #[derive(Debug)]

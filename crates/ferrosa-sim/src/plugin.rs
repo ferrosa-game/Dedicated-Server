@@ -31,7 +31,10 @@ pub trait PluginHooks: Sync {
 
     fn on_leave(&self, _sim: &mut Sim, _pid: PlayerId) {}
 
+    fn on_hurt(&self, _sim: &mut Sim, _attacker: PlayerId, _victim: PlayerId, _damage: i32) {}
+
     fn on_death(&self, _sim: &mut Sim, _pid: PlayerId) {}
+
 
     fn on_damage(&self, _sim: &mut Sim, _human: usize, _cause: DamageCause, _bone: Option<BoneId>, damage: i32) -> i32 {
         damage

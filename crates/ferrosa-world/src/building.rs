@@ -63,22 +63,23 @@ pub fn building_type(name: &str, roundcity: bool) -> i32 {
     }
 }
 
-/// The kinds of building record: a corporation's base, a car dealership, a lab, a clothing store, a
-/// bank, a gun store and a burger shop.
-pub const CORPORATION_BASE: i32 = 1;
-pub const CAR_DEALER: i32 = 3;
-pub const LAB: i32 = 4;
-pub const CLOTHING_STORE: i32 = 5;
-pub const BANK: i32 = 6;
-pub const GUN_STORE: i32 = 8;
-pub const BURGER_SHOP: i32 = 9;
+/// What kind of building the game keeps a record of. The game numbers these 1, 3, 4, 5, 6, 8 and 9, with nothing
+/// outside reading the number.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BuildingKind {
+    #[default]
+    Other,
+    CorporationBase,
+    CarDealer,
+    Lab,
+    ClothingStore,
+    Bank,
+    GunStore,
+    BurgerShop,
+}
 
-/// What a clothing store sells (two suits, a third, two necklaces) and a burger shop's single burger.
 const CLOTHING_STOCK: [(i32, i32); 5] = [(0, 1000), (1, 5000), (2, 10000), (3, 10000), (4, 100000)];
-const BURGER_PRICE: i32 = 20;
 
-/// A shop's stock entry: an item or vehicle type, its price and a third value (a
-/// dealership car's colour).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ShopEntry {
     pub kind: i32,
@@ -86,35 +87,21 @@ pub struct ShopEntry {
     pub extra: i32,
 }
 
-/// A building the game keeps a record of (created in placement order): its kind, the box inside
-/// it and what it sells.
 #[derive(Clone, Debug, Default)]
 pub struct BuildingRecord {
-    pub kind: i32,
+    pub kind: BuildingKind,
     pub interior_min: Vec3,
     pub interior_max: Vec3,
     pub shop: Vec<ShopEntry>,
-    /// Where the building's local frame sits in the world: its origin and turned axes.
     pub pos: Vec3,
     pub rot: RotMatrix,
-    /// The places a lab guard can be posted: the building file's bots placed
-    /// in the world.
     pub patrol: Vec<PatrolSpot>,
-    /// Where a dealership puts the cars it sells (24 along, 80 across and 2 up from its origin), and which
-    /// of the 8 spaces back from there is next.
     pub car_spawn: Vec3,
     pub car_counter: i32,
-    /// Its lobby (32 along, 18 across and 2 up from its origin; a lab's 50 along and 26 across), where a
-    /// lab's intel disk is left.
     pub lobby: Vec3,
-    /// The computers the building's item sets place: their cell and the
-    /// volume init_mission_spots gives them.
     pub computers: Vec<(IVec3, i32)>,
-    /// The corporation a base belongs to.
     pub team: i32,
-    /// A lab's mission spot.
-    pub spot: i32,
-    /// The two streets of the intersection nearest the point 32 along the building's facing.
+    pub mission_spot: i32,
     pub streets: (i32, i32),
 }
 
@@ -135,47 +122,25 @@ impl BuildingRecord {
     }
 }
 
-fn record_kind(building_type: i32) -> Option<i32> {
+fn record_kind(building_type: i32) -> Option<BuildingKind> {
     match building_type {
-        0..=5 => Some(CORPORATION_BASE),
-        10 => Some(LAB),
-        11 => Some(CAR_DEALER),
-        12 => Some(BANK),
-        13 => Some(CLOTHING_STORE),
-        14 => Some(GUN_STORE),
-        16 => Some(BURGER_SHOP),
+        0..=5 => Some(BuildingKind::CorporationBase),
+        10 => Some(BuildingKind::Lab),
+        11 => Some(BuildingKind::CarDealer),
+        12 => Some(BuildingKind::Bank),
+        13 => Some(BuildingKind::ClothingStore),
+        14 => Some(BuildingKind::GunStore),
+        16 => Some(BuildingKind::BurgerShop),
         _ => None,
     }
 }
 
-/// The quarter turn the table turns by with each turn of its base building.
-const CORPORATIONS: usize = 6;
-/// The base's car spaces: a row of four 16 back and 16 across from the interior's middle, 4 apart, then the row
-/// facing the other way 24 further across.
-const CAR_ROW_START: f32 = 16.0;
-const CAR_STEP: f32 = 4.0;
-const CAR_ROW_GAP: f32 = 24.0;
-const CAR_SPACES: usize = 8;
-/// The table sits 4 along and 17.5 across from the middle (Round City places it so; elsewhere the base table block
-/// does), and players spawn 12 along and 6 across from it.
-const TABLE_ALONG: f32 = 4.0;
-const TABLE_ACROSS: f32 = 17.5;
-const SPAWN_ALONG: f32 = 12.0;
-const SPAWN_ACROSS: f32 = 6.0;
-/// In versus, players spawn in the middle of the base, 13.5 up.
-const VERSUS_SPAWN_LIFT: f32 = 12.0;
-const VERSUS_SPAWN_LIFT2: f32 = 1.5;
-const VERSUS: u32 = 7;
-
-/// A corporation's base: the box inside it (one floor high), its vault,
-/// the table, where players spawn and the spaces its cars appear in.
 #[derive(Clone, Debug)]
 pub struct CorporationBase {
     pub interior_min: Vec3,
     pub interior_max: Vec3,
     pub vault_min: Vec3,
     pub vault_max: Vec3,
-    /// The way the table faces: a half turn plus a quarter turn per turn of the base building.
     pub table_orientation: f32,
     pub table: Vec3,
     pub spawn: Vec3,
@@ -248,7 +213,6 @@ pub struct Buildings<'a> {
     pub bases: Vec<CorporationBase>,
     /// The computers found while instantiating the building being placed.
     computers: Vec<IVec3>,
-    game_type: u32,
     /// The level's material names (load_level's texture list), which a building's texture names resolve against.
     materials: Vec<String>,
     /// The window atlas's layers (data_38ac24c4): a material, and the build block and portal whose window is cut out.
@@ -256,7 +220,7 @@ pub struct Buildings<'a> {
 }
 
 impl<'a> Buildings<'a> {
-    pub fn new(csx: &'a CityFileCSX, build_blocks: Vec<String>, item_sets: Vec<String>, game_type: u32, materials: Vec<String>) -> Self {
+    pub fn new(csx: &'a CityFileCSX, build_blocks: Vec<String>, item_sets: Vec<String>, materials: Vec<String>) -> Self {
         Self {
             csx,
             custom_names: csx.custom_blocks().map(|(n, _)| n).collect(),
@@ -267,8 +231,7 @@ impl<'a> Buildings<'a> {
             generated: Vec::new(),
             records: Vec::new(),
             computers: Vec::new(),
-            bases: vec![CorporationBase::default(); CORPORATIONS],
-            game_type,
+            bases: vec![CorporationBase::default(); 6],
             materials,
             atlas: Vec::new(),
         }
@@ -299,7 +262,7 @@ impl<'a> Buildings<'a> {
         let ty = building_type(name, roundcity);
         let corp = usize::try_from(ty).ok().and_then(|i| Team::CORPORATIONS.get(i).copied());
         let o = pos - off;
-        let base = usize::try_from(ty).ok().filter(|&i| i < CORPORATIONS);
+        let base = usize::try_from(ty).ok().filter(|&i| i < 6);
 
         if let Some(k) = base {
             let b = &mut self.bases[k];
@@ -331,7 +294,6 @@ impl<'a> Buildings<'a> {
     fn place_base(&mut self, k: usize, raw: &BuildingFile, o: IVec3, rot: u32, roundcity: bool) {
         let (x, z) = interior_span(raw, rot);
         let cell = |v: i32| v as f32 * 4.0;
-        let versus = self.game_type == VERSUS;
         let b = &mut self.bases[k];
 
         b.interior_min = Vec3::new(cell(o.x + x.0), cell(o.y), cell(o.z + z.0));
@@ -340,38 +302,32 @@ impl<'a> Buildings<'a> {
         let c = b.middle();
         let mut m = b.frame();
         let [r0, _, r2] = m;
-        let mut p = r0 * -CAR_ROW_START + c + r2 * CAR_ROW_START;
+        let mut p = r0 * -16.0 + c + r2 * 16.0;
 
-        for n in 1..=CAR_SPACES {
+        for n in 1..=8 {
             b.car_spaces.push((p, m));
 
             if n == 4 {
                 let axis = m[1];
                 rotate_orientation(&mut m, axis, 180.0_f32.to_radians());
 
-                p += m[2] * CAR_ROW_GAP;
-            } else if n != CAR_SPACES {
+                p += m[2] * 24.0;
+            } else if n != 8 {
                 let r0 = m[0];
 
-                p += r0 * CAR_STEP;
+                p += r0 * 4.0;
             }
         }
 
         let c = b.middle();
         let [r0, _, r2] = b.frame();
-        let t = r0 * TABLE_ALONG + c + r2 * TABLE_ACROSS;
+        let t = r0 * 4.0 + c + r2 * 17.5;
 
         if roundcity {
             b.table = t;
         }
 
-        b.spawn = r0 * SPAWN_ALONG + t + r2 * SPAWN_ACROSS;
-
-        if versus {
-            let (a, bb) = (b.interior_min, b.interior_max);
-
-            b.spawn = Vec3::new((a.x + bb.x) * 0.5, (a.y + VERSUS_SPAWN_LIFT) + VERSUS_SPAWN_LIFT2, (a.z + bb.z) * 0.5);
-        }
+        b.spawn = r0 * 12.0 + t + r2 * 6.0;
     }
 
     fn setup(&self, b: &BuildingFile) -> Vec<Tile> {
@@ -636,7 +592,7 @@ impl<'a> Buildings<'a> {
                         }
                     }
 
-                    if corp.is_some() && self.game_type != 7 {
+                    if corp.is_some() {
                         let id = v & 65535;
 
                         if id >= garage[0] && id <= garage[3] {
@@ -793,7 +749,7 @@ fn place_point(pos: Vec3, m: &RotMatrix, w: Vec3) -> Vec3 {
     pos + a * w.x + b * w.y + c * w.z
 }
 
-fn building_record(kind: i32, raw: &BuildingFile, o: IVec3, rot: u32, city: IVec3) -> BuildingRecord {
+fn building_record(kind: BuildingKind, raw: &BuildingFile, o: IVec3, rot: u32, city: IVec3) -> BuildingRecord {
     let off = raw.offsets.as_ivec3();
     let h = raw.height as i32;
     let (x, z) = interior_span(raw, rot);
@@ -801,8 +757,8 @@ fn building_record(kind: i32, raw: &BuildingFile, o: IVec3, rot: u32, city: IVec
     let (pos, m) = placement(raw, city, rot);
 
     let shop = match kind {
-        CLOTHING_STORE => CLOTHING_STOCK.iter().map(|&(k, price)| ShopEntry { kind: k, price, extra: 0 }).collect(),
-        BURGER_SHOP => vec![ShopEntry { kind: 0, price: BURGER_PRICE, extra: 0 }],
+        BuildingKind::ClothingStore => CLOTHING_STOCK.iter().map(|&(k, price)| ShopEntry { kind: k, price, extra: 0 }).collect(),
+        BuildingKind::BurgerShop => vec![ShopEntry { kind: 0, price: 20, extra: 0 }],
         _ => Vec::new(),
     };
 
@@ -813,7 +769,7 @@ fn building_record(kind: i32, raw: &BuildingFile, o: IVec3, rot: u32, city: IVec
         shop,
         pos,
         rot: m,
-        car_spawn: if kind == CAR_DEALER {
+        car_spawn: if kind == BuildingKind::CarDealer {
             let [a, b, c] = m;
             let p = pos + a * 24.0;
             let q = c * 80.0 + p;
@@ -824,14 +780,14 @@ fn building_record(kind: i32, raw: &BuildingFile, o: IVec3, rot: u32, city: IVec
         car_counter: 0,
         lobby: {
             let [a, b, c] = m;
-            let (along, across) = if kind == LAB { (50.0, 26.0) } else { (32.0, 18.0) };
+            let (along, across) = if kind == BuildingKind::Lab { (50.0, 26.0) } else { (32.0, 18.0) };
             a * along + pos + c * across + (b + b)
         },
         computers: Vec::new(),
         team: 0,
-        spot: 0,
+        mission_spot: 0,
         streets: (0, 0),
-        patrol: if kind == LAB {
+        patrol: if kind == BuildingKind::Lab {
             raw.bots
                 .iter()
                 .map(|b| {

@@ -19,13 +19,16 @@ world plugin {
     export tick-after-traffic;
     export before-physics;
     export after-physics;
+    export base-menus;
     export menus-done;
     export on-menu;
     export on-chat;
     export on-join;
     export on-leave;
+    export on-hurt;
     export on-death;
     export on-damage;
+    export joining-money;
     export on-admin-select;
     export programs;
 }

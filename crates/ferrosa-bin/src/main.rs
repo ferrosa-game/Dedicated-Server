@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, path::Path, sync::Arc};
 
-use ferrosa_map::file_types::srk::SrkData;
+use ferrosa_map::file_types::roster::Roster;
 use ferrosa_net::{Edge, ServerListing, masterserver::MasterServer};
 use ferrosa_sim::{ConnId, Inbound, Sim};
 use tokio::{net::UdpSocket, sync::mpsc};
@@ -17,11 +17,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     check_for_updates::print_update_status();
 
     let config = ConfigMain::read_from_file();
-    let ferrosa_plugins::LoadedPlugin { plugins, mut modes } = ferrosa_plugins::load(Path::new("plugins"));
-    modes.extend(ferrosa_sim::MODES);
+    let server_id = Roster::load(Path::new("players.json")).server_id;
+    let ferrosa_plugins::LoadedPlugin { plugins, modes } = ferrosa_plugins::load(Path::new("plugins"));
+
+    let Some(&first) = modes.first() else {
+        eprintln!("[Config] no game mode: build a mode plugin into plugins/ (round, world, eliminator or sandbox)");
+
+        return Ok(());
+    };
 
     let mode = ferrosa_sim::find(&modes, &config.gamemode).unwrap_or_else(|| {
-        let fallback = ferrosa_sim::find(&modes, "round").unwrap_or(modes[0]);
+        let fallback = ferrosa_sim::find(&modes, "round").unwrap_or(first);
         eprintln!("[Config] unknown gamemode {:?} - using {}", config.gamemode, fallback.name());
         fallback
     });
@@ -51,7 +57,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap();
     }
 
-    let srk = SrkData::load(Path::new("server.srk")).unwrap();
     let server_listing = ServerListing {
         build: 38,
         address: [0, 0, 0, 0],
@@ -60,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         password_protected: !config.server_password.is_empty(),
         server_password: config.server_password.clone(),
         port: config.port,
-        server_id: srk.server_id,
+        server_id,
         server_name: config.server_name.clone(),
     };
 

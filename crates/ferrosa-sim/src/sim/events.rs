@@ -18,7 +18,7 @@ impl Sim {
 
         let accout_data = self.join_account(&j.auth_packet);
 
-        if accout_data.ban_time > 0 {
+        if self.bans.is_banned(accout_data.account_id, accout_data.steam_id) {
             return self.kick(conn, src, "You are banned from this server");
         }
 
@@ -39,7 +39,7 @@ impl Sim {
         };
 
         if let Some(p) = self.players.get_mut(player_id.idx()) {
-            p.username = accout_data.name();
+            p.username = accout_data.name.clone();
         }
 
         self.clients.insert(
@@ -72,7 +72,7 @@ impl Sim {
 
         self.restore_account(player_id);
         let player = self.players.get_mut(player_id.idx()).unwrap();
-        player.username = super::economy::sanitize_name(&accout_data.player_name);
+        player.username = accout_data.name.clone();
         player.is_admin = admin;
         self.events.push(player.make_update_player_event(self.tick));
         self.events.push(player.make_update_financials_event(self.tick));

@@ -61,7 +61,6 @@ pub fn build_level(
     map_dir: &Path,
     data_dir: &Path,
     map_name: &str,
-    game_type: u32,
 ) -> Level {
     let materials: Vec<String> = ["concrete", "", "", ""].iter().map(|s| s.to_string()).chain(csx.textures().map(|(name, _, _)| name.to_string())).collect();
     let custom: Vec<(&str, IVec3)> = csx.custom_blocks().map(|(n, b)| (n, b.size.as_ivec3())).collect();
@@ -158,7 +157,7 @@ pub fn build_level(
     let build_blocks = list_names(&map_dir.join("buildblock"), ".sbl");
 
     let portals = PortalGroups::load(&map_dir.join("buildblock"), &build_blocks);
-    let mut buildings = Buildings::new(csx, build_blocks, item_sets.clone(), game_type, materials.clone());
+    let mut buildings = Buildings::new(csx, build_blocks, item_sets.clone(), materials.clone());
 
     for b in &city.buildings {
         buildings.place(&mut area, ground, &mut tables, &dims, b.name.as_str(), b.pos.as_ivec3(), b.rot, ground.roundcity());

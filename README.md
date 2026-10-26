@@ -54,15 +54,19 @@ Files the server reads from the working directory:
 | `config.toml` | The main settings. Written with defaults on first run. |
 | `config_world.txt` | World mode: `traffic`, `startcash`, `mincash`, the `crime*` rates and limits, `showjoinexit`, `respawnteam`. Written with defaults if missing. |
 | `serveradmin.txt` | `adminphone=<number>` lines, the phone numbers allowed to log in as admin. |
-| `server.srk` | Accounts: world mode's saved money and ratings, play time, bans. Created on first run. |
+| `serversteamban.txt` | `steamban=<id>` lines, Steam ids never let in. Written by hand; the server only reads it. |
+| `bans.txt` | The bans the server keeps itself, a line an account, with the second each lifts. |
+| `players.json` | The roster: the server's own id, and everyone it has seen (account, phone, Steam id, look, name). Created on first run. |
 | `plugins/round/config_round.txt` | Round mode: `roundtime` (minutes), `startcash`, `weekly`, `bonusratio`, `teamdamage`. |
 | `plugins/round/accounts.txt` | Round mode's saved money. |
+| `plugins/world/accounts.txt` | World mode's saved money, ratings, play time and respawn waits. |
+| `plugins/world/stats.txt` | World mode's statistics: missions settled, bullets fired, and each account's play time. |
 
 `config.toml`:
 
 | Key | Meaning |
 | --- | --- |
-| `gamemode` | `round`, `eliminator`, `world`, `sandbox` or any plugin's mode (case doesn't matter). |
+| `gamemode` | The name a mode plugin registered: `round`, `eliminator`, `world` or `sandbox` (case doesn't matter). Every mode is a plugin, so the server needs at least one built into `plugins/`. |
 | `server_name`, `max_players`, `port` | How the server is listed and reached. |
 | `server_password` | Empty for a public server. |
 | `admin_password` | The password for `/admin` in chat. |
@@ -70,12 +74,22 @@ Files the server reads from the working directory:
 | `map_name` | The map for modes that don't choose their own, like sandbox. |
 | `master_server_url`, `master_server_ip` | Where the server registers. |
 
-Keep `config.toml`, `serveradmin.txt`, `server.srk` and `plugins/round/accounts.txt` out of version control: they hold passwords and player data.
+Keep `config.toml`, `serveradmin.txt`, `bans.txt`, `players.json` and the plugins' `accounts.txt` out of version control: they hold passwords and player data.
+
+A mode saves what players own itself, in its own folder, so the server keeps no account file of its own. A
+`server.srk` from an older build is not read: its accounts, bans and server id do not carry over.
 
 ## Chat commands
 
 Admins log in with `/admin <password>`. They then have the original server's commands, among them `/kick`, `/ban`,
 `/list`, `/message`, `/cash`, `/setrating`, `/give` and `/resetgame [mode]`. Anyone can use `/tps` for tick timing.
+
+`/ban <phone>` asks, `/bany <ticks>` confirms and `/bann` cancels, as on the original server. A ban of a day
+(5184000 ticks) or more never lifts. `/unban <phone>` lifts one; a Steam id listed in `serversteamban.txt` stays
+banned whatever the ban list says.
+
+`/give` and `/setrating` reach a player who is connected. What a mode saves for an account is the mode's own, so the
+server does not reach into it for an offline player.
 
 Sandbox mode has test commands for everyone:
 

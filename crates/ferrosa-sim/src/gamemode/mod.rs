@@ -5,43 +5,22 @@ use self::rules::ModeRules;
 use crate::{PlayerId, sim::Sim};
 
 pub mod rules;
-pub mod unported;
 
 pub type Mode = &'static dyn ModeHooks;
 
-pub static MODES: [Mode; 5] = [
-    &unported::DRIVING,
-    &unported::RACING,
-    &unported::COOP,
-    &unported::VERSUS,
-    &unported::NONE,
-];
-
 pub fn find(modes: &[Mode], name: &str) -> Option<Mode> {
     modes.iter().copied().find(|m| m.name().eq_ignore_ascii_case(name) || m.aliases().iter().any(|a| a.eq_ignore_ascii_case(name)))
-}
-
-#[derive(Clone, Debug)]
-pub struct Modes {
-    pub versus: unported::VersusConfig,
-}
-
-impl Modes {
-    pub(crate) fn load() -> Self {
-        Self { versus: unported::VersusConfig::load(std::path::Path::new("config_versus.txt")) }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ModeSync {
     pub weekly_enabled: bool,
     pub weekday: u8,
-    pub versus_movedelay: Option<u8>,
 }
 
-/// What a game mode supplies. The server asks the current mode rather than naming modes. Clients only know the
-/// binary's eight modes, so each mode says which of those it looks like (`client_mode`) and works within that mode's
-/// menus and HUD.
+/// What a game mode supplies. The server asks the current mode rather than naming modes. Every mode is a plugin;
+/// clients only know the binary's eight modes, so each mode says which of those it looks like (`client_mode`) and
+/// works within that mode's menus and HUD.
 pub trait ModeHooks: Sync {
     /// The name config.toml and /resetgame use.
     fn name(&self) -> &'static str;
@@ -103,7 +82,7 @@ pub trait ModeHooks: Sync {
 
     /// What the initial sync says about the mode.
     fn sync(&self, sim: &Sim) -> ModeSync {
-        ModeSync { weekly_enabled: false, weekday: sim.world.weekday as u8, versus_movedelay: None }
+        ModeSync { weekly_enabled: false, weekday: sim.world.weekday as u8 }
     }
 
     /// /resetgame has named this mode (whether or not it switches to it).

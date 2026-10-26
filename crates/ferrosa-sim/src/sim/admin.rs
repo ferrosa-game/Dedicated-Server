@@ -10,7 +10,7 @@ use ferrosa_protocol::{
     frame_packet,
 };
 
-use super::Sim;
+use super::{Sim, bans};
 use crate::time::game_seconds;
 use crate::{ConnId, PlayerId, items::logic::phone::PhoneStatus};
 
@@ -20,28 +20,22 @@ const ARM_GUNS: [ItemKind; 5] = [ItemKind::Ak47, ItemKind::M16, ItemKind::Mp5, I
 pub struct AdminState {
     pub password: String,
     pub phones: Vec<u32>,
-    /// The Steam ids banned in serversteamban.txt.
-    pub steam_bans: Vec<u64>,
     pub kicked: Vec<IpAddr>,
-    pub pending_ban: Option<usize>,
+    /// The account an admin asked to ban, waiting for the /bany that says how long.
+    pub pending_ban: Option<u32>,
     pub reset_requested: bool,
     pub next_mode: Option<crate::gamemode::Mode>,
-    pub versus_map: i32,
 }
 
 impl AdminState {
-    /// load_admin_data: every `adminphone=` number in serveradmin.txt and every `steamban=` id in serversteamban.txt
-    /// beside it.
+    /// load_admin_data: every `adminphone=` number in serveradmin.txt. The `steamban=` ids beside it belong to the
+    /// ban list.
     pub(crate) fn load(path: &std::path::Path) -> Self {
         let phones = std::fs::read_to_string(path)
             .map(|text| text.split("adminphone=").skip(1).filter_map(|rest| leading_int(rest).map(|n| n as u32)).collect())
             .unwrap_or_default();
 
-        let steam_bans = std::fs::read_to_string(path.with_file_name("serversteamban.txt"))
-            .map(|text| text.split("steamban=").skip(1).filter_map(leading_u64).collect())
-            .unwrap_or_default();
-
-        AdminState { phones, steam_bans, ..Default::default() }
+        AdminState { phones, ..Default::default() }
     }
 }
 
@@ -54,12 +48,6 @@ fn scan_int(s: &str) -> Result<Option<i32>, ()> {
     }
 
     Ok(leading_int(t))
-}
-
-fn leading_u64(s: &str) -> Option<u64> {
-    let t = s.trim_start();
-    let end = t.char_indices().find(|&(_, c)| !c.is_ascii_digit()).map_or(t.len(), |(i, _)| i);
-    t[..end].parse::<u64>().ok()
 }
 
 fn leading_int(s: &str) -> Option<i32> {
@@ -187,25 +175,6 @@ impl Sim {
             h.health.vitality = 0;
         }
 
-        if let Some(rest) = msg.strip_prefix("/setmap ") {
-            let mut n = self.admin.versus_map + 1;
-
-            if !rest.is_empty() {
-                if let Ok(v) = scan_int(rest) {
-                    n = v.unwrap_or(0);
-                }
-
-                if (0..32).contains(&(n - 1)) {
-                    self.admin.versus_map = n - 1;
-                } else {
-                    self.admin.versus_map = 0;
-                    n = 1;
-                }
-            }
-
-            self.admin_say(&format!("mapnum: {n}"));
-        }
-
         if msg.starts_with("/resetgame") {
             self.admin.reset_requested = true;
 
@@ -223,10 +192,9 @@ impl Sim {
         {
             let phone = leading_int(rest).unwrap_or(0);
 
-            if let Some(i) = self.saved_accounts.players.iter().position(|a| a.phone_number as i32 == phone) {
-                self.admin.pending_ban = Some(i);
-
-                let name = &self.saved_accounts.players[i].name();
+            if let Some(a) = self.roster.by_phone(phone) {
+                let (id, name) = (a.account_id, a.name.clone());
+                self.admin.pending_ban = Some(id);
                 self.admin_say(&format!("{name}({phone}) ban?"));
             }
         }
@@ -238,18 +206,20 @@ impl Sim {
             let phone = nums.next().unwrap_or(0);
             let amount = nums.next().unwrap_or(0);
 
-            if let Some(account_idx) = self.saved_accounts.players.iter().position(|a| a.phone_number as i32 == phone) {
-                let account = &mut self.saved_accounts.players[account_idx];
-                let (name, phone) = (account.name(), account.phone_number as i32);
+            let line = match self.player_by_phone(phone) {
+                Some(pid) => {
+                    let name = self.players.get(pid.idx()).map(|p| p.username.clone()).unwrap_or_default();
 
-                account.money = (account.money as i32).wrapping_add(amount) as u32;
+                    if let Some(p) = self.players.get_mut(pid.idx()) {
+                        p.money = p.money.wrapping_add(amount);
+                    }
 
-                for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == account.account_id) {
-                    p.money = p.money.wrapping_add(amount);
+                    format!("{name}({phone}) {amount} cash")
                 }
+                None => format!("{phone} is not playing"),
+            };
 
-                self.admin_say(&format!("{name}({phone}) {amount} cash"));
-            }
+            self.admin_say(&line);
         }
 
         if let Some(rest) = msg.strip_prefix("/setrating ")
@@ -259,17 +229,20 @@ impl Sim {
             let phone = nums.next().unwrap_or(0);
             let rating = nums.next().unwrap_or(0);
 
-            if let Some(account_idx) = self.saved_accounts.players.iter().position(|a| a.phone_number as i32 == phone) {
-                let account = &mut self.saved_accounts.players[account_idx];
-                account.crim_rating = rating as u32;
-                let (id, name, phone) = (account.account_id, account.name(), account.phone_number as i32);
+            let line = match self.player_by_phone(phone) {
+                Some(pid) => {
+                    let name = self.players.get(pid.idx()).map(|p| p.username.clone()).unwrap_or_default();
 
-                for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == id) {
-                    p.crim_rating = rating;
+                    if let Some(p) = self.players.get_mut(pid.idx()) {
+                        p.crim_rating = rating;
+                    }
+
+                    format!("{name}({phone}) {rating} rating")
                 }
+                None => format!("{phone} is not playing"),
+            };
 
-                self.admin_say(&format!("{name}({phone}) {rating} rating"));
-            }
+            self.admin_say(&line);
         }
         if let Some(rest) = msg.strip_prefix("/bany ")
             && !rest.is_empty()
@@ -277,10 +250,9 @@ impl Sim {
         {
             let time = time.unwrap_or(0);
 
-            if let Some(i) = self.admin.pending_ban.filter(|&i| i < self.saved_accounts.players.len()) {
-                let a = &mut self.saved_accounts.players[i];
-                a.ban_time = time as u32;
-                let line = format!("{}({}) banned {time}", a.name(), a.phone_number as i32);
+            if let Some(id) = self.admin.pending_ban {
+                let line = self.ban_account(id, time).unwrap_or_else(|| "no such account".to_string());
+
                 self.admin_say(&line);
                 self.admin.pending_ban = None;
             }
@@ -289,6 +261,20 @@ impl Sim {
         if msg.starts_with("/bann") {
             self.admin_say("ban canceled");
             self.admin.pending_ban = None;
+        }
+
+        if let Some(rest) = msg.strip_prefix("/unban ")
+            && !rest.is_empty()
+        {
+            let phone = leading_int(rest).unwrap_or(0);
+            let account = self.roster.by_phone(phone).map(|a| (a.account_id, a.name.clone()));
+
+            if let Some((id, name)) = account {
+                let line = if self.bans.unban(id) { format!("{name}({phone}) unbanned") } else { format!("{name}({phone}) not banned") };
+
+                self.bans.save(std::path::Path::new("bans.txt"));
+                self.admin_say(&line);
+            }
         }
 
         if let Some(name) = msg.strip_prefix("/kick ") {
@@ -392,25 +378,27 @@ impl Sim {
 
         let (i, value) = (account as i32, value as i32);
 
-        if i < 0 || i as usize >= self.saved_accounts.players.len() || value < 0 {
+        if i < 0 || i as usize >= self.roster.players.len() || value < 0 {
             return;
         }
 
-        let a = &mut self.saved_accounts.players[i as usize];
+        let (id, name) = {
+            let a = &self.roster.players[i as usize];
+
+            (a.account_id, a.name.clone())
+        };
         let line = match kind {
-            4 => {
-                a.ban_time = value as u32;
-                format!("{} {i} banned {value}", a.name())
-            }
+            4 => match self.ban_account(id, value) {
+                Some(line) => line,
+                None => return,
+            },
 
             5 => {
-                a.crim_rating = value as u32;
-
-                for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == a.account_id) {
+                for (_, p) in self.players.iter_mut().filter(|(_, p)| p.account_id == id) {
                     p.crim_rating = value;
                 }
 
-                format!("{} {i} rating {value}", a.name())
+                format!("{name} {i} rating {value}")
             }
             _ => return,
         };
@@ -418,13 +406,29 @@ impl Sim {
         self.admin_say(&line);
     }
 
-    /// Whether packets from this address are ignored (a /kick until /clearkick).
+    fn ban_account(&mut self, account_id: u32, ticks: i32) -> Option<String> {
+        let a = self.roster.get(account_id)?;
+        let (steam, phone, name) = (a.steam_id, a.phone_number, a.name.clone());
+        let seconds = (ticks / game_seconds(1)).max(0) as u64;
+        let until = if seconds >= bans::PERMANENT { None } else { Some(bans::now() + seconds) };
+
+        self.bans.ban(account_id, steam, phone, &name, until);
+        self.bans.save(std::path::Path::new("bans.txt"));
+
+        Some(match until {
+            Some(_) => format!("{name}({}) banned {seconds}s", phone as i32),
+            None => format!("{name}({}) banned", phone as i32),
+        })
+    }
+
+    fn player_by_phone(&self, phone: i32) -> Option<PlayerId> {
+        self.players.iter().find(|(_, p)| p.phone_number as i32 == phone && !p.is_bot).map(|(i, _)| PlayerId(i as u32))
+    }
+
     pub(crate) fn is_kicked(&self, ip: IpAddr) -> bool {
         self.admin.kicked.contains(&ip)
     }
 
-    /// The connection pass of server_recv_and_dispatch: every connection's silence counts up, and those of banned
-    /// accounts or quiet for 1800 ticks are dropped.
     pub(crate) fn connection_timeouts(&mut self) {
         for c in self.clients.values_mut() {
             c.timeout += 1;
@@ -433,11 +437,7 @@ impl Sim {
         for conn in self.connection_order() {
             let Some(c) = self.clients.get(&conn) else { continue };
 
-            let banned = self
-                .players
-                .get(c.player_id.idx())
-                .and_then(|p| self.saved_accounts.players.iter().find(|a| a.account_id == p.account_id))
-                .is_some_and(|a| a.ban_time > 0);
+            let banned = self.players.get(c.player_id.idx()).is_some_and(|p| self.bans.is_banned(p.account_id, p.steam_id));
 
             if banned || c.timeout >= game_seconds(30) || self.players.get(c.player_id.idx()).is_none() {
                 if let Some(player) = self.players.get(c.player_id.idx()) {
@@ -449,8 +449,6 @@ impl Sim {
         }
     }
 
-    /// /resetgame's request, taken up by logic_simulation: round or eliminator mode starts over as the other with
-    /// everyone spectating, anything else just resets.
     pub(crate) fn admin_reset(&mut self) {
         if !self.admin.reset_requested {
             return;

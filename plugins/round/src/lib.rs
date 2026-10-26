@@ -125,7 +125,7 @@ impl Plugin for Round {
     }
 
     fn menus_done(&mut self) {
-        self.base_menus();
+        self.corp_buy_menus();
         self.menu_buttons();
     }
 

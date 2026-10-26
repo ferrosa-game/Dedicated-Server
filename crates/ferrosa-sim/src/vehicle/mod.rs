@@ -1,5 +1,3 @@
-//! Vehicles: the type table built from the body files and the vehicles in the world.
-
 pub mod physics;
 pub use ferrosa_world::vehicle_types as types;
 

@@ -134,6 +134,11 @@ pub trait Plugin: Default + 'static {
     fn after_physics(&mut self) {}
 
     /// Once every player's menus are done for the tick.
+    /// Each player's menus for the tick, once the shops and banks have had theirs. `outside` is where their human
+    /// stands when it is in no shop or bank, and none when it is in one, so a mode leaves those menus alone. Only
+    /// asked of the mode.
+    fn base_menus(&mut self, _player: PlayerId, _outside: Option<Vec3>) {}
+
     fn menus_done(&mut self) {}
 
     /// A menu button pressed; true takes it. The mode is asked first, then each plugin, then the shared menus.
@@ -150,16 +155,26 @@ pub trait Plugin: Default + 'static {
     /// A player has joined, their account restored and the initial sync sent: where a mode sets their starting money.
     fn on_join(&mut self, _player: PlayerId) {}
 
-    /// A player is leaving, before their shares and account are settled.
+    /// A player is leaving, before their shares are sold: where a mode saves what they had.
     fn on_leave(&mut self, _player: PlayerId) {}
+
+    /// One player has hurt another: where a mode scores it. The damage is what landed, except for a grenade or a
+    /// run-over, which both come as 100.
+    fn on_hurt(&mut self, _attacker: PlayerId, _victim: PlayerId, _damage: i32) {}
 
     /// A real player's human has died.
     fn on_death(&mut self, _player: PlayerId) {}
+
 
     /// A human is about to be hurt by a bullet, a grenade, a fall or a vehicle; returns the damage to deal instead (0
     /// to refuse it). The mode is asked first, then each plugin with the last answer.
     fn on_damage(&mut self, _human: HumanId, _cause: DamageCause, _bone: Option<Bone>, damage: i32) -> i32 {
         damage
+    }
+
+    /// What a joining player's money is, given what their account holds. Only asked of the mode.
+    fn joining_money(&mut self, money: i32) -> i32 {
+        money
     }
 
     /// /resetgame has named this plugin's mode. Only asked of the mode.
@@ -226,6 +241,12 @@ macro_rules! plugin {
             }
         }
 
+        impl $crate::exports::ferrosa::plugin::base_menus::Guest for __FerrosaPlugin {
+            fn base_menus(player: $crate::PlayerId, outside: ::std::option::Option<$crate::Vec3>) {
+                __FERROSA.with_borrow_mut(|p| p.base_menus(player, outside))
+            }
+        }
+
         impl $crate::exports::ferrosa::plugin::menus_done::Guest for __FerrosaPlugin {
             fn menus_done() {
                 __FERROSA.with_borrow_mut(|p| $crate::Plugin::menus_done(p))
@@ -256,6 +277,12 @@ macro_rules! plugin {
             }
         }
 
+        impl $crate::exports::ferrosa::plugin::on_hurt::Guest for __FerrosaPlugin {
+            fn on_hurt(attacker: $crate::PlayerId, victim: $crate::PlayerId, damage: i32) {
+                __FERROSA.with_borrow_mut(|p| $crate::Plugin::on_hurt(p, attacker, victim, damage))
+            }
+        }
+
         impl $crate::exports::ferrosa::plugin::on_death::Guest for __FerrosaPlugin {
             fn on_death(player: $crate::PlayerId) {
                 __FERROSA.with_borrow_mut(|p| $crate::Plugin::on_death(p, player))
@@ -265,6 +292,12 @@ macro_rules! plugin {
         impl $crate::exports::ferrosa::plugin::on_damage::Guest for __FerrosaPlugin {
             fn on_damage(human: $crate::HumanId, cause: $crate::DamageCause, bone: ::std::option::Option<$crate::Bone>, damage: i32) -> i32 {
                 __FERROSA.with_borrow_mut(|p| $crate::Plugin::on_damage(p, human, cause, bone, damage))
+            }
+        }
+
+        impl $crate::exports::ferrosa::plugin::joining_money::Guest for __FerrosaPlugin {
+            fn joining_money(money: i32) -> i32 {
+                __FERROSA.with_borrow_mut(|p| p.joining_money(money))
             }
         }
 

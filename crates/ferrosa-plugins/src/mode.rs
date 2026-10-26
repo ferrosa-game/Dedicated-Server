@@ -61,7 +61,17 @@ impl ModeHooks for WasmGameMode {
         ModeRules { reset_traffic: None, ready_start: false, punish_team_kills: false, ..ModeRules::default() }
     }
 
-    fn base_menus(&self, _sim: &mut Sim, _pid: PlayerId, _outside: Option<Vec3>) {}
+    fn base_menus(&self, sim: &mut Sim, pid: PlayerId, outside: Option<Vec3>) {
+        let outside = outside.map(Into::into);
+
+        self.call(SimPtr(sim), "base-menus", |h, s| h.base_menus.as_ref().map(|g| g.call_base_menus(s, pid.0, outside)));
+    }
+
+    fn joining_money(&self, sim: &Sim, money: i32) -> i32 {
+        let ptr = SimPtr(sim as *const Sim as *mut Sim);
+
+        self.call(ptr, "joining-money", |h, s| h.joining_money.as_ref().map(|g| g.call_joining_money(s, money))).unwrap_or(money)
+    }
 
     fn on_admin_select(&self, sim: &mut Sim) {
         self.call(SimPtr(sim), "on-admin-select", |h, s| h.on_admin_select.as_ref().map(|g| g.call_on_admin_select(s)));

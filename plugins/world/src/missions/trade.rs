@@ -1,14 +1,9 @@
-//! Uploading a mission's document: the corporation it is worth something to is paid, and any other holding it trades.
-
 use ferrosa_wit::server;
 
 use super::names::CORPORATION_NAMES;
 use crate::{World, state::CORPORATIONS};
 
 impl World {
-    /// mission_update_file_trade_state: a corporation uploaded the mission's document. If the mission is worth
-    /// something to it, it is paid and the mission closes for everyone else; otherwise it holds the file for trade
-    /// and each corporation the mission is worth something to is told, by status line and memo.
     pub fn file_trade(&mut self, m: usize, team: usize) {
         self.state.missions.missions[m].teams[team].uploaded = true;
 

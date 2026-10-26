@@ -13,28 +13,12 @@ pub struct ModeRules {
     pub reset_traffic: Option<u32>,
     /// Some traffic is parked in the third lane of flat three lane streets.
     pub parked_cars: bool,
-    /// The traffic drives as in co-op.
-    pub coop_traffic: bool,
     /// Dead humans stay on the ground.
     pub keep_bodies: bool,
     /// Loose items never despawn.
     pub keep_items: bool,
-    /// Hurting people raises criminal ratings, by these rates.
-    pub crime: bool,
-    /// What hurting someone adds to the attacker's criminal rating, by their teams: a civilian hurting a civilian or
-    /// a corporation's member, a member hurting a civilian, another member, or one inside their own base. A victim
-    /// who is already criminal adds less, and a player at `crimekick` has their human killed.
-    pub crimecivciv: i32,
-    pub crimecivteam: i32,
-    pub crimeteamciv: i32,
-    pub crimeteamteam: i32,
-    pub crimeteamteaminbase: i32,
-    pub crimekick: i32,
     /// Hurting a teammate hurts the attacker too.
     pub punish_team_kills: bool,
-    /// World mode's corporate ratings: the manager's rating is the account's credit and scales the missions, and ratings
-    /// are settled when a manager leaves. Only world mode sets it; plugins can't.
-    pub world_corporations: bool,
     /// The base buy menus (14 to 19) open inside a corporation's base.
     pub corp_buy_menus: bool,
     /// Corporation members count towards the player counts without a human.
@@ -43,9 +27,6 @@ pub struct ModeRules {
     pub mission_spots: bool,
     /// Garage doors open and close when a teammate knocks on them.
     pub door_knocks: bool,
-    /// Joining players get their saved money and ratings back, and new accounts start with the world config's
-    /// startcash.
-    pub saved_accounts: bool,
     /// Shares are sold when the human dies and bought back when a returning player takes it over.
     pub shares_follow_human: bool,
     /// A saved key keeps its own vehicle for the next day, rather than a new vehicle of its type and colour.
@@ -67,23 +48,13 @@ impl Default for ModeRules {
             stock_sell_rate: 0.95,
             reset_traffic: Some(TRAFFIC_CARS),
             parked_cars: false,
-            coop_traffic: false,
             keep_bodies: false,
             keep_items: false,
-            crime: false,
-            crimecivciv: 0,
-            crimecivteam: 0,
-            crimeteamciv: 0,
-            crimeteamteam: 0,
-            crimeteamteaminbase: 0,
-            crimekick: 0,
             punish_team_kills: true,
-            world_corporations: false,
             corp_buy_menus: false,
             count_humanless_members: false,
             mission_spots: false,
             door_knocks: true,
-            saved_accounts: false,
             shares_follow_human: false,
             keys_keep_vehicles: false,
             respawn_wait: false,
