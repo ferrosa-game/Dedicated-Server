@@ -80,7 +80,7 @@ impl Inventories {
                 Kept::Cash(c) => {
                     let Some(item) = server::find_item_kind("cashworld").and_then(spawn) else { continue };
 
-                    item.set_cash(*c);
+                    item.set_cash(c);
                     item
                 }
             };

@@ -5,6 +5,7 @@ use wasmtime::component::Resource;
 use crate::{
     bindings::ferrosa::plugin::types::{self, BuildingKind, Mat3, Vec3},
     host::HostState,
+    types::VolumeRef,
 };
 
 pub struct BuildingRef(pub(crate) usize);
@@ -113,6 +114,34 @@ impl types::HostBuilding for HostState {
     fn set_car_counter(&mut self, building: Resource<BuildingRef>, next: i32) -> wasmtime::Result<()> {
         let id = self.table.get(&building)?.0;
         self.sim_mut()?.set_building_car_counter(id, next);
+
+        Ok(())
+    }
+
+    fn patrol(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Vec<types::PatrolSpot>> {
+        let id = self.table.get(&building)?.0;
+        let spots = self.sim()?.building_patrol(id);
+        let spots: Vec<types::PatrolSpot> = spots
+            .iter()
+            .map(|s| types::PatrolSpot { pos: s.pos.into(), facing: s.facing as f32 * std::f32::consts::FRAC_PI_2, waypoints: s.waypoints.iter().map(|&w| w.into()).collect() })
+            .collect();
+
+        Ok(spots)
+    }
+
+    fn computers(&mut self, building: Resource<BuildingRef>) -> wasmtime::Result<Vec<types::BuildingComputer>> {
+        let id = self.table.get(&building)?.0;
+        let computers = self.sim()?.building_computers(id);
+        let computers: Vec<types::BuildingComputer> =
+            computers.iter().map(|&(cell, volume)| types::BuildingComputer { cell: glam::Vec3::new(cell.x as f32, cell.y as f32, cell.z as f32).into(), volume }).collect();
+
+        Ok(computers)
+    }
+
+    fn set_computer_volume(&mut self, building: Resource<BuildingRef>, index: u32, volume: Resource<VolumeRef>) -> wasmtime::Result<()> {
+        let id = self.table.get(&building)?.0;
+        let volume = self.table.get(&volume)?.0;
+        self.sim_mut()?.set_building_computer_volume(id, index as usize, volume);
 
         Ok(())
     }

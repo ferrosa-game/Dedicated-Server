@@ -25,6 +25,7 @@ pub use human::{Human, HumanHealth};
 pub use items::Item;
 pub use player::Player;
 pub use plugin::{DamageCause, NoPlugins, PluginHooks, Plugins};
+pub use api::world::CrimeRates;
 pub use sim::{Sim, economy::Corporation, missions::Mission};
 pub use vehicle::Vehicle;
 pub use world::skeleton::BoneId;

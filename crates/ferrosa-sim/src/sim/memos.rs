@@ -6,18 +6,6 @@ use crate::computer::links::Link;
 use crate::items::state::ItemState;
 use crate::time::{WORLD_HOUR, WORLD_MINUTE};
 
-/// sprintf_comma: the amount with thousands separated by commas.
-pub fn with_commas(n: i32) -> String {
-    if n > 999_999_999 {
-        format!("{},{:03},{:03},{:03}", n / 1_000_000_000, (n / 1_000_000) % 1000, (n / 1000) % 1000, n % 1000)
-    } else if n > 999_999 {
-        format!("{},{:03},{:03}", n / 1_000_000, (n / 1000) % 1000, n % 1000)
-    } else if n > 999 {
-        format!("{},{:03}", n / 1000, n % 1000)
-    } else {
-        format!("{n}")
-    }
-}
 
 /// The time of day the clock shows, as hour (1 to 12), minute and whether it is afternoon.
 pub fn clock_time(t: i32) -> (i32, i32, bool) {
@@ -77,56 +65,6 @@ impl Sim {
         }
     }
 
-    /// newspaper_load: readme.txt, a blank line, then the 10 accounts with the most money, joined by newlines.
-    pub(crate) fn load_newspaper(&mut self) {
-        let mut lines: Vec<Vec<u8>> = Vec::new();
-
-        if let Ok(data) = std::fs::read("readme.txt") {
-            let mut k = 0;
-
-            while k < data.len() && lines.len() <= 1021 {
-                let mut line = Vec::new();
-
-                while k < data.len() && data[k] != b'\n' && data[k] != b'\r' && line.len() < 123 {
-                    line.push(data[k]);
-                    k += 1;
-                }
-
-                while k < data.len() && (data[k] == b'\n' || data[k] == b'\r') {
-                    k += 1;
-                }
-
-                lines.push(line);
-            }
-        }
-
-        lines.push(Vec::new());
-        lines.push(b"Top 10 list".to_vec());
-
-        let mut order: Vec<usize> = (0..self.saved_accounts.players.len()).collect();
-
-        order.sort_by_key(|&i| (0x8fff_ffffu32.wrapping_sub(self.saved_accounts.players[i].money)) as i64);
-
-        for (rank, &i) in order.iter().take(10).enumerate() {
-            let a = &self.saved_accounts.players[i];
-            let name: String = a.player_name.iter().take_while(|&&c| c != 0).map(|&c| c as char).collect();
-            lines.push(format!("{}. {name}   ${}", rank + 1, with_commas(a.money as i32)).into_bytes());
-        }
-
-        let mut paper: Vec<u8> = Vec::new();
-
-        for line in &lines {
-            if line.len() + paper.len() <= 1021 {
-                paper.extend_from_slice(line);
-            }
-
-            if paper.len() <= 1021 {
-                paper.push(b'\n');
-            }
-        }
-
-        self.modes.world.state.newspaper = paper;
-    }
 
     /// place_corporation_mission_memo: a memo headed with the corporation and the time, on the corporation's table.
     pub(crate) fn place_corporation_memo(&mut self, k: usize, text: &[u8]) {

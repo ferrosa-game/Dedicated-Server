@@ -5,7 +5,6 @@ use ferrosa_protocol::{
 };
 
 use super::Sim;
-use crate::time::TICKS_PER_SECOND;
 use crate::{PlayerId, player::Player};
 
 pub const CORPORATIONS: usize = 6;
@@ -145,60 +144,11 @@ pub fn sanitize_name(raw: &[u8]) -> String {
     if name.is_empty() { "Noname".into() } else { name }
 }
 
-const SUIT_COLORS: [SuitColor; 6] = [SuitColor::Tan, SuitColor::DarkNavy, SuitColor::DarkGrey, SuitColor::Grey, SuitColor::Black, SuitColor::Grey];
-const TIE_COLORS: [u8; 6] = [2, 9, 8, 3, 7, 1];
 
-/// Suit colours a team change leaves alone.
-fn keeps_suit(suit: SuitColor) -> bool {
-    matches!(suit, SuitColor::Navy | SuitColor::White | SuitColor::Red)
-}
 
 pub const WORLD_TIME_START: i32 = 1728010;
-const WORLD_RESPAWN_BASE: i32 = 20 * TICKS_PER_SECOND;
-const WORLD_RESPAWN_PER_CRIME: i32 = 30;
 
 impl Sim {
-    /// update_suitcolor_model: moves the player to another team and dresses them for it (the corporation's suit and
-    /// tie, or plain clothes with no team), then their human.
-    pub(crate) fn set_player_team(&mut self, pid: PlayerId, team: Team) {
-        let Some(player) = self.players.get_mut(pid.idx()) else { return };
-        let old = player.team;
-
-        if old == team {
-            return;
-        }
-
-        self.leave_corp_management(pid, old);
-        let Some(player) = self.players.get_mut(pid.idx()) else { return };
-        player.team = team;
-        let look = &mut player.customization;
-
-        if let Some(c) = corporation_of(team) {
-            look.model = Model::Suit;
-
-            if !keeps_suit(look.suit_color) {
-                look.suit_color = SUIT_COLORS[c];
-            }
-
-            look.tie_color = TIE_COLORS[c];
-        } else if team == Team::Spectator {
-            look.model = Model::Casual;
-
-            if !keeps_suit(look.suit_color) {
-                look.suit_color = SuitColor::Brown;
-            }
-
-            look.tie_color = 0;
-        }
-
-        let look = player.customization;
-
-        if let Some(h) = player.human.and_then(|id| self.humans.get_mut(id)) {
-            h.customization.model = look.model;
-            h.customization.suit_color = look.suit_color;
-            h.customization.tie_color = look.tie_color;
-        }
-    }
 
     /// save_accounts: writes server.srk.
     pub(crate) fn save_accounts(&self) {
@@ -262,15 +212,6 @@ impl Sim {
             plugins.on_death(self, pid);
         }
 
-        if self.rules.respawn_wait {
-            if !self.modes.world.cfg.respawnteam {
-                self.set_player_team(pid, Team::Spectator);
-            }
-
-            let Some(player) = self.players.get_mut(pid.idx()) else { return };
-            player.spawn_timer = player.crim_rating * WORLD_RESPAWN_PER_CRIME + WORLD_RESPAWN_BASE;
-        }
-
         let Some(player) = self.players.get_mut(pid.idx()) else { return };
         player.human = None;
 
@@ -285,7 +226,7 @@ impl Sim {
 
         if !accounts.players.iter().any(|a| a.account_id == auth.account_id) {
             let mut a = SrkPlayerData::new(auth.account_id, &auth.player_name, auth.phone_number, auth.steam_id);
-            a.money = if self.rules.saved_accounts { self.modes.world.cfg.startcash as u32 } else { 10000 };
+            a.money = 10000;
             a.corp_rating = 1000;
             a.eye_color = rand::random_range(0..3) as u32;
             a.hair_color = rand::random_range(0..8) as u32;

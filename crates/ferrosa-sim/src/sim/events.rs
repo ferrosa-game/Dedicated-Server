@@ -120,10 +120,6 @@ impl Sim {
             Menu::Other(m) => m,
         };
 
-        if id == 1 && self.enter_city_menu(player_id, action.button) {
-            return;
-        }
-
         let (mode, plugins) = (self.mode, self.plugins);
 
         if let Ok(menu) = MenuType::try_from(id as u32)
@@ -138,10 +134,6 @@ impl Sim {
 
         if player.menu as u8 == id && matches!(id, 9..=11) {
             return self.shop_menu_action(player_id, action.button);
-        }
-
-        if player.menu as u8 == id && id == 13 {
-            return self.bank_menu_action(player_id, action.button);
         }
 
         match action.menu {

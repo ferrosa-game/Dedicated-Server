@@ -6,7 +6,6 @@ const MAX_FILES: usize = 256;
 const NAME_LEN: usize = 15;
 /// A volume's capacity: a disk holds 360, a computer 10000. COPY onto a volume of 399 or less fails
 /// once it has 3 files.
-pub const COMPUTER_CAPACITY: i32 = 10000;
 pub const SMALL_VOLUME: i32 = 399;
 pub const SMALL_VOLUME_FILES: usize = 2;
 

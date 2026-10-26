@@ -46,10 +46,6 @@ impl Sim {
             item.set_origin = Some(SetOrigin { cell, word: (word & (3 << 24)) + (word & 1023), index });
         }
 
-        if kind == ItemKind::Computer {
-            self.place_set_computer(id, pos, cell);
-        }
-
         Some(id)
     }
 

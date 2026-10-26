@@ -8,6 +8,40 @@ impl Sim {
         &self.world.map.level.buildings
     }
 
+    /// The map's name, as its folder is called.
+    pub fn map_name(&self) -> &str {
+        &self.world.map.map_name
+    }
+
+    /// A street's name; empty for a street the map hasn't got.
+    pub fn street_of(&self, street: i32) -> String {
+        usize::try_from(street).ok().and_then(|s| self.world.map.streets.streets.get(s)).map_or(String::new(), |s| s.name.to_string())
+    }
+
+    /// The two streets of the intersection a street starts at, for naming a place: none when the corner has fewer
+    /// than two.
+    pub fn street_corner(&self, street: i32) -> Option<(String, String)> {
+        let streets = &self.world.map.streets;
+        let s = streets.streets.get(usize::try_from(street).ok()?)?;
+        let i = streets.intersections.get(s.intersections[0])?;
+        let a = if i.streets[0] != -1 { i.streets[0] } else { i.streets[2] };
+        let b = if i.streets[1] != -1 { i.streets[1] } else { i.streets[3] };
+
+        (a != -1 && b != -1).then(|| (self.street_of(a), self.street_of(b)))
+    }
+
+    /// The two intersections a street runs between, as numbers into `intersections`.
+    pub fn street_intersections(&self, street: i32) -> Option<(u32, u32)> {
+        let s = self.world.map.streets.streets.get(usize::try_from(street).ok()?)?;
+
+        Some((s.intersections[0] as u32, s.intersections[1] as u32))
+    }
+
+    /// Where the trains start on the map's track, each with the way it faces.
+    pub fn track_spawns(&self) -> &[(glam::Vec3, f32)] {
+        &self.world.map.level.area.track.spawns
+    }
+
     pub fn building(&self, id: usize) -> Option<&BuildingRecord> {
         self.world.map.level.buildings.get(id)
     }

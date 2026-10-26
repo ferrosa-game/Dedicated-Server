@@ -157,6 +157,63 @@ impl types::HostPlayer for HostState {
         Ok(())
     }
 
+    fn set_corp_money(&mut self, player: Resource<PlayerRef>, money: i32, credit: i32) -> wasmtime::Result<()> {
+        let id = self.player_id_of(&player)?;
+        self.sim_mut()?.set_player_corp_money(id, money, credit);
+
+        Ok(())
+    }
+
+    fn crim_rating(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<i32> {
+        let id = self.player_id_of(&player)?;
+        Ok(self.sim()?.player_crim_rating(id))
+    }
+
+    fn set_crim_rating(&mut self, player: Resource<PlayerRef>, rating: i32) -> wasmtime::Result<()> {
+        let id = self.player_id_of(&player)?;
+        self.sim_mut()?.set_player_crim_rating(id, rating);
+
+        Ok(())
+    }
+
+    fn account(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<Option<types::Account>> {
+        let id = self.player_id_of(&player)?;
+        let got = self.sim()?.player_account(id);
+
+        Ok(got.map(|(money, corp_rating, crim_rating, play_time)| types::Account { money, corp_rating, crim_rating, play_time }))
+    }
+
+    fn set_account(&mut self, player: Resource<PlayerRef>, a: types::Account) -> wasmtime::Result<()> {
+        let id = self.player_id_of(&player)?;
+        self.sim_mut()?.set_player_account(id, a.money, a.corp_rating, a.crim_rating, a.play_time);
+
+        Ok(())
+    }
+
+    fn account_spawn_timer(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<i32> {
+        let id = self.player_id_of(&player)?;
+        Ok(self.sim()?.player_account_spawn_timer(id))
+    }
+
+    fn set_account_spawn_timer(&mut self, player: Resource<PlayerRef>, ticks: i32) -> wasmtime::Result<()> {
+        let id = self.player_id_of(&player)?;
+        self.sim_mut()?.set_player_account_spawn_timer(id, ticks);
+
+        Ok(())
+    }
+
+    fn bot_deadline(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<i32> {
+        let id = self.player_id_of(&player)?;
+        Ok(self.sim()?.player_bot_deadline(id))
+    }
+
+    fn set_bot_deadline(&mut self, player: Resource<PlayerRef>, clock: i32) -> wasmtime::Result<()> {
+        let id = self.player_id_of(&player)?;
+        self.sim_mut()?.set_player_bot_deadline(id, clock);
+
+        Ok(())
+    }
+
     fn team_switch_timer(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<i32> {
         Ok(self.player_of(&player)?.map_or(0, |p| p.team_switch_timer))
     }

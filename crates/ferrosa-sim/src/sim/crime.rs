@@ -10,7 +10,7 @@ impl Sim {
     /// (civilian or corporation, and whether the victim was in their own base), less the more criminal the victim
     /// already is. A player who reaches crimekick has their human killed.
     pub(crate) fn handle_criminal_rating(&mut self, attacker: PlayerId, victim: PlayerId, damage: i32) {
-        let cfg = self.modes.world.cfg;
+        let cfg = self.rules;
         let (Some(attacker_player), Some(attacker_victim)) = (self.players.get(attacker.idx()), self.players.get(victim.idx())) else { return };
         let (Some(attacker_human), Some(victim_human)) = (attacker_player.human, attacker_victim.human) else { return };
 

@@ -1,8 +1,7 @@
-use ferrosa_physics::rotation::IDENTITY;
-use ferrosa_protocol::clientbound::game::{ItemKind, MenuType, VehicleKind};
+use ferrosa_protocol::clientbound::game::{MenuType, VehicleKind};
 
 use super::{Sim, corporations::team_index};
-use crate::{PlayerId, items, items::state::ItemState};
+use crate::PlayerId;
 
 const CLOCK_START: i32 = 2376000;
 
@@ -92,130 +91,7 @@ impl Sim {
         }
     }
 
-    /// save_inventory: given a PID, save their inventory for when we will use it next
-    pub(crate) fn save_inventory(&mut self, pid: PlayerId) {
-        let Some(player) = self.players.get_mut(pid.idx()) else { return };
-        player.saved_inventory = Default::default();
 
-        let Some(human) = player.human.and_then(|h| self.humans.get(h)) else { return };
-
-        let mut saved: [Vec<SavedItem>; 7] = Default::default();
-        let mut keys = Vec::new();
-
-        for (slot, s) in human.inventory.iter().enumerate() {
-            for &id in &s.items[..s.count.max(0) as usize] {
-                let Some(item) = self.items.get(id as usize) else { continue };
-                let kind = item.item_type as i32;
-
-                if kind <= ItemKind::Bandage as i32 {
-                    let left = item.state.left();
-                    let mut entry = SavedItem { kind, a: 0, b: item.state.left() };
-
-                    if let Some(mag) = item.children.first().and_then(|&c| self.items.get(c)) {
-                        let rounds = mag.state.left();
-                        entry.a = 1;
-                        entry.b = rounds;
-
-                        if left > 0 && rounds <= self.item_types[mag.item_type as usize].magazine_ammo {
-                            entry.b = rounds + 1;
-                        }
-                    }
-
-                    saved[slot].push(entry);
-                } else if item.item_type == ItemKind::Key {
-                    if let ItemState::Key { vehicle: Some(v) } = item.state
-                        && let Some(veh) = self.vehicles.get(v).filter(|v| v.health > 0)
-                    {
-                        if self.rules.keys_keep_vehicles {
-                            keys.push((slot, v));
-                            saved[slot].push(SavedItem { kind, a: v as i32, b: 0 });
-                        } else {
-                            saved[slot].push(SavedItem { kind, a: veh.kind as i32, b: veh.color });
-                        }
-                    }
-                } else if let ItemState::Cash(c) = &item.state {
-                    saved[slot].push(SavedItem { kind, a: c.bills, b: c.codes as i32 });
-                }
-            }
-        }
-
-        for (_, v) in keys {
-            self.save_world_key(v);
-        }
-
-        if let Some(p) = self.players.get_mut(pid.idx()) {
-            p.saved_inventory = saved;
-        }
-    }
-
-    /// init_player_inventory: Initialize a player inventory with their saved items
-    pub(crate) fn init_player_inventory(&mut self, pid: PlayerId) {
-        let Some(p) = self.players.get(pid.idx()) else { return };
-        let Some(human) = p.human else { return };
-        let team = p.team;
-        let saved = p.saved_inventory.clone();
-        let Some(pos) = self.humans.get(human).map(|h| h.bones[0].pos) else { return };
-
-        for (slot, items) in saved.iter().enumerate() {
-            for saved_item in items {
-                let Ok(kind) = ItemKind::try_from(saved_item.kind as u8) else { continue };
-
-                let item = if saved_item.kind <= ItemKind::Bandage as i32 {
-                    let Some(id) = self.create_item(kind, pos, None, IDENTITY) else { continue };
-
-                    if !self.item_types[saved_item.kind as usize].is_gun {
-                        if let Some(i) = self.items.get_mut(id) {
-                            i.state.set_left(saved_item.b);
-                        }
-                    } else if saved_item.a > 0
-                        && let Ok(mag_kind) = ItemKind::try_from(saved_item.kind as u8 + 1)
-                        && let Some(mag) = self.create_item(mag_kind, pos, None, IDENTITY)
-                    {
-                        if let Some(i) = self.items.get_mut(mag) {
-                            i.state.set_left(saved_item.b);
-                        }
-
-                        items::attach_child(&mut self.items, &self.item_types, id, mag);
-                    }
-
-                    id
-                } else if kind == ItemKind::Key && self.rules.keys_keep_vehicles {
-                    let Some(id) = self.create_item(ItemKind::Key, pos, None, IDENTITY) else { continue };
-                    let v = self.world_key_vehicle(saved_item.a);
-
-                    if let Some(i) = self.items.get_mut(id) {
-                        i.state = ItemState::Key { vehicle: v };
-                    }
-
-                    id
-                } else if kind == ItemKind::Key {
-                    let Some(k) = team_index(team) else { continue };
-                    let Some(kind) = u8::try_from(saved_item.a).ok().and_then(|a| VehicleKind::try_from(a).ok()) else { continue };
-                    let Some(v) = self.corporation_spawn_vehicle(kind, k, saved_item.b) else { continue };
-                    let Some(id) = self.create_item(ItemKind::Key, pos, None, IDENTITY) else { continue };
-
-                    if let Some(i) = self.items.get_mut(id) {
-                        i.state = ItemState::Key { vehicle: Some(v) };
-                    }
-
-                    id
-                } else if kind == ItemKind::CashWorld {
-                    let Some(id) = self.create_item(kind, pos, None, IDENTITY) else { continue };
-
-                    if let Some(c) = self.items.get_mut(id).and_then(|i| i.state.cash_mut()) {
-                        c.bills = saved_item.a;
-                        c.codes = saved_item.b as u32;
-                    }
-
-                    id
-                } else {
-                    continue;
-                };
-
-                self.link_to_slot(human, item, slot);
-            }
-        }
-    }
 
     pub(crate) fn corporation_spawn_vehicle(&mut self, kind: VehicleKind, k: usize, color: i32) -> Option<usize> {
         let spaces = self.world.map.level.bases.get(k)?.car_spaces.clone();

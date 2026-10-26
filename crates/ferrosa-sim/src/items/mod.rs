@@ -182,10 +182,6 @@ impl Sim {
             self.return_set_item(id);
         }
 
-        if self.items.get(id).is_some_and(|i| i.item_type == ItemKind::PaperWorld) {
-            self.world_paper_deleted();
-        }
-
         self.drop_program(id);
         self.free_item_links(id);
 

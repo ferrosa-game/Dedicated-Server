@@ -1,4 +1,4 @@
-use ferrosa_sim::PlayerId;
+use ferrosa_sim::{CrimeRates, PlayerId};
 use wasmtime::bail;
 
 use crate::{
@@ -207,8 +207,141 @@ impl server::Host for HostState {
         self.building_handle(id as usize).map(Some)
     }
 
+    fn map_name(&mut self) -> wasmtime::Result<String> {
+        Ok(self.sim()?.map_name().to_string())
+    }
+
+    fn street_name(&mut self, street: i32) -> wasmtime::Result<String> {
+        Ok(self.sim()?.street_of(street))
+    }
+
+    fn street_corner(&mut self, street: i32) -> wasmtime::Result<Option<(String, String)>> {
+        Ok(self.sim()?.street_corner(street))
+    }
+
+    fn street_intersections(&mut self, street: i32) -> wasmtime::Result<Option<(u32, u32)>> {
+        Ok(self.sim()?.street_intersections(street))
+    }
+
+    fn track_spawns(&mut self) -> wasmtime::Result<Vec<(Vec3, f32)>> {
+        let spawns = self.sim()?.track_spawns().iter().map(|&(pos, angle)| (pos.into(), angle));
+
+        Ok(spawns.collect())
+    }
+
+    fn create_npc(&mut self, kind: i32, pos: Vec3, yaw: f32) -> wasmtime::Result<Option<u32>> {
+        Ok(self.sim_mut()?.add_npc(kind, pos.into(), yaw).map(|n| n as u32))
+    }
+
+    fn set_npc_waypoints(&mut self, npc: u32, waypoints: Vec<Vec3>) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_npc_waypoints(npc as usize, waypoints.into_iter().map(Into::into).collect());
+
+        Ok(())
+    }
+
+    fn set_crime(&mut self, rates: Option<types::CrimeRates>) -> wasmtime::Result<()> {
+        let rates = rates.map(|r| CrimeRates {
+            civ_civ: r.civ_civ,
+            civ_team: r.civ_team,
+            team_civ: r.team_civ,
+            team_team: r.team_team,
+            team_team_in_base: r.team_team_in_base,
+            kick: r.kick,
+        });
+
+        self.sim_mut()?.set_crime(rates);
+
+        Ok(())
+    }
+
     fn ground_below(&mut self, pos: Vec3) -> wasmtime::Result<Option<f32>> {
         Ok(self.sim()?.ground_below(pos.into()))
+    }
+
+    fn get_volume(&mut self, volume: i32) -> wasmtime::Result<Option<Resource<VolumeRef>>> {
+        if !self.sim()?.volume_exists(volume) {
+            return Ok(None);
+        }
+
+        self.volume_handle(volume).map(Some)
+    }
+
+    fn alloc_content(&mut self) -> wasmtime::Result<Option<i32>> {
+        let content = self.sim_mut()?.alloc_content();
+
+        Ok((content >= 0).then_some(content))
+    }
+
+    fn content_text(&mut self, content: i32) -> wasmtime::Result<Option<String>> {
+        Ok(self.sim()?.content_text(content))
+    }
+
+    fn set_content_text(&mut self, content: i32, text: String) -> wasmtime::Result<()> {
+        self.sim_mut()?.set_content_text(content, &text);
+        Ok(())
+    }
+
+    fn encipher_content(&mut self, content: i32) -> wasmtime::Result<()> {
+        self.sim_mut()?.encipher_content(content);
+        Ok(())
+    }
+
+    fn place_team_memo(&mut self, team: types::Team, text: String) -> wasmtime::Result<()> {
+        self.sim_mut()?.place_team_memo(team.into(), &text);
+        Ok(())
+    }
+
+    fn get_tick(&mut self) -> wasmtime::Result<u32> {
+        Ok(self.sim()?.tick_count())
+    }
+
+    fn save_accounts(&mut self) -> wasmtime::Result<()> {
+        self.sim_mut()?.save_account_file();
+        Ok(())
+    }
+
+    fn save_stats(&mut self) -> wasmtime::Result<()> {
+        self.sim_mut()?.save_stats_file();
+        Ok(())
+    }
+
+    fn send_stock_prices(&mut self) -> wasmtime::Result<()> {
+        self.sim_mut()?.send_stock_prices();
+        Ok(())
+    }
+
+    fn despawn_missions(&mut self, id: i32) -> wasmtime::Result<()> {
+        self.sim_mut()?.despawn_missions(id);
+        Ok(())
+    }
+
+    fn traffic_car_route(&mut self, car: u32) -> wasmtime::Result<Vec<i32>> {
+        Ok(self.sim()?.traffic_car_route(car as usize))
+    }
+
+    fn create_mission_bot(
+        &mut self,
+        expiry: i32,
+        pos: Vec3,
+        rot: Mat3,
+        vehicle: Resource<VehicleRef>,
+        seat: u32,
+    ) -> wasmtime::Result<Option<(u32, Option<Resource<HumanRef>>)>> {
+        let vid = self.table.get(&vehicle)?.0;
+        let Some((player, human)) = self.sim_mut()?.add_mission_bot(expiry, pos.into(), rot.into(), vid, seat as usize) else { return Ok(None) };
+        let human = match human {
+            Some(h) => Some(self.human_handle(h)?),
+            None => None,
+        };
+
+        Ok(Some((player.0, human)))
+    }
+
+    fn create_guards(&mut self, expiry: i32, pos: Vec3, rot: Mat3, vehicle: Resource<VehicleRef>) -> wasmtime::Result<()> {
+        let vid = self.table.get(&vehicle)?.0;
+        self.sim_mut()?.add_guards(expiry, pos.into(), rot.into(), vid);
+
+        Ok(())
     }
 
     fn clear_bullets(&mut self) -> wasmtime::Result<()> {
@@ -285,6 +418,10 @@ impl server::Host for HostState {
     fn set_traffic(&mut self, cars: u32, parked: bool) -> wasmtime::Result<()> {
         self.sim_mut()?.set_traffic(cars, parked);
         Ok(())
+    }
+
+    fn bill_value(&mut self, bill: types::Bill) -> wasmtime::Result<i32> {
+        Ok(ferrosa_sim::Sim::bill_value(bill as u32))
     }
 
     fn item_price(&mut self, kind: u32) -> wasmtime::Result<Option<i32>> {

@@ -164,6 +164,19 @@ impl types::HostVolume for HostState {
         Ok(self.table.get(&volume)?.0 as u32)
     }
 
+    fn add_file_of_content(&mut self, volume: Resource<VolumeRef>, name: String, content: i32) -> wasmtime::Result<bool> {
+        let v = self.table.get(&volume)?.0;
+
+        Ok(self.sim_mut()?.volume_add_file(v, &name, content) >= 0)
+    }
+
+    fn swap_files(&mut self, volume: Resource<VolumeRef>, a: u32, b: u32) -> wasmtime::Result<()> {
+        let v = self.table.get(&volume)?.0;
+        self.sim_mut()?.volume_swap_files(v, a as usize, b as usize);
+
+        Ok(())
+    }
+
     fn capacity(&mut self, volume: Resource<VolumeRef>) -> wasmtime::Result<i32> {
         let id = self.table.get(&volume)?.0;
         Ok(self.sim()?.volume_capacity(id).unwrap_or(0))
@@ -193,6 +206,11 @@ impl types::HostFile for HostState {
     fn name(&mut self, file: Resource<FileRef>) -> wasmtime::Result<String> {
         let FileRef(volume, file) = *self.table.get(&file)?;
         Ok(self.sim()?.file_name(volume, file).unwrap_or_default())
+    }
+
+    fn content(&mut self, file: Resource<FileRef>) -> wasmtime::Result<i32> {
+        let FileRef(volume, file) = *self.table.get(&file)?;
+        Ok(self.sim()?.file_content(volume, file))
     }
 
     fn text(&mut self, file: Resource<FileRef>) -> wasmtime::Result<String> {

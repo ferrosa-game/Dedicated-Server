@@ -85,6 +85,46 @@ impl types::HostCorporation for HostState {
         Ok(())
     }
 
+    fn settle_mission(&mut self, corporation: Resource<CorporationRef>, slot: u32, success: bool, cash: i32) -> wasmtime::Result<()> {
+        let team = self.table.get(&corporation)?.0;
+        self.sim_mut()?.settle_mission(team, slot as usize, success, cash);
+
+        Ok(())
+    }
+
+    fn intel(&mut self, corporation: Resource<CorporationRef>) -> wasmtime::Result<i32> {
+        let team = self.table.get(&corporation)?.0;
+        Ok(self.sim()?.corporation_intel(team))
+    }
+
+    fn set_intel(&mut self, corporation: Resource<CorporationRef>, intel: i32) -> wasmtime::Result<()> {
+        let team = self.table.get(&corporation)?.0;
+        self.sim_mut()?.set_corporation_intel(team, intel);
+
+        Ok(())
+    }
+
+    fn set_prints(&mut self, corporation: Resource<CorporationRef>, prints: i32) -> wasmtime::Result<()> {
+        let team = self.table.get(&corporation)?.0;
+        self.sim_mut()?.set_corporation_prints(team, prints);
+
+        Ok(())
+    }
+
+    fn disconnect_phones(&mut self, corporation: Resource<CorporationRef>) -> wasmtime::Result<()> {
+        let team = self.table.get(&corporation)?.0;
+        self.sim_mut()?.disconnect_team_phones(team);
+
+        Ok(())
+    }
+
+    fn send_mission_text(&mut self, corporation: Resource<CorporationRef>, slot: u32) -> wasmtime::Result<()> {
+        let team = self.table.get(&corporation)?.0;
+        self.sim_mut()?.send_mission_text(team, slot as usize);
+
+        Ok(())
+    }
+
     fn drop(&mut self, corporation: Resource<CorporationRef>) -> wasmtime::Result<()> {
         self.table.delete(corporation)?;
         Ok(())

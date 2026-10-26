@@ -1,19 +1,14 @@
 use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
-use ferrosa_protocol::clientbound::game::VehicleKind;
 use ferrosa_protocol::{SuitColor, clientbound::game::MenuType};
 use glam::Vec3;
 
 use ferrosa_protocol::clientbound::game::ItemKind;
 
 use super::{Sim, items::touchables};
-use crate::items::state::BILL_VALUES;
 use crate::items::state::ItemState;
-use crate::items::types::ItemType;
-use crate::time::WORLD_HOUR;
 use crate::{
     PlayerId,
-    vehicle::types::VehicleType,
-    world::building::{BURGER_SHOP, BuildingRecord, CAR_DEALER, CLOTHING_STORE, GUN_STORE, ShopEntry},
+    world::building::{BURGER_SHOP, CAR_DEALER, CLOTHING_STORE, GUN_STORE, ShopEntry},
 };
 
 fn menu(id: u8) -> MenuType {
@@ -27,24 +22,8 @@ fn menu(id: u8) -> MenuType {
 }
 
 impl Sim {
-    pub(crate) fn restock_dealerships(&mut self) {
-        restock_dealerships(&mut self.world.map.level.buildings, &self.vehicle_types);
-    }
 
-    pub(crate) fn stock_gun_stores(&mut self) {
-        stock_gun_stores(&mut self.world.map.level.buildings, &self.item_types);
-    }
 
-    /// The shop part of logic_world each tick: before closing time every burger shop has its burger.
-    pub(crate) fn stock_burger_shops(&mut self) {
-        if self.world_time > 19 * WORLD_HOUR - 1 {
-            return;
-        }
-        
-        for b in self.world.map.level.buildings.iter_mut().filter(|b| b.kind == 9) {
-            b.shop = vec![ShopEntry { kind: 0, price: 20, extra: 0 }];
-        }
-    }
 
     /// The menu part of logic_player: standing in a dealership opens its front page (menu 9), in a store, clothing
     /// store or burger shop its list (menu 10), in a bank the bank (menu 13); leaving the building closes menus 9 to 11.
@@ -170,80 +149,6 @@ impl Sim {
         }
     }
 
-    /// The bank menu (13) of logic_playerinteractions; any other button (16) leaves it.
-    pub(crate) fn bank_menu_action(&mut self, pid: PlayerId, button: u32) {
-        let Some(human) = self.players.get(pid.idx()).and_then(|p| p.human) else { return };
-
-        match button {
-            b if (1..=6).contains(&b) => self.bank_withdraw(pid, human, b),
-            7 => self.bank_deposit(pid, human),
-            16 => {
-                if let Some(p) = self.players.get_mut(pid.idx()) {
-                    p.menu = MenuType::EmptyBase;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    /// A bill of `code` from the player's money: new cash in an empty right hand, or onto the cash held there; the
-    /// money goes even when no cash could be made.
-    fn bank_withdraw(&mut self, pid: PlayerId, human: usize, code: u32) {
-        let value = BILL_VALUES[code as usize];
-        let Some(p) = self.players.get(pid.idx()) else { return };
-        let withdrawn = self.modes.world.state.bills_withdrawn.get(&pid).copied().unwrap_or(0);
-
-        if p.money < value || (code <= 2 && withdrawn > 39) {
-            return;
-        }
-
-        let Some(hand) = self.humans.get(human).map(|h| h.inventory[0]) else { return };
-
-        if hand.count <= 0 {
-            self.give_item(human, ItemKind::CashWorld as u8, 0..1, |state| {
-                if let ItemState::Cash(cash) = state {
-                    cash.bills = 0;
-                    cash.codes = code;
-                }
-            });
-        } else {
-            let Some(cash) = self.items.get_mut(hand.items[0] as usize).filter(|i| i.item_type == ItemKind::CashWorld).and_then(|i| i.state.cash_mut()) else {
-                return;
-            };
-
-            if !cash.insert(0, code) {
-                return;
-            }
-        }
-
-        let Some(p) = self.players.get_mut(pid.idx()) else { return };
-        p.money -= value;
-
-        if code <= 2 {
-            *self.modes.world.state.bills_withdrawn.entry(pid).or_default() += 1;
-        }
-    }
-
-    /// The cash in the right hand goes into the player's money.
-    fn bank_deposit(&mut self, pid: PlayerId, human: usize) {
-        let Some(hand) = self.humans.get(human).map(|h| h.inventory[0]) else { return };
-
-        if hand.count <= 0 {
-            return;
-        }
-
-        let id = hand.items[0] as usize;
-        let Some(value) = self.items.get(id).filter(|i| i.item_type == ItemKind::CashWorld).and_then(|i| i.state.cash()).map(|c| c.value()) else { return };
-
-        if let Some(p) = self.players.get_mut(pid.idx()) {
-            p.money += value;
-        }
-
-        self.mark_item_for_deletion(id);
-    }
-
-    /// dealership_buy_vehicle: a player with a human and fewer than 3 cars bought this round buys the car on list line
-    /// `button`: it is put in the dealership's next space, turned a quarter from the building, owned by the player,
     /// with its key in the first free pocket, and the line goes (the last one takes its place).
     fn dealership_buy_vehicle(&mut self, pid: PlayerId, button: u32) {
         let Some(p) = self.players.get(pid.idx()) else { return };
@@ -447,57 +352,5 @@ impl Sim {
         }
 
         self.update_player_event(pid);
-    }
-}
-
-/// restock_shop_vehicles: each dealership sells off some cars at random, then fills up to eight with random types
-/// and colours at their list price.
-pub fn restock_dealerships(buildings: &mut [BuildingRecord], types: &[VehicleType]) {
-    for building in buildings.iter_mut().filter(|b| b.kind == 3) {
-        let mut j = 0;
-
-        while j < building.shop.len() {
-            if rand::random_ratio(1, 8) {
-                let last = building.shop.pop().unwrap();
-
-                if j < building.shop.len() {
-                    building.shop[j] = last;
-                }
-            } else {
-                j += 1;
-            }
-        }
-
-        while building.shop.len() < 8 {
-            let kind = random_stock_vehicle() as i32;
-
-            let price = types.get(kind as usize).map_or(0, |t| t.price);
-            let extra = rand::random_range(0..6);
-
-            building.shop.push(ShopEntry { kind, price, extra });
-        }
-    }
-}
-
-/// The gun stores' fixed stock.
-pub fn stock_gun_stores(buildings: &mut [BuildingRecord], item_types: &[ItemType]) {
-    let stock: Vec<ShopEntry> = [11, 12, 7, 8, 1, 2, 3, 4, 9, 10, 14, 13].iter().map(|&k| ShopEntry { kind: k, price: item_types[k as usize].price, extra: 0 }).collect();
-
-    for b in buildings.iter_mut().filter(|b| b.kind == GUN_STORE) {
-        b.shop = stock.clone();
-    }
-}
-
-/// The type a dealership or round corporation stocks: mostly town cars, hatchbacks, minivans and vans, now and then a
-/// beamer, rarely a turbo and very rarely a Turbo S.
-pub fn random_stock_vehicle() -> VehicleKind {
-    match rand::random_range(0..16) {
-        0..=1 => VehicleKind::Van,
-        2..=5 => VehicleKind::TownCar,
-        6..=9 => VehicleKind::Hatchback,
-        10..=12 => VehicleKind::Minivan,
-        13..=14 => VehicleKind::Beamer,
-        _ if rand::random_ratio(1, 16) => VehicleKind::TurboS,
-        _ => VehicleKind::Turbo,
     }
 }

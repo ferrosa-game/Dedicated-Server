@@ -26,6 +26,13 @@ impl Vec3 {
 impl Mat3 {
     /// No rotation.
     pub const IDENTITY: Self = Self { x: Vec3::new(1.0, 0.0, 0.0), y: Vec3::new(0.0, 1.0, 0.0), z: Vec3::new(0.0, 0.0, 1.0) };
+
+    /// A turn of `angle` about the up axis, as everything placed on the ground is turned.
+    pub fn from_yaw(angle: f32) -> Self {
+        let (s, c) = angle.sin_cos();
+
+        Self { x: Vec3::new(c, 0.0, s), y: Vec3::new(0.0, 1.0, 0.0), z: Vec3::new(-s, 0.0, c) }
+    }
 }
 
 impl Add for Vec3 {

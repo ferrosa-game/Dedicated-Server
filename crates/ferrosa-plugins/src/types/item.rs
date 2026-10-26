@@ -14,6 +14,25 @@ impl HostState {
     }
 }
 
+/// A note's code on the wire, which is its place in the list.
+fn code(b: types::Bill) -> u32 {
+    b as u32
+}
+
+/// The note a code names; the eighth is worth nothing.
+fn bill(code: u32) -> types::Bill {
+    match code {
+        0 => types::Bill::One,
+        1 => types::Bill::Five,
+        2 => types::Bill::Ten,
+        3 => types::Bill::Twenty,
+        4 => types::Bill::Fifty,
+        5 => types::Bill::Hundred,
+        6 => types::Bill::Thousand,
+        _ => types::Bill::None,
+    }
+}
+
 impl types::HostItem for HostState {
     fn id(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<u32> {
         Ok(self.table.get(&item)?.0 as u32)
@@ -42,6 +61,11 @@ impl types::HostItem for HostState {
     fn set_phone_number(&mut self, item: Resource<ItemRef>, number: i32) -> wasmtime::Result<bool> {
         let id = self.table.get(&item)?.0;
         Ok(self.sim_mut()?.set_phone_number(id, number))
+    }
+
+    fn set_radio_channel(&mut self, item: Resource<ItemRef>, channel: i32) -> wasmtime::Result<bool> {
+        let id = self.table.get(&item)?.0;
+        Ok(self.sim_mut()?.set_radio_channel(id, channel))
     }
 
     fn set_phone_texture(&mut self, item: Resource<ItemRef>, texture: i32) -> wasmtime::Result<bool> {
@@ -102,6 +126,25 @@ impl types::HostItem for HostState {
         self.body_handle(body).map(Some)
     }
 
+    fn despawn_time(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<i32> {
+        let id = self.table.get(&item)?.0;
+        Ok(self.sim()?.item_despawn_time(id))
+    }
+
+    fn set_despawn_time(&mut self, item: Resource<ItemRef>, ticks: i32) -> wasmtime::Result<()> {
+        let id = self.table.get(&item)?.0;
+        self.sim_mut()?.set_item_despawn_time(id, ticks);
+
+        Ok(())
+    }
+
+    fn write_memo(&mut self, item: Resource<ItemRef>, text: String) -> wasmtime::Result<()> {
+        let id = self.table.get(&item)?.0;
+        self.sim_mut()?.write_item_memo(id, &text);
+
+        Ok(())
+    }
+
     fn uses(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<i32> {
         let id = self.table.get(&item)?.0;
         Ok(self.sim()?.item_uses(id))
@@ -121,12 +164,25 @@ impl types::HostItem for HostState {
 
     fn cash(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<Option<Cash>> {
         let id = self.table.get(&item)?.0;
-        Ok(self.sim()?.item_cash(id).map(|(bills, codes)| Cash { bills, codes }))
+
+        Ok(self.sim()?.item_cash(id).map(|(top, codes)| Cash { bills: (0..=top).map(|k| bill((codes >> (k * 3)) & 7)).collect() }))
     }
 
     fn set_cash(&mut self, item: Resource<ItemRef>, cash: Cash) -> wasmtime::Result<bool> {
         let id = self.table.get(&item)?.0;
-        Ok(self.sim_mut()?.set_item_cash(id, cash.bills, cash.codes))
+        let codes = cash.bills.iter().enumerate().fold(0u32, |v, (k, &b)| v | (code(b) << (k * 3)));
+
+        Ok(self.sim_mut()?.set_item_cash(id, cash.bills.len() as i32 - 1, codes))
+    }
+
+    fn cash_value(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<Option<i32>> {
+        let id = self.table.get(&item)?.0;
+        Ok(self.sim()?.item_cash_value(id))
+    }
+
+    fn insert_bill(&mut self, item: Resource<ItemRef>, at: u32, b: types::Bill) -> wasmtime::Result<bool> {
+        let id = self.table.get(&item)?.0;
+        Ok(self.sim_mut()?.insert_item_bill(id, at as i32, code(b)))
     }
 
     fn delete(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<()> {

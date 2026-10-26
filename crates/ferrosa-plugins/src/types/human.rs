@@ -124,6 +124,35 @@ impl types::HostHuman for HostState {
         Ok(())
     }
 
+    fn vehicle_seat(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<Option<u32>> {
+        let id = self.table.get(&human)?.0;
+        Ok(self.sim()?.human_vehicle_seat(id))
+    }
+
+    fn yaw(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<f32> {
+        let id = self.table.get(&human)?.0;
+        Ok(self.sim()?.human_yaw(id))
+    }
+
+    fn max_stamina(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<i32> {
+        let id = self.table.get(&human)?.0;
+        Ok(self.sim()?.human_max_stamina(id))
+    }
+
+    fn set_max_stamina(&mut self, human: Resource<HumanRef>, stamina: i32) -> wasmtime::Result<()> {
+        let id = self.table.get(&human)?.0;
+        self.sim_mut()?.set_human_max_stamina(id, stamina);
+
+        Ok(())
+    }
+
+    fn release_from_bot(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<()> {
+        let id = self.table.get(&human)?.0;
+        self.sim_mut()?.release_bot_human(id);
+
+        Ok(())
+    }
+
     fn delete(&mut self, human: Resource<HumanRef>) -> wasmtime::Result<()> {
         let id = self.table.get(&human)?.0;
         self.sim_mut()?.remove_human(id);

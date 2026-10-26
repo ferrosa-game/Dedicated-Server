@@ -68,10 +68,7 @@ impl Sim {
 
         self.traffic = Traffic::new(&map.streets, map.map_name == "round");
         self.missions.counter = 0;
-        self.modes.world.state.memos = 0;
         self.fs.reset();
-        self.load_newspaper();
-        self.init_mission_spots();
         self.admin.pending_ban = None;
 
         for c in &mut self.corp_state {

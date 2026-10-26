@@ -205,20 +205,6 @@ impl Sim {
             key = KEY_BACKSPACE;
         }
 
-        if c.mode == Mode::Mission {
-            c.cursor = -1;
-
-            if c.mission.timer <= 0 {
-                self.mission_key(id, c, key);
-            }
-
-            if c.mode == Mode::Mission {
-                return;
-            }
-
-            key = KEY_BACKSPACE;
-        }
-
         let b = key as u8;
         let len = text_len(&c.input[..INPUT_LEN]);
 
@@ -533,16 +519,7 @@ impl Sim {
                 c.line_mut()[0] = 0;
             }
             b"COPY" => self.copy_command(id, c, &s, &mut pos, cwd),
-            b"MISSION" | b"MISSION.EXE" => {
-                if c.team == -1 {
-                    return self.say(id, c, b"BAD COMMAND OR FILE NAME");
-                }
-
-                c.mode = Mode::Mission;
-                c.cursor = -1;
-                self.mission_init(id, c);
-            }
-            b"DECRYPT" | b"DECRYPT.EXE" => {
+                        b"DECRYPT" | b"DECRYPT.EXE" => {
                 let (mut d, mut dir) = (drive, cwd);
                 let file =
                     (self.resolve_path(id, c, &mut d, &mut dir, &s, &mut pos) == 0).then(|| self.drive_volume(id, d)).filter(|&v| v != -1).and_then(|v| {
@@ -742,7 +719,6 @@ impl Sim {
         }
 
         if c.mode == Mode::Mission {
-            self.mission_tick(id, c);
         }
     }
 }

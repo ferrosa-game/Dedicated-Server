@@ -56,13 +56,13 @@ impl Cash {
     }
 
     /// value: calculate the value of this stack of cash from its bills
-    pub(crate) fn value(&self) -> i32 {
+    pub fn value(&self) -> i32 {
         (0..=self.bills).map(|k| BILL_VALUES[self.code(k) as usize]).sum()
     }
 
     /// cash_separate: puts a bill of `code` in at `index` (on top past the end), moving the bills above it up; a
     /// stack holds ten.
-    pub(crate) fn insert(&mut self, index: i32, code: u32) -> bool {
+    pub fn insert(&mut self, index: i32, code: u32) -> bool {
         let bills = self.bills;
 
         if bills > 8 {

@@ -1,7 +1,6 @@
 pub mod decrypt;
 pub mod fs;
 pub mod links;
-pub mod mission;
 pub mod shell;
 
 pub const LINES: usize = 32;
@@ -68,7 +67,6 @@ pub struct Computer {
     pub program: String,
     pub args: String,
     pub decrypt: decrypt::Decrypter,
-    pub mission: mission::MissionScreen,
 }
 
 impl Default for Computer {
@@ -89,7 +87,6 @@ impl Default for Computer {
             program: String::new(),
             args: String::new(),
             decrypt: decrypt::Decrypter::default(),
-            mission: mission::MissionScreen::default(),
         }
     }
 }
@@ -105,6 +102,20 @@ pub fn put_text(line: &mut [u8; COLUMNS], s: &[u8]) {
 }
 
 impl Computer {
+    /// A row written across the first `width` columns only, the line ending there, as the game's own list screens
+    /// highlight a row.
+    pub(crate) fn field(&mut self, l: usize, text: &[u8], width: usize, color: u8) {
+        let n = text_len(text);
+
+        for k in 0..width {
+            self.lines[l][k] = if k < n { text[k] } else { b' ' };
+            self.colors[l][k] = color;
+        }
+
+        self.lines[l][width] = 0;
+    }
+
+
     pub(crate) fn line_mut(&mut self) -> &mut [u8; COLUMNS] {
         &mut self.lines[self.current_line as usize & (LINES - 1)]
     }

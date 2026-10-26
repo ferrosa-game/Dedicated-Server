@@ -163,6 +163,20 @@ interface types {
         set-tie-colour: func(colour: option<suit-colour>);
         necklace: func() -> u8;
         set-necklace: func(necklace: u8);
+        /// The corporation money and credit their client is shown; a mode that runs corporations sets these.
+        set-corp-money: func(money: s32, credit: s32);
+        /// Their criminal rating, which the server's own scoring raises when they hurt people.
+        crim-rating: func() -> s32;
+        set-crim-rating: func(rating: s32);
+        /// Their saved account; none for a bot, or a player the server has no account for.
+        account: func() -> option<account>;
+        set-account: func(account: account);
+        /// How long they must wait before spawning again, which the server keeps with their account.
+        account-spawn-timer: func() -> s32;
+        set-account-spawn-timer: func(ticks: s32);
+        /// The world clock a bot leaves at; 0 for one that stays.
+        bot-deadline: func() -> s32;
+        set-bot-deadline: func(clock: s32);
         /// Ticks until they may switch team again; 0 lets them.
         team-switch-timer: func() -> s32;
         set-team-switch-timer: func(ticks: s32);
@@ -228,12 +242,23 @@ interface types {
         missions: func() -> list<mission>;
         /// Sets a mission slot and tells the corporation's clients.
         set-mission: func(slot: u32, mission: mission);
+        /// settle_mission_result: a mission slot decided, paying `cash` and settling the corporation's rating.
+        settle-mission: func(slot: u32, success: bool, cash: s32);
         /// The shares its members hold, plus what the market keeps.
         shares: func() -> s32;
         set-shares: func(shares: s32);
         price: func() -> f32;
         /// Sets a share's price, and sends every client the prices.
         set-price: func(price: f32);
+        /// The intel it can ask for: 1 to 8 can request, 0 requested, 11 faxed, others none.
+        intel: func() -> s32;
+        set-intel: func(intel: s32);
+        /// How many intel screens it has printed; the server stops it at four.
+        set-prints: func(prints: s32);
+        /// Hangs up both of its phones, wherever they are.
+        disconnect-phones: func();
+        /// Sends a mission's result text to its clients, which their MISSION.EXE shows.
+        send-mission-text: func(slot: u32);
     }
 
     /// A rigid body: a bone of a human, an item, or a vehicle's chassis or wheel. Every call reads or changes the real
@@ -281,7 +306,17 @@ interface types {
         enter-vehicle: func(vehicle: borrow<vehicle>, seat: u32) -> bool;
         /// Its bones' bodies.
         bones: func() -> list<body>;
+        /// A bot's human let go of: the traffic car it drives goes back to the traffic, what it holds stops
+        /// despawning, and it stays in the world with nobody controlling it.
+        release-from-bot: func();
         set-view-yaw: func(yaw: f32);
+        /// Which of its vehicle's seats it is in, 0 the driver's; none for one on foot.
+        vehicle-seat: func() -> option<u32>;
+        /// The way its body faces along the ground, in radians.
+        yaw: func() -> f32;
+        /// Its stamina ceiling, which world mode wears down over a day.
+        max-stamina: func() -> s32;
+        set-max-stamina: func(stamina: s32);
         /// A new item of `kind` into the first free slot from `first` up to but not `end`: 0 and 1 are the hands, 2
         /// to 6 the pockets. None if it didn't fit.
         give-item: func(kind: u32, first: u32, end: u32) -> option<item>;
@@ -305,8 +340,11 @@ interface types {
         phone-number: func() -> option<s32>;
         /// False if it isn't a phone.
         set-phone-number: func(number: s32) -> bool;
-        /// Which of the two phone textures it shows; false if it isn't a phone.
+        /// Which of the two phone textures it shows; false if it isn't a phone. This is what tells clients about a
+        /// phone, so it comes after set-phone-number.
         set-phone-texture: func(texture: s32) -> bool;
+        /// The channel a walkie-talkie talks on; false if it isn't one.
+        set-radio-channel: func(channel: s32) -> bool;
         /// The vehicle a key opens; false if it isn't a key.
         set-key-vehicle: func(vehicle: option<borrow<vehicle>>) -> bool;
         /// Puts `child` inside it, such as a disk in a briefcase (open or closed) or a magazine in a gun; false if it
@@ -317,6 +355,11 @@ interface types {
         /// The human whose hands or pockets it's in; none for an item lying in the world (or inside another).
         holder: func() -> option<human>;
         body: func() -> option<body>;
+        /// How long it has before it despawns; 0 for one that never does.
+        despawn-time: func() -> s32;
+        set-despawn-time: func(ticks: s32);
+        /// The text a paper or memo shows, as the game's own memos are written.
+        write-memo: func(text: string);
         /// What's left in it: a gun's chambered rounds, a magazine's rounds, a grenade's or bandage's uses.
         uses: func() -> s32;
         set-uses: func(uses: s32);
@@ -326,6 +369,11 @@ interface types {
         cash: func() -> option<cash>;
         /// False if it isn't cash.
         set-cash: func(cash: cash) -> bool;
+        /// What the bundle is worth; none if it isn't cash.
+        cash-value: func() -> option<s32>;
+        /// cash_separate: puts a note into the bundle at `at` (on top past the end), moving the notes above it up.
+        /// False if it isn't cash or already holds ten.
+        insert-bill: func(at: u32, bill: bill) -> bool;
         /// The computer inside it; none if it isn't a computer.
         computer: func() -> option<computer>;
         /// The volume a disk holds; none if it isn't a disk.
@@ -354,8 +402,12 @@ interface types {
         /// Its wheels' bodies.
         wheels: func() -> list<body>;
         pos: func() -> vec3;
+        /// The traffic car it is, if it is one: the number server.traffic-car-route takes.
+        traffic-car: func() -> option<u32>;
         /// Makes it a parked traffic car, which bots can drive.
         park-in-traffic: func();
+        /// Which of the track's stations a train runs from.
+        set-train-index: func(index: s32);
         /// Takes it out of the world, getting anyone in it out first.
         delete: func();
     }
@@ -381,9 +433,21 @@ interface types {
     }
 
     /// A bundle of cash: how many bills, and each bill's code (three bits apiece).
+    /// The notes cash comes in. `none` is the eighth code a bill can carry, which is worth nothing.
+    enum bill {
+        one,
+        five,
+        ten,
+        twenty,
+        fifty,
+        hundred,
+        thousand,
+        none,
+    }
+
+    /// A bundle of cash: the notes it holds, the bottom one first.
     record cash {
-        bills: s32,
-        codes: u32,
+        bills: list<bill>,
     }
 
     /// The item kinds the game itself has. A kind's number, which item.kind and server.spawn-item-by-id use, is
@@ -499,6 +563,46 @@ interface types {
         extra: s32,
     }
 
+    /// What hurting someone adds to the attacker's criminal rating, by their teams. A victim who is already
+    /// criminal adds less.
+    record crime-rates {
+        /// A civilian hurting a civilian.
+        civ-civ: s32,
+        /// A civilian hurting a corporation's member.
+        civ-team: s32,
+        /// A member hurting a civilian.
+        team-civ: s32,
+        /// A member hurting another corporation's member.
+        team-team: s32,
+        /// The same, inside the victim's own base.
+        team-team-in-base: s32,
+        /// The rating at which a player's human is killed.
+        kick: s32,
+    }
+
+    /// What a player's saved account holds, which the server keeps across days and restores when they rejoin. A
+    /// mode that keeps money and ratings writes them here.
+    record account {
+        money: u32,
+        corp-rating: u32,
+        crim-rating: u32,
+        /// 5 is added at every world mode save; stats.txt counts it in tens.
+        play-time: u32,
+    }
+
+    /// A guard post inside a building: where it stands, the way it faces, and the route it walks.
+    record patrol-spot {
+        pos: vec3,
+        facing: f32,
+        waypoints: list<vec3>,
+    }
+
+    /// A computer a building's item sets place: the cell it stands in, and the volume it reads.
+    record building-computer {
+        cell: vec3,
+        volume: s32,
+    }
+
     /// A building on the map, in placement order. Every call reads or changes the real building; the map's own
     /// records live as long as the map, so a handle never goes stale.
     resource building {
@@ -529,6 +633,12 @@ interface types {
         /// Which of the 8 spaces back from car-spawn is next.
         car-counter: func() -> s32;
         set-car-counter: func(next: s32);
+        /// The places a guard can be posted in it.
+        patrol: func() -> list<patrol-spot>;
+        /// The computers its item sets place.
+        computers: func() -> list<building-computer>;
+        /// Gives one of those computers the volume it reads, for a computer the sets have not placed yet.
+        set-computer-volume: func(index: u32, volume: borrow<volume>);
     }
 
     /// A street intersection.
@@ -735,6 +845,11 @@ interface types {
         capacity: func() -> s32;
         /// Every file on it. Files are never taken away, so a file keeps its place for as long as the volume lives.
         files: func() -> list<file>;
+        /// A file named `name` reading `content`, which may already be another file's. False once the volume holds
+        /// 256 files.
+        add-file-of-content: func(name: string, content: s32) -> bool;
+        /// Swaps two of its files, as the decoy documents are shuffled.
+        swap-files: func(a: u32, b: u32);
         /// A new file holding `text`; none once the volume holds 256 files, or the 8192 file contents are all
         /// taken. Directories are only ever read, never made, so it goes in the root.
         add-file: func(name: string, text: string) -> option<file>;
@@ -746,6 +861,8 @@ interface types {
         /// Its text, enciphered or not: a plugin reads through the cipher.
         text: func() -> string;
         set-text: func(text: string);
+        /// The content it reads, which several files can share.
+        content: func() -> s32;
         /// Whether DECRYPT must be run on it to read it in game.
         encrypted: func() -> bool;
         /// Enciphers it with a fresh cipher, or leaves it plain.

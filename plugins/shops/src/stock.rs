@@ -1,6 +1,5 @@
 use ferrosa_wit::{Building, BuildingKind, ItemKind, ShopEntry, VehicleKind, server};
 
-/// The guns, magazines, bandages and grenades a gun store sells, in the order it lists them.
 const GUN_STOCK: [ItemKind; 12] = [
     ItemKind::Pistol,
     ItemKind::PistolMag,
@@ -16,13 +15,8 @@ const GUN_STOCK: [ItemKind; 12] = [
     ItemKind::Grenade,
 ];
 
-const BURGER_PRICE: i32 = 20;
-
-/// Burger shops close at seven in the evening.
 const CLOSING_TIME: i32 = 19 * 60 * 60;
 
-/// The type a dealership stocks: mostly town cars, hatchbacks, minivans and vans, now and then a beamer, rarely a
-/// turbo and very rarely a Turbo S.
 fn random_stock_vehicle() -> VehicleKind {
     match rand::random_range(0..16) {
         0..=1 => VehicleKind::Van,
@@ -35,12 +29,10 @@ fn random_stock_vehicle() -> VehicleKind {
     }
 }
 
-/// of_kind: get every building of a type
 fn of_kind(kind: BuildingKind) -> impl Iterator<Item = Building> {
     server::buildings().into_iter().filter(move |b| b.kind() == kind)
 }
 
-/// restock_dealerships: for every car dealer, restock it with new random vehicles
 pub fn restock_dealerships() {
     for building in of_kind(BuildingKind::CarDealer) {
         let mut shop = building.shop();
@@ -69,7 +61,6 @@ pub fn restock_dealerships() {
     }
 }
 
-/// The gun stores' fixed stock.
 pub fn stock_gun_stores() {
     let stock: Vec<ShopEntry> = GUN_STOCK.iter().map(|&kind| ShopEntry { kind: kind as i32, price: server::item_price(kind as u32).unwrap_or(0), extra: 0 }).collect();
 
@@ -78,13 +69,12 @@ pub fn stock_gun_stores() {
     }
 }
 
-/// The burger shops' one line, until they close for the day.
 pub fn stock_burger_shops() {
     if server::world_time() > CLOSING_TIME - 1 {
         return;
     }
 
-    let stock = [ShopEntry { kind: 0, price: BURGER_PRICE, extra: 0 }];
+    let stock = [ShopEntry { kind: 0, price: 20, extra: 0 }];
 
     for building in of_kind(BuildingKind::BurgerShop) {
         building.set_shop(&stock);

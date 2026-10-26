@@ -23,6 +23,7 @@ mod items;
 mod physics;
 mod players;
 mod vehicles;
+pub mod world;
 
 #[derive(Default)]
 pub(crate) struct PendingUpdates {

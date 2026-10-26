@@ -19,8 +19,17 @@ pub struct ModeRules {
     pub keep_bodies: bool,
     /// Loose items never despawn.
     pub keep_items: bool,
-    /// Hurting people raises criminal ratings.
+    /// Hurting people raises criminal ratings, by these rates.
     pub crime: bool,
+    /// What hurting someone adds to the attacker's criminal rating, by their teams: a civilian hurting a civilian or
+    /// a corporation's member, a member hurting a civilian, another member, or one inside their own base. A victim
+    /// who is already criminal adds less, and a player at `crimekick` has their human killed.
+    pub crimecivciv: i32,
+    pub crimecivteam: i32,
+    pub crimeteamciv: i32,
+    pub crimeteamteam: i32,
+    pub crimeteamteaminbase: i32,
+    pub crimekick: i32,
     /// Hurting a teammate hurts the attacker too.
     pub punish_team_kills: bool,
     /// World mode's corporate ratings: the manager's rating is the account's credit and scales the missions, and ratings
@@ -62,6 +71,12 @@ impl Default for ModeRules {
             keep_bodies: false,
             keep_items: false,
             crime: false,
+            crimecivciv: 0,
+            crimecivteam: 0,
+            crimeteamciv: 0,
+            crimeteamteam: 0,
+            crimeteamteaminbase: 0,
+            crimekick: 0,
             punish_team_kills: true,
             world_corporations: false,
             corp_buy_menus: false,

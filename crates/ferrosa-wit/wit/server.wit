@@ -1,7 +1,7 @@
 package ferrosa:plugin@0.1.0;
 
 interface server {
-    use types.{body, body-id, building, chat-type, client-mode, computer, corporation, game-state, human, human-id, intersection, item, item-id, mat3, player, player-id, sound, team, vec3, vehicle, vehicle-id, volume};
+    use types.{bill, body, body-id, building, crime-rates, chat-type, client-mode, computer, corporation, game-state, human, human-id, intersection, item, item-id, mat3, player, player-id, sound, team, vec3, vehicle, vehicle-id, volume};
 
     /// Makes this plugin a game mode, named for config.toml's gamemode and /resetgame. Only from init, and only once: a
     /// plugin that registers a mode is that mode, and only its mode hooks are called. `map` is the map it plays; none
@@ -42,6 +42,8 @@ interface server {
     items: func() -> list<item>;
     /// Get a specific item by ID
     get-item: func(id: item-id) -> option<item>;
+    /// What a note is worth.
+    bill-value: func(bill: bill) -> s32;
     /// What an item kind costs in the shops.
     item-price: func(kind: u32) -> option<s32>;
 
@@ -71,6 +73,28 @@ interface server {
     /// Every building the map keeps a record of, in placement order; a building's number is its place in the list.
     buildings: func() -> list<building>;
     get-building: func(id: u32) -> option<building>;
+    /// The map's name, as its folder is called.
+    map-name: func() -> string;
+    /// A street's name; empty for a street the map hasn't got.
+    street-name: func(street: s32) -> string;
+    /// The two streets of the intersection a street starts at, for naming a place: none when the corner has fewer
+    /// than two.
+    street-corner: func(street: s32) -> option<tuple<string, string>>;
+    /// The two intersections a street runs between, as numbers into `intersections`.
+    street-intersections: func(street: s32) -> option<tuple<u32, u32>>;
+    /// Where the trains start on the map's track, each with the way it faces.
+    track-spawns: func() -> list<tuple<vec3, f32>>;
+
+    /// A new NPC of `kind` standing at `pos` facing `yaw`, which the server's own NPC code then runs; none once all
+    /// 1024 slots are taken. The number is the NPC's own, for set-npc-waypoints.
+    create-npc: func(kind: s32, pos: vec3, yaw: f32) -> option<u32>;
+    /// The route an NPC walks, from the first point, round and round.
+    set-npc-waypoints: func(npc: u32, waypoints: list<vec3>);
+
+    /// Hurting people raises criminal ratings by these rates, and the kick applies; none turns it off, as it is
+    /// after every reset. A mode sets it from its reset hook.
+    set-crime: func(rates: option<crime-rates>);
+
     /// The height of the ground under `pos`, looking from 8 above it to 256 below.
     ground-below: func(pos: vec3) -> option<f32>;
 
@@ -78,9 +102,42 @@ interface server {
     computers: func() -> list<computer>;
     /// The computer in item `item`; none if it isn't a computer.
     get-computer: func(item: item-id) -> option<computer>;
+    /// A volume by its number, as volume.id gives it.
+    get-volume: func(volume: s32) -> option<volume>;
     /// A new empty volume holding `capacity`, as a disk (360) or a computer (10000) has; none once all 1024 are
     /// taken. Nothing reads it until it is given to a disk.
     new-volume: func(capacity: s32) -> option<volume>;
+
+    /// A new empty file content; none once all 8192 are taken. A content is the text behind a file, and several
+    /// files can share one.
+    alloc-content: func() -> option<s32>;
+    /// A content's text, read through its cipher.
+    content-text: func(content: s32) -> option<string>;
+    set-content-text: func(content: s32, text: string);
+    /// Enciphers a content with a fresh cipher, so DECRYPT must be run on it in game.
+    encipher-content: func(content: s32);
+
+    /// A memo on a corporation's table, headed with its name and the time.
+    place-team-memo: func(team: team, text: string);
+
+    /// The server's tick count, which counts on from the reset (60 a second).
+    get-tick: func() -> u32;
+    /// Writes the accounts out, as world mode does at every save.
+    save-accounts: func();
+    /// Writes the server's stats out.
+    save-stats: func();
+    /// Sends every client the corporations' share prices.
+    send-stock-prices: func();
+
+    /// The items of a deal's missions taken out of the world.
+    despawn-missions: func(id: s32);
+    /// The streets a traffic car is driving, in order.
+    traffic-car-route: func(car: u32) -> list<s32>;
+
+    /// A mission bot seated in `vehicle`, which leaves at `expiry`: the player and its human.
+    create-mission-bot: func(expiry: s32, pos: vec3, rot: mat3, vehicle: borrow<vehicle>, seat: u32) -> option<tuple<player-id, option<human>>>;
+    /// A vehicle's guards: one in the front passenger seat, each back seat taken at even odds, all armed.
+    create-guards: func(expiry: s32, pos: vec3, rot: mat3, vehicle: borrow<vehicle>);
 
     /// Every bullet in flight gone.
     clear-bullets: func();

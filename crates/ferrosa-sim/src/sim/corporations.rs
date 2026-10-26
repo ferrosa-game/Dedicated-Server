@@ -1,4 +1,3 @@
-use ferrosa_physics::rotation::{IDENTITY, rotate_orientation};
 use ferrosa_protocol::{
     Team,
     clientbound::game::{
@@ -16,17 +15,15 @@ use crate::{
 };
 
 /// The team phones: the manager's at the table is numbered (team + 1) * 1111, and the one after it goes with it.
-pub(crate) const PHONE_NUMBER_STEP: i32 = 1111;
 /// A member can work the garage door from up to 4 outside the base.
 const DOOR_REACH: f32 = 4.0;
 
-/// A corporation's people and account: its manager and applicants, and its money and credit.
+/// A corporation's people and account: its manager and applicants, and its money.
 #[derive(Clone, Debug, Default)]
 pub struct CorpState {
     pub manager: Option<PlayerId>,
     pub applicants: Vec<PlayerId>,
     pub money: i32,
-    pub credit: i32,
     pub door_open: bool,
     pub funds: i32,
     pub missions: [super::missions::Mission; super::missions::MISSION_SLOTS],
@@ -38,8 +35,6 @@ pub struct CorpState {
     /// none) and how many screens it has printed (4 at most).
     pub intel: i32,
     pub prints: i32,
-    /// The volumes of the base's computers.
-    pub computers: Vec<i32>,
 }
 
 pub(crate) fn team_index(team: Team) -> Option<usize> {
@@ -56,35 +51,6 @@ impl Sim {
         }
     }
 
-    /// set_team_manager: the manager gets the team phone on the table and, in world mode, their corporate rating as the
-    /// account's credit.
-    pub(crate) fn set_team_manager(&mut self, k: usize, pid: PlayerId) {
-        if self.rules.world_corporations {
-            let rating = self.players.get(pid.idx()).map_or(0, |p| p.corp_rating);
-            self.corp_state[k].credit = rating.max(0);
-            self.scale_missions_for_manager(k, rating);
-        }
-
-        self.disconnect_phone(k);
-
-        let base = &self.world.map.level.bases[k];
-        let mut rot = IDENTITY;
-        let axis = rot[1];
-        rotate_orientation(&mut rot, axis, (base.table_orientation as f64 - 90.0_f64.to_radians()) as f32);
-
-        if let Some(id) = self.create_item(ItemKind::Phone, base.table, None, rot) {
-            if let Some(phone) = self.items.get_mut(id).and_then(|i| i.state.phone_mut()) {
-                phone.texture = 0;
-                phone.number = (k as i32 + 1) * 1111;
-            }
-
-            self.phone_update(id);
-        }
-
-        self.corp_state[k].manager = Some(pid);
-        let name = self.players.get(pid.idx()).map_or(String::new(), |p| p.username.clone());
-        self.announce(&format!("{name} is now manager of {}", Team::CORPORATION_NAMES[k]));
-    }
 
     pub(crate) fn disconnect_phone(&mut self, k: usize) {
         let number = (k as i32 + 1) * 1111;
@@ -137,20 +103,6 @@ impl Sim {
         self.corp_state[k].money = 0;
     }
 
-    /// A player stops managing the corporation they leave (in world mode after paying out its money).
-    pub(crate) fn leave_corp_management(&mut self, pid: PlayerId, team: Team) {
-        let Some(k) = team_index(team) else { return };
-
-        if self.corp_state[k].manager != Some(pid) {
-            return;
-        }
-
-        if self.rules.world_corporations {
-            self.update_corp_player_ratings(k);
-        }
-
-        self.corp_state[k].manager = None;
-    }
 
     /// Opens or closes a corporation's garage door (create_event_toggle_team_door); the door cells follow at the end of
     /// the tick (apply_team_doors).

@@ -73,6 +73,19 @@ impl types::HostVehicle for HostState {
         Ok(())
     }
 
+    fn traffic_car(&mut self, vehicle: Resource<VehicleRef>) -> wasmtime::Result<Option<u32>> {
+        let id = self.table.get(&vehicle)?.0;
+
+        Ok(self.sim()?.vehicle_traffic_car(id).map(|c| c as u32))
+    }
+
+    fn set_train_index(&mut self, vehicle: Resource<VehicleRef>, index: i32) -> wasmtime::Result<()> {
+        let id = self.table.get(&vehicle)?.0;
+        self.sim_mut()?.set_vehicle_train_index(id, index);
+
+        Ok(())
+    }
+
     fn drop(&mut self, vehicle: Resource<VehicleRef>) -> wasmtime::Result<()> {
         self.table.delete(vehicle)?;
         Ok(())

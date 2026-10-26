@@ -6,12 +6,10 @@ use crate::{PlayerId, sim::Sim};
 
 pub mod rules;
 pub mod unported;
-pub mod world;
 
 pub type Mode = &'static dyn ModeHooks;
 
-pub static MODES: [Mode; 6] = [
-    &world::Hooks,
+pub static MODES: [Mode; 5] = [
     &unported::DRIVING,
     &unported::RACING,
     &unported::COOP,
@@ -26,12 +24,11 @@ pub fn find(modes: &[Mode], name: &str) -> Option<Mode> {
 #[derive(Clone, Debug)]
 pub struct Modes {
     pub versus: unported::VersusConfig,
-    pub world: world::WorldMode,
 }
 
 impl Modes {
     pub(crate) fn load() -> Self {
-        Self { versus: unported::VersusConfig::load(std::path::Path::new("config_versus.txt")), world: world::WorldMode::load() }
+        Self { versus: unported::VersusConfig::load(std::path::Path::new("config_versus.txt")) }
     }
 }
 

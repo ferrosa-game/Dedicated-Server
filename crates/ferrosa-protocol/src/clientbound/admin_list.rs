@@ -1,6 +1,5 @@
 use crate::codec::WireWrite;
 
-/// One filled row of the admin list: an account id, its name and phone number.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AdminListEntry {
     pub account_id: i32,
@@ -8,8 +7,6 @@ pub struct AdminListEntry {
     pub phone_number: i32,
 }
 
-/// Packet 9 (send_adminpacket): the admin list, sent to admin connections every 128 ticks. Each row is a set bit
-/// and its entry, or a clear bit.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AdminList {
     pub rows: Vec<Option<AdminListEntry>>,

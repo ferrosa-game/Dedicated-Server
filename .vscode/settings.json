@@ -4,6 +4,8 @@
         "plugins/sandbox/Cargo.toml",
         "plugins/round/Cargo.toml",
         "plugins/eliminator/Cargo.toml",
-        "plugins/computer_games/Cargo.toml"
+        "plugins/computer_games/Cargo.toml",
+        "plugins/shops/Cargo.toml",
+        "plugins/world/Cargo.toml"
     ]
 }
