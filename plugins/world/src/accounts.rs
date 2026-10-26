@@ -226,23 +226,13 @@ impl World {
 
     pub fn restore_account(&mut self, pid: PlayerId) {
         let Some(p) = server::get_player(pid) else { return };
+        let Some(id) = p.account_id() else { return };
+        let (startcash, mincash) = (self.state.cfg.startcash, self.state.cfg.mincash);
+        let a = self.state.accounts.open(id, startcash);
 
-        let Some(a) = p.account_id().and_then(|id| self.state.accounts.get(id)) else {
-            p.set_money(self.state.cfg.startcash);
-
-            return;
-        };
-
-        if a.money == 0 {
-            p.set_money(self.state.cfg.startcash);
-            p.set_corp_rating(a.corp_rating);
-
-            return;
-        }
-
-        p.set_money(a.money.max(self.state.cfg.mincash));
+        p.set_money(a.money.max(mincash));
+        p.set_corp_rating(a.corp_rating.max(0));
         p.set_crim_rating(a.crim_rating);
-        p.set_corp_rating(a.corp_rating);
         p.set_spawn_timer(a.spawn_timer);
     }
 

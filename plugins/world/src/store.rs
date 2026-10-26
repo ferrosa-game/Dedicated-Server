@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Account {
     pub money: i32,
     pub corp_rating: i32,
@@ -8,12 +8,6 @@ pub struct Account {
     pub play_time: u32,
     pub spawn_timer: i32,
     pub name: String,
-}
-
-impl Default for Account {
-    fn default() -> Self {
-        Account { money: 10_000, corp_rating: 1_000, crim_rating: 0, play_time: 0, spawn_timer: 0, name: String::new() }
-    }
 }
 
 #[derive(Default)]
@@ -67,12 +61,12 @@ impl Accounts {
         }
     }
 
-    pub fn get(&self, id: u32) -> Option<&Account> {
-        self.0.get(&id)
-    }
-
     pub fn entry(&mut self, id: u32) -> &mut Account {
         self.0.entry(id).or_default()
+    }
+
+    pub fn open(&mut self, id: u32, money: i32) -> &mut Account {
+        self.0.entry(id).or_insert(Account { money, corp_rating: 1000, ..Account::default() })
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&u32, &Account)> {

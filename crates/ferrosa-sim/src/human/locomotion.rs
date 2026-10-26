@@ -386,17 +386,18 @@ pub fn update_movement_target(h: &mut Human, surface: &Surface, ticks: u32) {
     let vl = v.length();
 
     if vl > 0.05 {
-        let mut st = h.stamina;
+        let mut new_stam = h.stamina;
+
         let tired = if ticks.is_multiple_of(16) {
-            if st > 0 {
-                st -= 1;
-                h.stamina = st;
-                st <= 7
+            if new_stam > 0 {
+                new_stam -= 1;
+                h.stamina = new_stam;
+                new_stam <= 7
             } else {
                 true
             }
         } else {
-            st <= 7
+            new_stam <= 7
         };
 
         if tired {
