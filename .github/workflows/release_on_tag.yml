@@ -27,6 +27,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+          lfs: true
+
+      - name: Fetch assets
+        shell: bash
+        run: |
+          git -C data lfs pull
+
+          size=$(wc -c < data/round/test.csx)
+          [ "$size" -gt 1000000 ] || { echo "data/ holds LFS pointers, not assets (test.csx is $size bytes)"; exit 1; }
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -59,6 +68,12 @@ jobs:
             mkdir -p "$staging/plugins/$name"
             grep -v '^entry' "$plugin/plugin.toml" > "$staging/plugins/$name/plugin.toml"
             cp "$plugin/$entry" "$staging/plugins/$name/plugin.wasm"
+          done
+
+          test -s "$staging/data/round/test.csx" || { echo "packaged data/ is missing assets"; exit 1; }
+
+          for plugin in plugins/*/; do
+            test -s "$staging/plugins/$(basename "$plugin")/plugin.wasm" || { echo "packaged $(basename "$plugin") has no wasm"; exit 1; }
           done
 
           cd "$staging" && 7z a "../$staging.zip" .
