@@ -126,6 +126,18 @@ impl types::HostItem for HostState {
         self.body_handle(body).map(Some)
     }
 
+    fn is_static(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<bool> {
+        let id = self.table.get(&item)?.0;
+        Ok(self.sim()?.item_is_static(id))
+    }
+
+    fn set_is_static(&mut self, item: Resource<ItemRef>, still: bool) -> wasmtime::Result<()> {
+        let id = self.table.get(&item)?.0;
+        self.sim_mut()?.set_item_is_static(id, still);
+
+        Ok(())
+    }
+
     fn despawn_time(&mut self, item: Resource<ItemRef>) -> wasmtime::Result<i32> {
         let id = self.table.get(&item)?.0;
         Ok(self.sim()?.item_despawn_time(id))

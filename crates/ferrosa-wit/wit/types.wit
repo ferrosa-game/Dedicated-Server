@@ -149,6 +149,8 @@ interface types {
         set-items-bought: func(count: s32);
         /// The account they joined with; none for a bot.
         account-id: func() -> option<u32>;
+        /// A message only this player sees.
+        send-message: func(message: string);
         /// Their next human has it.
         gender: func() -> gender;
         set-gender: func(gender: gender);
@@ -281,6 +283,7 @@ interface types {
         mass: func() -> f32;
         /// Resting, so the physics leaves it alone until something wakes it.
         settled: func() -> bool;
+        set-settled: func(settled: bool);
         /// A push of `impulse` at `offset` from its centre.
         add-impulse: func(offset: vec3, impulse: vec3);
     }
@@ -363,6 +366,10 @@ interface types {
         holder: func() -> option<human>;
         body: func() -> option<body>;
         /// How long it has before it despawns; 0 for one that never does.
+        /// Scenery: the item's body is held still and never simulated (item_simulation's isStatic). It does not
+        /// become solid - nothing collides with an item either way.
+        is-static: func() -> bool;
+        set-is-static: func(still: bool);
         despawn-time: func() -> s32;
         set-despawn-time: func(ticks: s32);
         /// The text a paper or memo shows, as the game's own memos are written.

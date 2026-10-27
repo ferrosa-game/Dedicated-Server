@@ -70,6 +70,16 @@ impl types::HostBody for HostState {
         Ok(self.body_of(&body)?.is_some_and(|b| b.settled))
     }
 
+    fn set_settled(&mut self, body: Resource<BodyRef>, settled: bool) -> wasmtime::Result<()> {
+        let id = self.table.get(&body)?.0;
+
+        if let Some(b) = self.sim_mut()?.body_mut(id) {
+            b.settled = settled;
+        }
+
+        Ok(())
+    }
+
     fn add_impulse(&mut self, body: Resource<BodyRef>, offset: Vec3, impulse: Vec3) -> wasmtime::Result<()> {
         let id = self.table.get(&body)?.0;
         self.sim_mut()?.add_impulse(id, offset.into(), impulse.into());

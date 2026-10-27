@@ -227,8 +227,7 @@ impl WireRead for Event {
             }
             8 => ServerEvent::UpdatePlayerRound(EventUpdatePlayerRound { client_id: r.bits(8)?, money: r.i32()?, stocks: r.i32()?, phone_number: r.u32()? }),
             9 => {
-                let sound_type = Sound::try_from(r.bits(8)?)?;
-                ServerEvent::Sound(EventSound { sound_type, pos: r.vec3()?, volume: r.f32()?, pitch: r.f32()? })
+                ServerEvent::Sound(EventSound { sound_type: r.bits(8)? as u8, pos: r.vec3()?, volume: r.f32()?, pitch: r.f32()? })
             }
             10 => ServerEvent::TeamDoor(EventTeamDoor { team_id: r.bits(8)? as i32, door_open: r.bits(1)? != 0 }),
             11 => ServerEvent::Unused11(EventUnused { values: [r.i32()?, r.i32()?, r.i32()?, r.i32()?] }),

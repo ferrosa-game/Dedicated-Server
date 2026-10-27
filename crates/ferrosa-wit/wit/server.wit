@@ -145,6 +145,15 @@ interface server {
     /// Plays `sound` for everyone near `pos`, at `volume` (1 is its own) and `pitch` (1 is its own). How far it
     /// carries is the sound's, not the volume's.
     play-sound: func(sound: sound, pos: vec3, volume: f32, pitch: f32);
+    /// A sound by its number in the client's table, for one the `sound` enum does not name.
+    play-sound-by-id: func(sound: u8, pos: vec3, volume: f32, pitch: f32);
+
+    /// An explosion seen and heard at `pos`, hurting nobody; a grenade's is size 0.
+    create-explosion: func(pos: vec3, size: s32);
+    /// A bullet of `kind` leaving `pos` at `vel`, hurting whoever it hits as `player`'s shot.
+    create-bullet: func(kind: s32, pos: vec3, vel: vec3, player: option<player-id>);
+    /// The spark of a bullet striking something, which nothing is hurt by.
+    create-bullet-hit: func(kind: s32, pos: vec3, normal: vec3);
 
     /// The running mode's name.
     get-mode: func() -> string;

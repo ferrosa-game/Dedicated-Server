@@ -73,7 +73,7 @@ impl Sound {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EventSound {
-    pub sound_type: Sound,
+    pub sound_type: u8,
     pub pos: Vec3,
     pub volume: f32,
     pub pitch: f32,

@@ -341,6 +341,26 @@ impl server::Host for HostState {
         Ok(())
     }
 
+    fn play_sound_by_id(&mut self, sound: u8, pos: types::Vec3, volume: f32, pitch: f32) -> wasmtime::Result<()> {
+        self.sim_mut()?.play_sound_by_id(sound, pos.into(), volume, pitch);
+        Ok(())
+    }
+
+    fn create_explosion(&mut self, pos: types::Vec3, size: i32) -> wasmtime::Result<()> {
+        self.sim_mut()?.create_explosion(pos.into(), size);
+        Ok(())
+    }
+
+    fn create_bullet(&mut self, kind: i32, pos: types::Vec3, vel: types::Vec3, player: Option<u32>) -> wasmtime::Result<()> {
+        self.sim_mut()?.create_bullet(kind, pos.into(), vel.into(), player.map(PlayerId));
+        Ok(())
+    }
+
+    fn create_bullet_hit(&mut self, kind: i32, pos: types::Vec3, normal: types::Vec3) -> wasmtime::Result<()> {
+        self.sim_mut()?.create_bullet_hit(kind, pos.into(), normal.into());
+        Ok(())
+    }
+
     fn get_mode(&mut self) -> wasmtime::Result<String> {
         Ok(self.sim()?.mode_name().to_string())
     }

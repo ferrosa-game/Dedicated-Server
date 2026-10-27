@@ -136,9 +136,30 @@ impl Sim {
     }
 
     pub fn play_sound(&mut self, sound: Sound, pos: Vec3, volume: f32, pitch: f32) {
+        self.play_sound_by_id(sound as u8, pos, volume, pitch);
+    }
+
+    /// A sound by its number in the client's table, for one `Sound` does not name.
+    pub fn play_sound_by_id(&mut self, sound: u8, pos: Vec3, volume: f32, pitch: f32) {
         let e = EventSound { sound_type: sound, pos, volume, pitch };
 
         self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Sound(e) });
+    }
+
+    pub fn create_explosion(&mut self, pos: Vec3, size: i32) {
+        let e = ferrosa_protocol::clientbound::game::events::explosion::EventExplosion { size, pos };
+
+        self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Explosion(e) });
+    }
+
+    pub fn create_bullet_hit(&mut self, kind: i32, pos: Vec3, normal: Vec3) {
+        let e = ferrosa_protocol::clientbound::game::events::bullet_hit::EventBulletHit { unk: 0, hit_type: kind, pos, normal };
+
+        self.events.push(Event { tick_created: self.tick, kind: ServerEvent::BulletHit(e) });
+    }
+
+    pub fn create_bullet(&mut self, kind: i32, pos: Vec3, vel: Vec3, player: Option<PlayerId>) {
+        crate::sim::bullets::create_bullet(&mut self.bullets, kind, pos, vel, player, 1.0);
     }
 
     pub fn ground_below(&self, pos: Vec3) -> Option<f32> {

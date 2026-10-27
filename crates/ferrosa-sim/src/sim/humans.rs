@@ -153,7 +153,7 @@ impl Sim {
                     && h.health.vitality <= 0
                 {
                     let (pos, victim) = (h.pos, h.player);
-                    let e = EventSound { sound_type: Sound::BodyHit, pos, volume: 1.0, pitch: 0.5 };
+                    let e = EventSound { sound_type: Sound::BodyHit as u8, pos, volume: 1.0, pitch: 0.5 };
                     self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Sound(e) });
 
                     if let Some(driver) = driver {
@@ -164,7 +164,7 @@ impl Sim {
         }
 
         if cause == DamageCause::Fall && damage > 0 {
-            let e = EventSound { sound_type: Sound::BodyHit, pos: landed, volume: 1.0, pitch: 0.5 };
+            let e = EventSound { sound_type: Sound::BodyHit as u8, pos: landed, volume: 1.0, pitch: 0.5 };
 
             self.events.push(Event { tick_created: self.tick, kind: ServerEvent::Sound(e) });
         }
@@ -188,7 +188,7 @@ impl Sim {
                     self.settle_death(pid);
                     continue;
                 }
-                HumanOutput::Sound { sound, pos, volume, pitch } => ServerEvent::Sound(EventSound { sound_type: sound, pos, volume, pitch }),
+                HumanOutput::Sound { sound, pos, volume, pitch } => ServerEvent::Sound(EventSound { sound_type: sound as u8, pos, volume, pitch }),
                 HumanOutput::Damage { human, cause, bone, damage } => {
                     self.deal_crush(human, cause, bone, damage);
                     continue;

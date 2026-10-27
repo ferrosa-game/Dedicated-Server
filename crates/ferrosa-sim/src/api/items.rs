@@ -149,6 +149,16 @@ impl Sim {
         c.insert(at, code)
     }
 
+    pub fn item_is_static(&self, item: usize) -> bool {
+        self.items.get(item).is_some_and(|i| i.is_static)
+    }
+
+    pub fn set_item_is_static(&mut self, item: usize, still: bool) {
+        if let Some(i) = self.items.get_mut(item) {
+            i.is_static = still;
+        }
+    }
+
     pub fn bill_value(code: u32) -> i32 {
         crate::items::state::BILL_VALUES.get(code as usize).copied().unwrap_or(0)
     }

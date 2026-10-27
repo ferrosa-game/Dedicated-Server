@@ -41,6 +41,9 @@ pub struct Item {
     /// The body's velocity at the last sync, what a burst sends.
     pub vel: Vec3,
     pub physics_sim: bool,
+    /// Scenery: its body is held still and never simulated, as item_simulation's isStatic does it. It is not solid;
+    /// nothing collides with an item either way.
+    pub is_static: bool,
     pub physics_settled: bool,
     pub settled_timer: i32,
     /// Whether the item is out of sight: in a closed briefcase, on an item in a pocket, or in a pocket
@@ -119,6 +122,7 @@ impl Sim {
             pos,
             vel: vel.unwrap_or(Vec3::ZERO),
             physics_sim: false,
+            is_static: false,
             physics_settled: false,
             settled_timer: 0,
             in_pocket: false,
@@ -342,6 +346,19 @@ impl Sim {
             }
 
             item.physics_sim = false;
+
+            if item.is_static {
+                let body = item.body;
+
+                if let Some(body) = self.bodies.get_mut(body) {
+                    body.vel = Vec3::ZERO;
+                    body.ang_vel = Vec3::ZERO;
+                    body.ang_momentum = Vec3::ZERO;
+                    body.settled = true;
+                }
+
+                continue;
+            }
 
             if matches!(item.item_type, ItemKind::Computer | ItemKind::Arcade | ItemKind::TableTest | ItemKind::Wall) {
                 item.physics_settled = true;

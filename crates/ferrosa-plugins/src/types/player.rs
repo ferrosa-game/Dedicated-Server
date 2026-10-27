@@ -115,6 +115,13 @@ impl types::HostPlayer for HostState {
         Ok(self.player_of(&player)?.filter(|p| !p.is_bot).map(|p| p.account_id))
     }
 
+    fn send_message(&mut self, player: Resource<PlayerRef>, message: String) -> wasmtime::Result<()> {
+        let id = self.player_id_of(&player)?;
+        self.sim_mut()?.priv_chat(id, &message);
+
+        Ok(())
+    }
+
     fn model(&mut self, player: Resource<PlayerRef>) -> wasmtime::Result<types::Model> {
         Ok(self.player_of(&player)?.map_or(Model::default(), |p| p.customization.model).into())
     }
