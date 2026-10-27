@@ -2,10 +2,8 @@ target/
 map.ppm
 players.json
 stats.txt
-config.toml
-config_world.txt
-config_round.txt
-config.toml
+/config.toml
+/config_world.txt
 serveradmin.txt
 bans.txt
 accounts.txt
